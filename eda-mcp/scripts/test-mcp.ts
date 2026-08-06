@@ -51,12 +51,15 @@ await client.connect(transport);
 console.log('▶ 已连接 MCP server（stdio）\n');
 
 const EXPECTED_TOOLS = [
+	'eda_component_detail',
 	'eda_current_context',
 	'eda_execute',
 	'eda_list_projects',
 	'eda_open_project',
 	'eda_pair_start',
 	'eda_project_overview',
+	'eda_schematic_components',
+	'eda_schematic_nets',
 	'eda_status',
 	'eda_unpair',
 ];
@@ -157,8 +160,52 @@ if (connected) {
 	console.log('\n[5] 工程结构工具 —— 跳过（扩展未连入）');
 }
 
-// 6. 参数校验
-console.log('\n[6] 参数校验');
+// 6. 原理图读取（M1-2）
+if (connected) {
+	console.log('\n[6] 原理图读取');
+
+	const all = parse(await client.callTool({ name: 'eda_schematic_components', arguments: {} }));
+	const comps = (all.components ?? []) as Array<Record<string, unknown>>;
+	check('器件清单非空', comps.length > 0, all);
+	check('器件含位号与引脚数', comps.every((c) => !!c.designator && typeof c.pins === 'number'), comps[0]);
+	check('清单口径为真实器件（少于原理图图元数）', (all.total_in_schematic as number) < 140, all.total_in_schematic);
+	console.log(`     ${String(all.total_in_schematic)} 个器件，例：${JSON.stringify(comps[0])}`);
+
+	const res = parse(await client.callTool({ name: 'eda_schematic_components', arguments: { designator_filter: 'R' } }));
+	const rs = (res.components ?? []) as Array<{ designator?: string }>;
+	check('位号前缀筛选只命中同类', rs.length > 0 && rs.every((c) => /^R\d+$/i.test(String(c.designator))), rs.slice(0, 5));
+	console.log(`     位号前缀 R 命中 ${rs.length} 个：${rs.slice(0, 8).map((c) => c.designator).join(', ')}`);
+
+	const kw = parse(await client.callTool({ name: 'eda_schematic_components', arguments: { keyword: 'AMS1117' } }));
+	check('关键词搜索命中型号', ((kw.components ?? []) as unknown[]).length > 0, kw);
+
+	const u1 = parse(await client.callTool({ name: 'eda_component_detail', arguments: { designator: 'U1' } }));
+	const u1pins = (u1.pins ?? []) as Array<{ net?: string | null }>;
+	check('器件详情返回属性', Object.keys((u1.props ?? {}) as object).length > 5, Object.keys((u1.props ?? {}) as object).length);
+	check('器件详情返回引脚及其网络', u1pins.length > 0 && u1pins.some((p) => !!p.net), u1pins);
+	check('剔除了内部标识字段', !Object.keys((u1.props ?? {}) as object).includes('3D Model Transform'));
+	console.log(`     U1 = ${String(u1.part)}，${u1pins.length} 脚，datasheet=${String(u1.datasheet ?? '无')}`);
+
+	const bad = parse(await client.callTool({ name: 'eda_component_detail', arguments: { designator: 'ZZ999' } }));
+	check('未知位号给出可读错误', String(bad.error ?? '').includes('找不到'), bad);
+
+	const nets = parse(await client.callTool({ name: 'eda_schematic_nets', arguments: {} }));
+	const netList = (nets.nets ?? []) as Array<{ name?: string; pin_count?: number }>;
+	check('网络概览非空', netList.length > 0, nets);
+	check('默认折叠自动命名网络', !netList.some((n) => /^\$\d*N\d+$/.test(String(n.name))), netList.slice(0, 5));
+	check('按连接数降序', netList.every((n, i) => i === 0 || (netList[i - 1]!.pin_count ?? 0) >= (n.pin_count ?? 0)));
+	console.log(`     ${String(nets.total_nets)} 个网络，前三：${netList.slice(0, 3).map((n) => `${n.name}(${n.pin_count})`).join(', ')}`);
+
+	const gnd = parse(await client.callTool({ name: 'eda_schematic_nets', arguments: { net_name: String(netList[0]?.name) } }));
+	const nodes = (gnd.nodes ?? []) as Array<{ designator?: string; pin?: string }>;
+	check('指定网络返回节点明细', nodes.length > 0 && nodes.every((n) => !!n.designator && !!n.pin), nodes.slice(0, 3));
+	console.log(`     ${String(gnd.net)} 挂 ${nodes.length} 个引脚，例：${nodes.slice(0, 3).map((n) => `${n.designator}.${n.pin}`).join(' ')}`);
+} else {
+	console.log('\n[6] 原理图读取 —— 跳过（扩展未连入）');
+}
+
+// 7. 参数校验
+console.log('\n[7] 参数校验');
 const bad = parse(await client.callTool({ name: 'eda_execute', arguments: { code: '' } }));
 check('空 code 被拒绝', JSON.stringify(bad).includes('必填'), bad);
 
