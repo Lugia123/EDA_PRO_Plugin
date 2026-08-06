@@ -53,7 +53,10 @@ console.log('▶ 已连接 MCP server（stdio）\n');
 const EXPECTED_TOOLS = [
 	'eda_component_detail',
 	'eda_current_context',
+	'eda_download_datasheet',
 	'eda_execute',
+	'eda_library_device',
+	'eda_library_search',
 	'eda_list_projects',
 	'eda_open_project',
 	'eda_pair_start',
@@ -218,8 +221,61 @@ if (connected) {
 	console.log('\n[7] 原理图 DRC —— 跳过（扩展未连入）');
 }
 
-// 8. 参数校验
-console.log('\n[8] 参数校验');
+// 8. 元器件库（M1-3）
+if (connected) {
+	console.log('\n[8] 元器件库');
+
+	const search = parse(await client.callTool({ name: 'eda_library_search', arguments: { keyword: 'AMS1117', limit: 5 } }));
+	const devs = (search.devices ?? []) as Array<Record<string, unknown>>;
+	check('库搜索有结果', devs.length > 0, search);
+	check('结果含型号与 uuid', devs.every((d) => !!d.name && !!d.device_uuid), devs[0]);
+	console.log(`     搜到 ${devs.length} 个：${devs.slice(0, 3).map((d) => `${String(d.name)}(${String(d.lcsc ?? '-')})`).join(', ')}`);
+
+	const dev = parse(await client.callTool({ name: 'eda_library_device', arguments: { lcsc_id: 'C347222' } }));
+	check('按立创编号查到器件', String(dev.name ?? '').includes('AMS1117'), dev.name);
+	check('返回 datasheet 链接', typeof dev.datasheet === 'string' && String(dev.datasheet).startsWith('http'), dev.datasheet);
+	check('返回电气参数', Object.keys((dev.parameters ?? {}) as object).length > 3, Object.keys((dev.parameters ?? {}) as object));
+	check('剔除了噪音字段', !Object.keys((dev.parameters ?? {}) as object).includes('3D Model Transform'));
+	check('返回默认位号前缀', typeof dev.designator_prefix === 'string', dev.designator_prefix);
+	console.log(`     C347222 = ${String(dev.name)}，位号前缀 ${String(dev.designator_prefix)}，参数 ${Object.keys((dev.parameters ?? {}) as object).length} 项`);
+
+	const miss = parse(await client.callTool({ name: 'eda_library_device', arguments: { lcsc_id: 'C000000000' } }));
+	check('不存在的编号给出可读错误', String(miss.error ?? '').includes('未找到'), miss);
+} else {
+	console.log('\n[8] 元器件库 —— 跳过（扩展未连入）');
+}
+
+// 9. 数据手册下载（M4）
+if (connected) {
+	console.log('\n[9] 数据手册下载');
+	const tmpDir = '/tmp/eda-mcp-datasheet-test';
+
+	// RF1 是 atta.szlcsc.com 直链 PDF，应能真正下载下来
+	const ok = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { designator: 'RF1', save_dir: tmpDir } }));
+	check('按位号下载 PDF 成功', ok.ok === true && typeof ok.saved_path === 'string', ok);
+	check('落地文件有内容', (ok.size_kb as number) > 0, ok.size_kb);
+	console.log(`     RF1 → ${String(ok.saved_path)} (${String(ok.size_kb)} KB)`);
+
+	// U1 是 item.szlcsc.com 的网页链接，必须如实报告而不是假装成功
+	const html = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { designator: 'U1', save_dir: tmpDir } }));
+	check('网页链接如实报告非 PDF', String(html.error ?? '').includes('不是 PDF'), html);
+	check('给出让用户在浏览器打开的提示', String(html.hint ?? '').includes('浏览器'), html.hint);
+
+	// SSRF 防护
+	const ssrf = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { url: 'http://127.0.0.1:49630/health' } }));
+	check('拒绝内网地址', JSON.stringify(ssrf).includes('拒绝下载内网地址'), ssrf);
+
+	const badProto = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { url: 'file:///etc/passwd' } }));
+	check('拒绝非 http(s) 协议', JSON.stringify(badProto).includes('只支持 http/https'), badProto);
+
+	const noSuch = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { designator: 'ZZ999' } }));
+	check('位号不存在时给出可读错误', String(noSuch.error ?? '').includes('没有位号'), noSuch);
+} else {
+	console.log('\n[9] 数据手册下载 —— 跳过（扩展未连入）');
+}
+
+// 10. 参数校验
+console.log('\n[10] 参数校验');
 const bad = parse(await client.callTool({ name: 'eda_execute', arguments: { code: '' } }));
 check('空 code 被拒绝', JSON.stringify(bad).includes('必填'), bad);
 
