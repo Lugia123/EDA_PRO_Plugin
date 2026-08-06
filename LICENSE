@@ -1,0 +1,32 @@
+MIT License
+
+Copyright (c) 2026 EDA_PRO_Plugin contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+本项目整体采用 MIT 许可，但以下部分例外：
+
+- `eext-eda-bridge/` 基于官方扩展脚手架 easyeda/pro-api-sdk 派生，
+  该部分沿用其原始的 Apache License 2.0，许可副本见 `eext-eda-bridge/LICENSE`。
+  我们在其之上新增的源码同样以 MIT 提供，两者共存不冲突。
+
+嘉立创EDA / EasyEDA 为其各自权利人的商标。本项目与之无隶属关系，
+仅在功能描述中提及以说明兼容性。

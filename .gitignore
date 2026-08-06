@@ -1,0 +1,28 @@
+# 依赖
+node_modules/
+
+# 构建产物（bundle 由 deploy 脚本生成后复制进 plugin/，不入库源目录）
+dist/
+eext-eda-bridge/build/dist/
+*.eext
+
+# 凭证 —— 绝不入库
+# 正常情况下配对 token 在 ~/.eda-mcp/pairing.json（不在本仓库内），
+# 这几条是防止有人把配置目录拷进项目或用 EDA_MCP_HOME 指到仓库里。
+pairing.json
+.eda-mcp/
+*.pem
+*.key
+.env
+.env.*
+
+# 日志与临时文件
+*.log
+tmp/
+.cache/
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
