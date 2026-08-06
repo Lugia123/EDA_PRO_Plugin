@@ -2,7 +2,7 @@
 
 用 AI 操作**立创EDA专业版**（EasyEDA Pro）—— 一个 Claude Code plugin，把 EDA 的原理图 / PCB / 器件库能力接进 AI 的工具箱。
 
-> 状态：早期开发中。MCP 端与配对鉴权已可运行，EDA 扩展端开发中。
+> 状态：只读能力与基础创建能力已可用，真机验证通过（68 项自测全通过）。写入类（画原理图 / 布线）尚未实现。
 
 ## 它由两半组成
 
@@ -74,9 +74,19 @@ eda_pair_start → 6 位配对码 → 用户在 EDA 扩展面板输入 → 换�
 | `eda_schematic_drc` | 原理图 DRC（仅分类计数，见 skill 说明） |
 | `eda_library_search` / `eda_library_device` | 器件库检索、选型 |
 | `eda_download_datasheet` | 数据手册 PDF 下载到本地 |
+| `eda_create_project` / `eda_create_board` / `eda_create_schematic_page` / `eda_rename_board` | 新建工程、板子、原理图页（写操作） |
+| `eda_open_document` | 同工程内切换编辑器标签（PCB / 原理图页） |
+| `eda_pcb_overview` / `eda_pcb_nets` / `eda_pcb_drc` | PCB 层数、走线长度、DRC（带明细） |
 | `eda_execute` | 兜底：在 EDA 里执行任意 API 代码 |
 
-配套 4 个 skill：`eda-connect`、`eda-project`、`eda-schematic`、`eda-library`。
+配套 6 个 skill：`eda-connect`、`eda-project`、`eda-schematic`、`eda-library`、`eda-pcb`、`eda-api`
+（后者含 71 个 API 类 / 569 个方法的索引）。
+
+### 还没做的
+
+- 原理图写入（放器件、连线）
+- PCB 写入（走线、铺铜）
+- 板子改名：EDA 侧接口不稳定，工具会如实报失败，请在界面手动改
 
 ## 依赖前提
 
