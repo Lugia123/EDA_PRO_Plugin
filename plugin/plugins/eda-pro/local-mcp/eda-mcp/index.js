@@ -19643,6 +19643,191 @@ var connectionTools = [
   }
 ];
 
+// src/tools/types.ts
+function requireString(args, key) {
+  const v = args[key];
+  if (typeof v !== "string" || !v.trim()) throw new Error(`${key} \u5FC5\u586B\uFF08string\uFF09`);
+  return v;
+}
+function optionalString(args, key) {
+  const v = args[key];
+  return typeof v === "string" && v.trim() ? v : void 0;
+}
+function optionalBool(args, key, dflt = false) {
+  const v = args[key];
+  return typeof v === "boolean" ? v : dflt;
+}
+
+// src/tools/create.ts
+var CREATE_TIMEOUT_MS = 6e4;
+var createTools = [
+  {
+    name: "eda_create_project",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u65B0\u5EFA\u4E00\u4E2A\u5DE5\u7A0B\u3002\u9ED8\u8BA4\u5EFA\u5728\u5F53\u524D\u56E2\u961F\u4E0B\u3002\n\n\u521B\u5EFA\u540E**\u4E0D\u4F1A\u81EA\u52A8\u5207\u6362**\u8FC7\u53BB\uFF0C\u5F53\u524D\u7F16\u8F91\u7684\u5DE5\u7A0B\u4FDD\u6301\u4E0D\u53D8\uFF1B\u8981\u5207\u8FC7\u53BB\u7528 eda_open_project\u3002\n\n\u6CE8\u610F\u8FD9\u4F1A\u5728\u7528\u6237\u7684\u7ACB\u521B\u8D26\u53F7\u91CC\u771F\u5B9E\u521B\u5EFA\u5DE5\u7A0B\uFF0C\u52A8\u624B\u524D\u5148\u8DDF\u7528\u6237\u786E\u8BA4\u540D\u79F0\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "\u5DE5\u7A0B\u540D\uFF08\u663E\u793A\u540D\uFF09" },
+        description: { type: "string", description: "\u5DE5\u7A0B\u63CF\u8FF0\uFF0C\u53EF\u9009" },
+        team_uuid: { type: "string", description: "\u76EE\u6807\u56E2\u961F uuid\uFF0C\u53EF\u9009\uFF0C\u9ED8\u8BA4\u5F53\u524D\u56E2\u961F" }
+      },
+      required: ["name"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const name = requireString(args, "name");
+      const desc = optionalString(args, "description");
+      const team = optionalString(args, "team_uuid");
+      return ctx2.exec(
+        `
+				const team = ${JSON.stringify(team ?? null)} || (await eda.dmt_Team.getCurrentTeamInfo())?.uuid;
+				if (!team) return { ok: false, error: '\u62FF\u4E0D\u5230\u56E2\u961F uuid' };
+				const uuid = await eda.dmt_Project.createProject(
+					${JSON.stringify(name)}, undefined, team, undefined, ${JSON.stringify(desc ?? "")}
+				);
+				if (!uuid) return { ok: false, error: '\u521B\u5EFA\u5931\u8D25\uFF0C\u53EF\u80FD\u662F\u540C\u540D\u5DE5\u7A0B\u5DF2\u5B58\u5728\u6216\u65E0\u6743\u9650' };
+				return { ok: true, project_uuid: uuid, name: ${JSON.stringify(name)},
+					note: '\u5DE5\u7A0B\u5DF2\u521B\u5EFA\u4F46\u672A\u5207\u6362\u8FC7\u53BB\uFF0C\u9700\u8981\u7F16\u8F91\u7684\u8BDD\u7528 eda_open_project \u6253\u5F00' };
+			`,
+        CREATE_TIMEOUT_MS
+      );
+    }
+  },
+  {
+    name: "eda_create_board",
+    description: '\u3010\u5199\u64CD\u4F5C\u3011\u5728**\u5F53\u524D\u5DE5\u7A0B**\u91CC\u65B0\u5EFA\u4E00\u5757\u677F\u5B50\uFF0C\u81EA\u52A8\u914D\u597D\u4E00\u5F20\u539F\u7406\u56FE\uFF08\u542B 1 \u9875\uFF09\u548C\u4E00\u4E2A PCB\u3002\n\n\u8FD9\u662F"\u65B0\u5EFA\u677F\u5B50"\u7684\u6B63\u786E\u505A\u6CD5\uFF1A\u5E95\u5C42\u8981\u5148\u5EFA\u539F\u7406\u56FE\u548C PCB \u518D\u7ED1\u5B9A\uFF0C\u672C\u5DE5\u5177\u5DF2\u5C01\u88C5\u3002\n\n\u7ED9\u4E86 name \u4F1A\u5C1D\u8BD5\u521B\u5EFA\u540E\u6539\u540D\uFF1B\u4E0D\u7ED9\u5219\u7528 EDA \u7684\u9ED8\u8BA4\u547D\u540D\uFF08Board1\u3001Board2\u2026\uFF09\u3002\n**\u6539\u540D\u4E0D\u4FDD\u8BC1\u6210\u529F**\uFF1AEDA \u7684 modifyBoardName \u5B9E\u6D4B\u4E0D\u7A33\u5B9A\uFF08\u6709\u65F6\u8FD4\u56DE true \u5374\u6CA1\u751F\u6548\uFF0C\u6709\u65F6\u76F4\u63A5\u8FD4\u56DE false\uFF0C\u539F\u56E0\u672A\u67E5\u660E\uFF09\u3002\u6539\u540D\u5931\u8D25\u65F6\u677F\u5B50\u4ECD\u4F1A\u4EE5\u9ED8\u8BA4\u540D\u6B63\u5E38\u5EFA\u597D\uFF0C\u8FD4\u56DE\u91CC renamed=false \u4E14 rename_failed \u4F1A\u8BF4\u660E\u2014\u2014\u8FD9\u65F6\u8BF7\u8BA9\u7528\u6237\u5728 EDA \u754C\u9762\u91CC\u624B\u52A8\u6539\u540D\u3002\n\n\u6CE8\u610F\u4F5C\u7528\u5728\u5F53\u524D\u6253\u5F00\u7684\u5DE5\u7A0B\u4E0A \u2014\u2014 \u5148\u7528 eda_project_overview \u786E\u8BA4\u662F\u4E0D\u662F\u76EE\u6807\u5DE5\u7A0B\u3002',
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string", description: "\u677F\u5B50\u540D\uFF0C\u53EF\u9009\uFF1B\u4E0D\u7ED9\u7528 EDA \u9ED8\u8BA4\u547D\u540D" } }
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const name = optionalString(args, "name");
+      return ctx2.exec(
+        `
+				const proj = await eda.dmt_Project.getCurrentProjectInfo();
+				if (!proj) return { ok: false, error: '\u5F53\u524D\u6CA1\u6709\u6253\u5F00\u7684\u5DE5\u7A0B' };
+				// \u5B9E\u6D4B\uFF1A\u8FD9\u4E24\u4E2A\u65E0\u53C2\u8C03\u7528\u53EA\u4EA7\u751F\u6E38\u79BB\u6587\u6863\uFF0C\u5FC5\u987B\u518D createBoard \u7ED1\u5B9A
+				const schUuid = await eda.dmt_Schematic.createSchematic();
+				const pcbUuid = await eda.dmt_Pcb.createPcb();
+				if (!schUuid || !pcbUuid) return { ok: false, error: '\u521B\u5EFA\u539F\u7406\u56FE\u6216 PCB \u5931\u8D25' };
+				const createdName = await eda.dmt_Board.createBoard(schUuid, pcbUuid);
+				if (!createdName) return { ok: false, error: '\u7ED1\u5B9A\u677F\u5B50\u5931\u8D25' };
+
+				// \u5148\u6309\u521B\u5EFA\u65F6\u7684\u540D\u5B57\u53D6\u56DE\u5B8C\u6574\u4FE1\u606F \u2014\u2014 \u6539\u540D\u653E\u5728\u540E\u9762\uFF0C\u56E0\u4E3A\u6539\u540D\u53EF\u80FD\u5931\u8D25\uFF0C
+				// \u5931\u8D25\u65F6\u6211\u4EEC\u4ECD\u8981\u6709 sch/pcb \u7684 uuid \u53EF\u8FD4\u56DE\u3002
+				// \u521A\u5EFA\u597D\u7684\u677F\u5076\u5C14\u67E5\u5230\u65F6 pcb \u5B57\u6BB5\u8FD8\u6CA1\u6302\u4E0A\uFF0C\u91CD\u67E5\u4E00\u6B21\u5373\u53EF\u3002
+				let info = (await eda.dmt_Board.getAllBoardsInfo()).find(b => b.name === createdName);
+				if (!info?.pcb) {
+					await new Promise(r => setTimeout(r, 400));
+					info = (await eda.dmt_Board.getAllBoardsInfo()).find(b => b.name === createdName) || info;
+				}
+
+				const want = ${JSON.stringify(name ?? null)};
+				let finalName = createdName;
+				let renameNote;
+				if (want && want !== createdName) {
+					// modifyBoardName \u7684\u8FD4\u56DE\u503C\u4E0D\u53EF\u4FE1\uFF08\u5B9E\u6D4B\u6709\u65F6\u8FD4\u56DE true \u5374\u6CA1\u751F\u6548\uFF09\uFF0C
+					// \u4E00\u5F8B\u4EE5\u300C\u91CD\u65B0\u67E5\u8BE2\u5217\u8868\u91CC\u6709\u6CA1\u6709\u65B0\u540D\u5B57\u300D\u4E3A\u51C6\u3002
+					await eda.dmt_Board.modifyBoardName(createdName, want);
+					const names = (await eda.dmt_Board.getAllBoardsInfo()).map(b => b.name);
+					if (names.includes(want)) {
+						finalName = want;
+					} else {
+						renameNote = '\u6539\u540D\u672A\u751F\u6548\uFF0C\u677F\u5B50\u4EE5\u9ED8\u8BA4\u540D ' + createdName + ' \u521B\u5EFA\uFF08\u677F\u5B50\u672C\u8EAB\u662F\u597D\u7684\uFF09\u3002'
+							+ 'EDA \u7684 modifyBoardName \u5B9E\u6D4B\u4E0D\u7A33\u5B9A\uFF0C\u539F\u56E0\u672A\u67E5\u660E\uFF1B\u8BF7\u8BA9\u7528\u6237\u5728 EDA \u754C\u9762\u91CC\u624B\u52A8\u6539\u540D\u3002';
+					}
+				}
+
+				return {
+					ok: true,
+					board: {
+						name: finalName,
+						uuid: info?.uuid,
+						schematic: info?.schematic ? { uuid: info.schematic.uuid, name: info.schematic.name,
+							pages: (info.schematic.page || []).map(p => ({ uuid: p.uuid, name: p.name })) } : null,
+						pcb: info?.pcb ? { uuid: info.pcb.uuid, name: info.pcb.name } : null,
+					},
+					renamed: finalName === want,
+					rename_failed: renameNote,
+					project: proj.friendlyName || proj.name,
+				};
+			`,
+        CREATE_TIMEOUT_MS
+      );
+    }
+  },
+  {
+    name: "eda_create_schematic_page",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u7ED9\u5DF2\u6709\u7684\u539F\u7406\u56FE\u52A0\u4E00\u9875\u3002schematic_uuid \u4ECE eda_project_overview \u7684 boards[].schematic.uuid \u62FF\u3002\n\n\u9002\u7528\u4E8E\u539F\u7406\u56FE\u5185\u5BB9\u591A\u3001\u9700\u8981\u5206\u9875\u7EC4\u7EC7\u7684\u60C5\u51B5\uFF08\u5982\u7535\u6E90\u4E00\u9875\u3001MCU \u4E00\u9875\uFF09\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        schematic_uuid: { type: "string", description: "\u76EE\u6807\u539F\u7406\u56FE uuid" },
+        name: { type: "string", description: "\u9875\u540D\uFF0C\u53EF\u9009\uFF1B\u4E0D\u7ED9\u7528\u9ED8\u8BA4\u547D\u540D" }
+      },
+      required: ["schematic_uuid"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const uuid2 = requireString(args, "schematic_uuid");
+      const name = optionalString(args, "name");
+      return ctx2.exec(
+        `
+				const pageUuid = await eda.dmt_Schematic.createSchematicPage(${JSON.stringify(uuid2)});
+				if (!pageUuid) return { ok: false, error: '\u5EFA\u9875\u5931\u8D25\uFF0C\u8BF7\u786E\u8BA4 schematic_uuid \u6B63\u786E' };
+				const want = ${JSON.stringify(name ?? null)};
+				let renamed = false;
+				if (want) renamed = await eda.dmt_Schematic.modifySchematicPageName(pageUuid, want);
+				const info = await eda.dmt_Schematic.getSchematicPageInfo(pageUuid);
+				return { ok: true, page: { uuid: pageUuid, name: info?.name }, renamed };
+			`,
+        CREATE_TIMEOUT_MS
+      );
+    }
+  },
+  {
+    name: "eda_rename_board",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u7ED9\u677F\u5B50\u6539\u540D\u3002\u677F\u540D\u5728\u5DE5\u7A0B\u5185\u552F\u4E00\uFF0C\u91CD\u540D\u4F1A\u5931\u8D25\u3002\n\n**\u8FD9\u4E2A\u529F\u80FD\u4E0D\u53EF\u9760**\uFF1AEDA \u7684 modifyBoardName \u5B9E\u6D4B\u65F6\u7075\u65F6\u4E0D\u7075\uFF08\u6709\u65F6\u8FD4\u56DE true \u5374\u6CA1\u751F\u6548\uFF0C\u6709\u65F6\u8FD4\u56DE false\uFF0C\u4E0E\u540D\u5B57\u957F\u77ED\u3001\u662F\u5426\u542B\u4E2D\u6587\u3001\u662F\u5426\u521A\u5237\u65B0\u9875\u9762\u90FD\u65E0\u7A33\u5B9A\u5173\u7CFB\uFF0C\u539F\u56E0\u672A\u67E5\u660E\uFF09\u3002\u672C\u5DE5\u5177\u4EE5\u300C\u6539\u5B8C\u91CD\u65B0\u67E5\u5217\u8868\u300D\u4E3A\u51C6\uFF0C\u4E0D\u4FE1 API \u8FD4\u56DE\u503C\uFF1B\u5931\u8D25\u65F6\u5982\u5B9E\u62A5\u9519\u3002\n\n\u8FDE\u7EED\u5931\u8D25\u5C31\u522B\u91CD\u8BD5\u4E86\uFF0C\u8BA9\u7528\u6237\u5728 EDA \u754C\u9762\u91CC\u624B\u52A8\u6539\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        current_name: { type: "string", description: "\u5F53\u524D\u677F\u540D" },
+        new_name: { type: "string", description: "\u65B0\u677F\u540D" }
+      },
+      required: ["current_name", "new_name"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const from = requireString(args, "current_name");
+      const to = requireString(args, "new_name");
+      return ctx2.exec(
+        `
+				const boards = await eda.dmt_Board.getAllBoardsInfo();
+				if (!boards.some(b => b.name === ${JSON.stringify(from)})) {
+					return { ok: false, error: '\u5F53\u524D\u5DE5\u7A0B\u91CC\u6CA1\u6709\u677F\u5B50 ' + ${JSON.stringify(from)}, boards: boards.map(b => b.name) };
+				}
+				// \u8FD4\u56DE\u503C\u4E0D\u53EF\u4FE1\uFF0C\u4EE5\u91CD\u65B0\u67E5\u8BE2\u4E3A\u51C6\u3002
+				// \u5224\u636E\u5FC5\u987B\u662F\u300C\u65B0\u540D\u51FA\u73B0 \u4E14 \u65E7\u540D\u6D88\u5931\u300D\u2014\u2014 \u53EA\u770B\u65B0\u540D\u5B58\u5728\u7684\u8BDD\uFF0C
+				// \u76EE\u6807\u540D\u6070\u597D\u662F\u53E6\u4E00\u5757\u5DF2\u5B58\u5728\u7684\u677F\u65F6\u4F1A\u8BEF\u5224\u6210\u529F\u3002
+				await eda.dmt_Board.modifyBoardName(${JSON.stringify(from)}, ${JSON.stringify(to)});
+				const names = (await eda.dmt_Board.getAllBoardsInfo()).map(b => b.name);
+				if (names.includes(${JSON.stringify(to)}) && !names.includes(${JSON.stringify(from)})) {
+					return { ok: true, from: ${JSON.stringify(from)}, to: ${JSON.stringify(to)} };
+				}
+				return {
+					ok: false,
+					error: '\u6539\u540D\u672A\u751F\u6548\u3002EDA \u7684 modifyBoardName \u5B9E\u6D4B\u4E0D\u7A33\u5B9A\uFF0C\u539F\u56E0\u672A\u67E5\u660E\uFF1B'
+						+ '\u82E5\u65B0\u540D\u5B57\u4E0E\u73B0\u6709\u677F\u5B50\u91CD\u540D\u4E5F\u4F1A\u5931\u8D25\u3002\u5EFA\u8BAE\u8BA9\u7528\u6237\u5728 EDA \u754C\u9762\u91CC\u624B\u52A8\u6539\u540D\u3002',
+					boards: names,
+				};
+			`,
+        CREATE_TIMEOUT_MS
+      );
+    }
+  }
+];
+
 // src/tools/datasheet.ts
 import { createWriteStream } from "node:fs";
 import { mkdir as mkdir2, stat, unlink } from "node:fs/promises";
@@ -19729,21 +19914,6 @@ function isAutoNetName(name) {
 }
 function naturalCompare(a, b) {
   return a.localeCompare(b, void 0, { numeric: true, sensitivity: "base" });
-}
-
-// src/tools/types.ts
-function requireString(args, key) {
-  const v = args[key];
-  if (typeof v !== "string" || !v.trim()) throw new Error(`${key} \u5FC5\u586B\uFF08string\uFF09`);
-  return v;
-}
-function optionalString(args, key) {
-  const v = args[key];
-  return typeof v === "string" && v.trim() ? v : void 0;
-}
-function optionalBool(args, key, dflt = false) {
-  const v = args[key];
-  return typeof v === "boolean" ? v : dflt;
 }
 
 // src/tools/datasheet.ts
@@ -20072,7 +20242,7 @@ var projectTools = [
   },
   {
     name: "eda_open_project",
-    description: "\u5728 EDA \u91CC\u6253\u5F00\u6307\u5B9A uuid \u7684\u5DE5\u7A0B\uFF08\u5207\u6362\u5F53\u524D\u5DE5\u7A0B\uFF09\u3002uuid \u4ECE eda_list_projects \u83B7\u53D6\u3002\n\n\u4F1A\u6539\u53D8\u7528\u6237\u754C\u9762\u663E\u793A\u7684\u5185\u5BB9\uFF0C\u4F46\u4E0D\u4FEE\u6539\u5DE5\u7A0B\u6570\u636E\u3002\u5207\u6362\u540E\u5EFA\u8BAE\u518D\u8C03 eda_project_overview \u786E\u8BA4\u3002\n\n\u672C\u5DE5\u5177\u4F1A\u5148\u6821\u9A8C uuid \u662F\u5426\u5C5E\u4E8E\u53EF\u8BBF\u95EE\u7684\u5DE5\u7A0B\uFF0C\u65E0\u6548 uuid \u76F4\u63A5\u8FD4\u56DE\u9519\u8BEF\u800C\u4E0D\u4F1A\u771F\u7684\u53BB\u6253\u5F00\u2014\u2014 \u56E0\u4E3A\u5B9E\u6D4B\u53D1\u73B0 EDA \u7684 openProject \u9047\u5230\u4E0D\u5B58\u5728\u7684 uuid \u4E0D\u662F\u5E72\u51C0\u5931\u8D25\uFF0C\u800C\u662F\u628A\u7F16\u8F91\u5668\u5207\u5230\u7A7A\u767D\u7684\u300C\u5F00\u59CB\u9875\u300D\uFF0C\u5BFC\u81F4\u5F53\u524D\u5DE5\u7A0B\u4E0A\u4E0B\u6587\u4E22\u5931\u3001\u540E\u7EED\u6240\u6709 getCurrent* \u8C03\u7528\u8FD4\u56DE\u7A7A\u3002",
+    description: "\u5728 EDA \u91CC\u6253\u5F00\u6307\u5B9A uuid \u7684\u5DE5\u7A0B\uFF08\u5207\u6362\u5F53\u524D\u5DE5\u7A0B\uFF09\u3002uuid \u4ECE eda_list_projects \u83B7\u53D6\u3002\n\n\u4F1A\u6539\u53D8\u7528\u6237\u754C\u9762\u663E\u793A\u7684\u5185\u5BB9\uFF0C\u4F46\u4E0D\u4FEE\u6539\u5DE5\u7A0B\u6570\u636E\u3002\u5207\u6362\u540E\u5EFA\u8BAE\u518D\u8C03 eda_project_overview \u786E\u8BA4\u3002\n\n\u672C\u5DE5\u5177\u4F1A\u5148\u6821\u9A8C uuid \u662F\u5426\u5C5E\u4E8E\u53EF\u8BBF\u95EE\u7684\u5DE5\u7A0B\uFF0C\u65E0\u6548 uuid \u76F4\u63A5\u8FD4\u56DE\u9519\u8BEF\u800C\u4E0D\u4F1A\u771F\u7684\u53BB\u6253\u5F00\u2014\u2014 \u56E0\u4E3A\u5B9E\u6D4B\u53D1\u73B0 EDA \u7684 openProject \u9047\u5230\u4E0D\u5B58\u5728\u7684 uuid \u4E0D\u662F\u5E72\u51C0\u5931\u8D25\uFF0C\u800C\u662F\u628A\u7F16\u8F91\u5668\u5207\u5230\u7A7A\u767D\u7684\u300C\u5F00\u59CB\u9875\u300D\uFF0C\u5BFC\u81F4\u5F53\u524D\u5DE5\u7A0B\u4E0A\u4E0B\u6587\u4E22\u5931\u3001\u540E\u7EED\u6240\u6709 getCurrent* \u8C03\u7528\u8FD4\u56DE\u7A7A\u3002\n\n**\u5207\u5230\u4E0D\u540C\u5DE5\u7A0B\u4F1A\u91CD\u8F7D EDA \u9875\u9762\u5E76\u77ED\u6682\u65AD\u5F00\u8FDE\u63A5**\uFF08\u7EA6 10-30 \u79D2\uFF09\uFF0C\u672C\u5DE5\u5177\u4F1A\u7ACB\u5373\u8FD4\u56DE\u800C\u4E0D\u7B49\u5F85\u5B8C\u6210\u3002\u5207\u6362\u540E\u4E0D\u8981\u9A6C\u4E0A\u67E5\u6570\u636E \u2014\u2014 \u5148\u8C03 eda_status \u786E\u8BA4\u91CD\u65B0\u8FDE\u4E0A\uFF0C\u518D\u8C03 eda_project_overview\uFF1B\u8FC7\u65E9\u67E5\u8BE2\u4F1A\u56E0\u4E3A\u5DE5\u7A0B\u5C1A\u672A\u52A0\u8F7D\u5B8C\u800C\u8FD4\u56DE\u7A7A\u5217\u8868\u3002",
     inputSchema: {
       type: "object",
       properties: { project_uuid: { type: "string", description: "\u76EE\u6807\u5DE5\u7A0B uuid" } },
@@ -20094,10 +20264,23 @@ var projectTools = [
 				if (!known) {
 					return { ok: false, error: '\u5DE5\u7A0B ' + target + ' \u4E0D\u5728\u53EF\u8BBF\u95EE\u5217\u8868\u4E2D\uFF0C\u5DF2\u963B\u6B62\u6253\u5F00\uFF08\u907F\u514D\u6E05\u7A7A\u5F53\u524D\u5DE5\u7A0B\u4E0A\u4E0B\u6587\uFF09\u3002\u8BF7\u7528 eda_list_projects \u786E\u8BA4 uuid\u3002' };
 				}
-				const ok = await eda.dmt_Project.openProject(target);
-				if (!ok) return { ok: false, error: '\u6253\u5F00\u5931\u8D25\uFF0Cuuid \u6709\u6548\u4F46 EDA \u62D2\u7EDD\u6253\u5F00\uFF0C\u53EF\u80FD\u662F\u6743\u9650\u6216\u7F51\u7EDC\u95EE\u9898' };
-				const proj = await eda.dmt_Project.getCurrentProjectInfo();
-				return { ok: true, current_project: proj ? { uuid: proj.uuid, name: proj.friendlyName || proj.name } : null };
+
+				const cur = await eda.dmt_Project.getCurrentProjectInfo();
+				if (cur && cur.uuid === target) {
+					// \u76EE\u6807\u5C31\u662F\u5F53\u524D\u5DE5\u7A0B\uFF1AEDA \u4E0D\u4F1A\u91CD\u8F7D\uFF0C\u53EF\u4EE5\u540C\u6B65\u786E\u8BA4
+					return { ok: true, already_open: true, current_project: { uuid: cur.uuid, name: cur.friendlyName || cur.name } };
+				}
+
+				// \u5207\u5230\u522B\u7684\u5DE5\u7A0B\u4F1A\u91CD\u8F7D\u9875\u9762\u3001\u65AD\u5F00\u672C\u8FDE\u63A5\uFF0C\u82E5\u5728\u8FD9\u91CC await \u5C31\u62FF\u4E0D\u5230\u56DE\u5305\u4E86\u3002
+				// \u6240\u4EE5\u5EF6\u8FDF\u89E6\u53D1\uFF0C\u5148\u628A\u7ED3\u679C\u53D1\u56DE\u53BB\u3002
+				setTimeout(() => { eda.dmt_Project.openProject(target); }, 50);
+				return {
+					ok: true,
+					switching: true,
+					from: cur ? (cur.friendlyName || cur.name) : null,
+					to_uuid: target,
+					note: '\u5DF2\u53D1\u8D77\u5207\u6362\u3002EDA \u4F1A\u91CD\u8F7D\u9875\u9762\u5E76\u77ED\u6682\u65AD\u5F00\u8FDE\u63A5\uFF08\u7EA6 10-30 \u79D2\uFF09\u3002\u8BF7\u5148\u7528 eda_status \u786E\u8BA4\u91CD\u8FDE\uFF0C\u518D\u67E5\u5DE5\u7A0B\u6570\u636E \u2014\u2014 \u8FC7\u65E9\u67E5\u8BE2\u4F1A\u8FD4\u56DE\u7A7A\u5217\u8868\u3002',
+				};
 			`,
         6e4
       );
@@ -20248,7 +20431,8 @@ var allTools = [
   ...projectTools,
   ...schematicTools,
   ...libraryTools,
-  ...datasheetTools
+  ...datasheetTools,
+  ...createTools
 ];
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 

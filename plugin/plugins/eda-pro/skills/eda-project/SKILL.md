@@ -70,6 +70,31 @@ teamUuid 再传。`eda_list_projects` 已处理。
 `eda_list_projects` 默认只列当前团队；要跨团队找工程才开 `include_all_teams`
 （每个工程要单独查一次详情，约 250ms，工程多时明显变慢）。
 
+## 新建板子
+
+「新建一块板」在 EDA 里不是一步操作：底层要先建原理图、再建 PCB、最后 `createBoard(schUuid, pcbUuid)`
+把两者绑定。单独调 `createSchematic()` 只会产生**游离文档**，不会出现在板子列表里；
+`createBoard()` 不带参数则什么也不会创建。`eda_create_board` 已经封装好这三步。
+
+```
+eda_create_board(name:"PowerBoard")   → 一块板 + 一张原理图（含 1 页）+ 一个 PCB
+eda_create_schematic_page(schematic_uuid:"...", name:"P2")  → 给原理图加页
+```
+
+新建的板**立即**出现在 `eda_project_overview` 里，不用刷新。
+
+### 改名不可靠
+
+`eda_rename_board` 和 `eda_create_board(name:...)` 的改名部分**时灵时不灵**：
+EDA 的 `modifyBoardName` 有时返回 true 却没生效、有时直接返回 false，与名字长短、是否含中文、
+是否刚刷新页面都没有稳定关系，原因未查明。
+
+工具的处理是**改完重新查列表来判定**（判据是"新名出现且旧名消失"），失败时如实报 `renamed:false`。
+所以：
+
+- 建板时给 name 是"尽力而为"，失败也不影响板子本身建好，只是叫默认名
+- 连续失败不要重试，直接让用户在 EDA 界面里手动改名
+
 ## 切换工程
 
 ```
@@ -79,3 +104,15 @@ eda_project_overview           → 确认切过去了
 ```
 
 切换只改变界面显示，不修改任何工程数据。但会打断用户当前的编辑视图，**操作前最好说一声**。
+
+**切到不同工程会重载 EDA 页面、断开连接约 10-30 秒。** `eda_open_project` 会立即返回
+（带 `switching:true`），不等切换完成 —— 因为等的话连接已经断了，回包也拿不到。所以：
+
+```
+eda_open_project(uuid)      → 立即返回 switching:true
+eda_status                  → 轮询到 connected_clients 非空，说明重连好了
+eda_project_overview        → 这时才查得到新工程的数据
+```
+
+**切换后马上查数据会拿到空列表**（工程还没加载完），不要据此判断"工程是空的"。
+目标就是当前工程时不会重载，工具会直接返回 `already_open:true`。

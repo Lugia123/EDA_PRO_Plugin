@@ -1,5 +1,6 @@
 /** 工具注册表 —— 新增一组工具只需在这里 import 并加进数组 */
 import { connectionTools } from './connection.js';
+import { createTools } from './create.js';
 import { datasheetTools } from './datasheet.js';
 import { libraryTools } from './library.js';
 import { projectTools } from './project.js';
@@ -12,6 +13,7 @@ export const allTools: ToolDef[] = [
 	...schematicTools,
 	...libraryTools,
 	...datasheetTools,
+	...createTools,
 ];
 
 export const toolMap = new Map<string, ToolDef>(allTools.map((t) => [t.name, t]));

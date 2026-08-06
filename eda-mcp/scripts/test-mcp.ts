@@ -52,6 +52,9 @@ console.log('▶ 已连接 MCP server（stdio）\n');
 
 const EXPECTED_TOOLS = [
 	'eda_component_detail',
+	'eda_create_board',
+	'eda_create_project',
+	'eda_create_schematic_page',
 	'eda_current_context',
 	'eda_download_datasheet',
 	'eda_execute',
@@ -61,6 +64,7 @@ const EXPECTED_TOOLS = [
 	'eda_open_project',
 	'eda_pair_start',
 	'eda_project_overview',
+	'eda_rename_board',
 	'eda_schematic_components',
 	'eda_schematic_drc',
 	'eda_schematic_nets',
@@ -88,6 +92,10 @@ console.log(`     bridge_port=${String(st.bridge_port)} clients=${JSON.stringify
 // 3. 等扩展连到本进程的 bridge
 console.log('\n[3] 等待 EDA 扩展连入本进程的 bridge（最多 120s）');
 let connected = false;
+/** 当前编辑器类型；原理图相关测试需要 'schematic'，否则跳过而不是判失败 */
+let editorKind = 'unknown';
+/** 当前原理图里是否有器件；空图时内容类断言无意义 */
+let hasComponents = false;
 for (let i = 0; i < 60; i++) {
 	const s = parse(await client.callTool({ name: 'eda_status', arguments: {} }));
 	const clients = (s.connected_clients ?? []) as unknown[];
@@ -137,8 +145,12 @@ if (connected) {
 
 	const cc = parse(await client.callTool({ name: 'eda_current_context', arguments: {} }));
 	check('current_context 能判断编辑器类型', ['schematic', 'pcb', 'other'].includes(String(cc.editor)), cc);
-	check('current_context 返回当前板', !!(cc.board as { name?: string } | null)?.name, cc.board);
-	console.log(`     当前：editor=${String(cc.editor)} board=${JSON.stringify(cc.board)}`);
+	editorKind = String(cc.editor);
+	// board 只有在编辑器里打开了文档时才有值；editor=other（如停在开始页）时为 null 是正确行为
+	if (editorKind !== 'other') {
+		check('current_context 返回当前板', !!(cc.board as { name?: string } | null)?.name, cc.board);
+	}
+	console.log(`     当前：editor=${editorKind} board=${JSON.stringify(cc.board)}`);
 
 	const lp = parse(await client.callTool({ name: 'eda_list_projects', arguments: {} }));
 	const projects = (lp.projects ?? []) as Array<{ uuid?: string; name?: string; team?: string }>;
@@ -158,19 +170,26 @@ if (connected) {
 	const badOpen = parse(await client.callTool({ name: 'eda_open_project', arguments: { project_uuid: 'not-a-real-uuid' } }));
 	check('open_project 拦截无效 uuid', badOpen.ok === false && String(badOpen.error ?? '').includes('不在可访问列表'), badOpen);
 
+	// 拦截不应改变编辑器状态：不管之前是 schematic / pcb / other，之后都该一样
 	const stillThere = parse(await client.callTool({ name: 'eda_current_context', arguments: {} }));
-	check('拦截后当前工程上下文未被破坏', !!(stillThere.board as { name?: string } | null)?.name, stillThere);
+	check('拦截后编辑器状态未被破坏', String(stillThere.editor) === editorKind, { before: editorKind, after: stillThere.editor });
 } else {
 	console.log('\n[5] 工程结构工具 —— 跳过（扩展未连入）');
 }
 
-// 6. 原理图读取（M1-2）
-if (connected) {
+// 6. 原理图读取（M1-2）—— 需要编辑器里正开着一张原理图
+if (connected && editorKind === 'schematic') {
 	console.log('\n[6] 原理图读取');
 
 	const all = parse(await client.callTool({ name: 'eda_schematic_components', arguments: {} }));
 	const comps = (all.components ?? []) as Array<Record<string, unknown>>;
-	check('器件清单非空', comps.length > 0, all);
+	check('能取到网表并返回器件总数', typeof all.total_in_schematic === 'number', all);
+	// 空原理图（比如刚建的板）是合法状态，内容相关的断言就没意义了
+	hasComponents = comps.length > 0;
+	if (!hasComponents) {
+		console.log('     当前原理图没有器件（空图），跳过内容相关断言');
+	}
+	if (hasComponents) {
 	check('器件含位号与引脚数', comps.every((c) => !!c.designator && typeof c.pins === 'number'), comps[0]);
 	check('清单口径为真实器件（少于原理图图元数）', (all.total_in_schematic as number) < 140, all.total_in_schematic);
 	console.log(`     ${String(all.total_in_schematic)} 个器件，例：${JSON.stringify(comps[0])}`);
@@ -204,12 +223,13 @@ if (connected) {
 	const nodes = (gnd.nodes ?? []) as Array<{ designator?: string; pin?: string }>;
 	check('指定网络返回节点明细', nodes.length > 0 && nodes.every((n) => !!n.designator && !!n.pin), nodes.slice(0, 3));
 	console.log(`     ${String(gnd.net)} 挂 ${nodes.length} 个引脚，例：${nodes.slice(0, 3).map((n) => `${n.designator}.${n.pin}`).join(' ')}`);
+	}
 } else {
-	console.log('\n[6] 原理图读取 —— 跳过（扩展未连入）');
+	console.log(`\n[6] 原理图读取 —— 跳过（${connected ? `编辑器当前是 ${editorKind}，不是原理图` : '扩展未连入'}）`);
 }
 
-// 7. 原理图 DRC（M1-4）
-if (connected) {
+// 7. 原理图 DRC（M1-4）—— 同样需要开着有内容的原理图
+if (connected && editorKind === 'schematic' && hasComponents) {
 	console.log('\n[7] 原理图 DRC');
 	const drc = parse(await client.callTool({ name: 'eda_schematic_drc', arguments: {} }));
 	check('DRC 返回通过与否', typeof drc.passed === 'boolean', drc);
@@ -218,7 +238,7 @@ if (connected) {
 	check('说明了 API 只给汇总的限制', String(drc.note ?? '').includes('分类计数'), drc.note);
 	console.log(`     passed=${String(drc.passed)} errors=${String(drc.errors)} warnings=${String(drc.warnings)}`);
 } else {
-	console.log('\n[7] 原理图 DRC —— 跳过（扩展未连入）');
+	console.log(`\n[7] 原理图 DRC —— 跳过（${connected ? `编辑器当前是 ${editorKind}` : '扩展未连入'}）`);
 }
 
 // 8. 元器件库（M1-3）
@@ -245,8 +265,8 @@ if (connected) {
 	console.log('\n[8] 元器件库 —— 跳过（扩展未连入）');
 }
 
-// 9. 数据手册下载（M4）
-if (connected) {
+// 9. 数据手册下载（M4）—— 按位号取链接要读网表，需要开着有内容的原理图
+if (connected && editorKind === 'schematic' && hasComponents) {
 	console.log('\n[9] 数据手册下载');
 	const tmpDir = '/tmp/eda-mcp-datasheet-test';
 
@@ -271,11 +291,72 @@ if (connected) {
 	const noSuch = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { designator: 'ZZ999' } }));
 	check('位号不存在时给出可读错误', String(noSuch.error ?? '').includes('没有位号'), noSuch);
 } else {
-	console.log('\n[9] 数据手册下载 —— 跳过（扩展未连入）');
+	console.log(`\n[9] 数据手册下载 —— 跳过（${!connected ? '扩展未连入' : editorKind !== 'schematic' ? `编辑器当前是 ${editorKind}` : '当前原理图是空图'}）`);
 }
 
-// 10. 参数校验
-console.log('\n[10] 参数校验');
+// 10. 创建类工具（M3-1）—— 只在测试工程里跑
+if (connected) {
+	const ov = parse(await client.callTool({ name: 'eda_project_overview', arguments: {} }));
+	const projName = String((ov.project as { name?: string } | undefined)?.name ?? '');
+	const isSandbox = /测试|test|sandbox/i.test(projName);
+
+	if (!isSandbox) {
+		console.log(`\n[10] 创建类工具 —— 跳过：当前工程「${projName}」不是测试工程`);
+		console.log('     写入类测试只在名字含「测试/test」的工程里跑，避免污染真实设计');
+	} else {
+		console.log(`\n[10] 创建类工具（沙箱工程「${projName}」）`);
+		const boardsBefore = ((ov.boards ?? []) as unknown[]).length;
+
+		// 板名必须是 ASCII —— EDA 不接受中文/空格（实测）
+		const stamp = `AIBoard_${String(Date.now()).slice(-6)}`;
+		const nb = parse(await client.callTool({ name: 'eda_create_board', arguments: { name: stamp } }));
+		const board = (nb.board ?? {}) as { name?: string; schematic?: { uuid?: string; pages?: unknown[] }; pcb?: { uuid?: string } };
+		check('建板成功', nb.ok === true, nb);
+		// 改名不可靠（EDA 侧问题），这里只要求「要么改成功，要么如实报告失败」
+		check(
+			'改名结果如实反映',
+			(nb.renamed === true && board.name === stamp) || (nb.renamed === false && !!nb.rename_failed),
+			{ renamed: nb.renamed, name: board.name, note: nb.rename_failed },
+		);
+		check('自动配了原理图且含 1 页', !!board.schematic?.uuid && (board.schematic.pages ?? []).length === 1, board.schematic);
+		check('自动配了 PCB', !!board.pcb?.uuid, board.pcb);
+		console.log(`     新板「${String(board.name)}」sch=${String(board.schematic?.uuid)} pcb=${String(board.pcb?.uuid)}`);
+
+		const ov2 = parse(await client.callTool({ name: 'eda_project_overview', arguments: {} }));
+		check('新板立即出现在 overview 里', ((ov2.boards ?? []) as unknown[]).length === boardsBefore + 1, {
+			before: boardsBefore,
+			after: ((ov2.boards ?? []) as unknown[]).length,
+		});
+
+		if (board.schematic?.uuid) {
+			const pg = parse(
+				await client.callTool({ name: 'eda_create_schematic_page', arguments: { schematic_uuid: board.schematic.uuid, name: 'PwrPage' } }),
+			);
+			check('加页成功', pg.ok === true, pg);
+			check('新页有 uuid', !!(pg.page as { uuid?: string } | undefined)?.uuid, pg.page);
+		}
+
+		// 用板子的实际名字（可能是默认名）来测改名；同样只要求结果如实
+		const actualName = String(board.name);
+		const rn = parse(await client.callTool({ name: 'eda_rename_board', arguments: { current_name: actualName, new_name: `${actualName}b` } }));
+		check('改名要么成功要么如实报错', rn.ok === true || String(rn.error ?? '').includes('未生效'), rn);
+
+		const rnBad = parse(await client.callTool({ name: 'eda_rename_board', arguments: { current_name: '不存在的板', new_name: 'x' } }));
+		check('对不存在的板给出可读错误', rnBad.ok === false && String(rnBad.error ?? '').includes('没有板子'), rnBad);
+
+		// 关键性质：改名工具绝不能在没生效时报成功
+		const rnCheck = parse(await client.callTool({ name: 'eda_rename_board', arguments: { current_name: actualName, new_name: 'Board2' } }));
+		check('与现有板重名时不谎报成功', rnCheck.ok === false, rnCheck);
+
+		const pgBad = parse(await client.callTool({ name: 'eda_create_schematic_page', arguments: { schematic_uuid: 'bogus-uuid' } }));
+		check('无效原理图 uuid 加页失败且可读', pgBad.ok === false, pgBad);
+	}
+} else {
+	console.log('\n[10] 创建类工具 —— 跳过（扩展未连入）');
+}
+
+// 11. 参数校验
+console.log('\n[11] 参数校验');
 const bad = parse(await client.callTool({ name: 'eda_execute', arguments: { code: '' } }));
 check('空 code 被拒绝', JSON.stringify(bad).includes('必填'), bad);
 

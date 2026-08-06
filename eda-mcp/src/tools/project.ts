@@ -121,7 +121,10 @@ export const projectTools: ToolDef[] = [
 			'\n\n会改变用户界面显示的内容，但不修改工程数据。切换后建议再调 eda_project_overview 确认。' +
 			'\n\n本工具会先校验 uuid 是否属于可访问的工程，无效 uuid 直接返回错误而不会真的去打开' +
 			'—— 因为实测发现 EDA 的 openProject 遇到不存在的 uuid 不是干净失败，而是把编辑器切到空白的「开始页」，' +
-			'导致当前工程上下文丢失、后续所有 getCurrent* 调用返回空。',
+			'导致当前工程上下文丢失、后续所有 getCurrent* 调用返回空。' +
+			'\n\n**切到不同工程会重载 EDA 页面并短暂断开连接**（约 10-30 秒），本工具会立即返回而不等待完成。' +
+			'切换后不要马上查数据 —— 先调 eda_status 确认重新连上，再调 eda_project_overview；' +
+			'过早查询会因为工程尚未加载完而返回空列表。',
 		inputSchema: {
 			type: 'object',
 			properties: { project_uuid: { type: 'string', description: '目标工程 uuid' } },
@@ -143,10 +146,23 @@ export const projectTools: ToolDef[] = [
 				if (!known) {
 					return { ok: false, error: '工程 ' + target + ' 不在可访问列表中，已阻止打开（避免清空当前工程上下文）。请用 eda_list_projects 确认 uuid。' };
 				}
-				const ok = await eda.dmt_Project.openProject(target);
-				if (!ok) return { ok: false, error: '打开失败，uuid 有效但 EDA 拒绝打开，可能是权限或网络问题' };
-				const proj = await eda.dmt_Project.getCurrentProjectInfo();
-				return { ok: true, current_project: proj ? { uuid: proj.uuid, name: proj.friendlyName || proj.name } : null };
+
+				const cur = await eda.dmt_Project.getCurrentProjectInfo();
+				if (cur && cur.uuid === target) {
+					// 目标就是当前工程：EDA 不会重载，可以同步确认
+					return { ok: true, already_open: true, current_project: { uuid: cur.uuid, name: cur.friendlyName || cur.name } };
+				}
+
+				// 切到别的工程会重载页面、断开本连接，若在这里 await 就拿不到回包了。
+				// 所以延迟触发，先把结果发回去。
+				setTimeout(() => { eda.dmt_Project.openProject(target); }, 50);
+				return {
+					ok: true,
+					switching: true,
+					from: cur ? (cur.friendlyName || cur.name) : null,
+					to_uuid: target,
+					note: '已发起切换。EDA 会重载页面并短暂断开连接（约 10-30 秒）。请先用 eda_status 确认重连，再查工程数据 —— 过早查询会返回空列表。',
+				};
 			`,
 				60_000,
 			);
