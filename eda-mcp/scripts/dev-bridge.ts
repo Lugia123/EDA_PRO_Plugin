@@ -13,6 +13,9 @@
  * 所以这里配对过一次，之后走 MCP 也是连着的。
  */
 import { createInterface } from 'node:readline';
+import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
 import { Bridge } from '../src/bridge.js';
 import { loadPairing, startPairing } from '../src/pairing.js';
 
@@ -66,6 +69,48 @@ setInterval(() => {
 			.catch((e: Error) => out(`❌ 探针失败：${e.message}`));
 	}
 }, 1000);
+
+/**
+ * 开发用执行端点 —— 让终端能直接把代码丢进 EDA，省去每次绕浏览器注入。
+ *
+ * 安全：只绑 127.0.0.1，且必须带 X-Dev-Token（每次启动随机生成，写到 /tmp）。
+ * 恶意网页猜不到 token 也读不到本地文件。**这个端点只在本脚本里有，
+ * 正式的 MCP 进程不会开**，那边所有执行都必须经过 MCP 工具调用。
+ */
+const DEV_TOKEN = randomBytes(16).toString('hex');
+const DEV_TOKEN_FILE = '/tmp/eda-dev-token';
+const DEV_PORT = 49650;
+writeFileSync(DEV_TOKEN_FILE, DEV_TOKEN, { mode: 0o600 });
+
+createServer((req, res) => {
+	const reply = (status: number, body: unknown) => {
+		res.writeHead(status, { 'Content-Type': 'application/json' });
+		res.end(JSON.stringify(body));
+	};
+	if (req.headers['x-dev-token'] !== DEV_TOKEN) return reply(403, { error: 'bad dev token' });
+	if (req.method !== 'POST' || req.url !== '/exec') return reply(404, { error: 'POST /exec only' });
+
+	let body = '';
+	req.on('data', (c) => (body += c));
+	req.on('end', () => {
+		let code: string;
+		let timeout: number | undefined;
+		try {
+			const parsed = JSON.parse(body) as { code?: string; timeout_ms?: number };
+			if (typeof parsed.code !== 'string') throw new Error('code 必须是 string');
+			code = parsed.code;
+			timeout = parsed.timeout_ms;
+		} catch (e) {
+			return reply(400, { error: (e as Error).message });
+		}
+		bridge
+			.execute(code, timeout)
+			.then((result) => reply(200, { ok: true, result }))
+			.catch((e: Error) => reply(200, { ok: false, error: e.message }));
+	});
+}).listen(DEV_PORT, '127.0.0.1', () => {
+	out(`▶ 开发执行端点：POST http://127.0.0.1:${DEV_PORT}/exec（token 见 ${DEV_TOKEN_FILE}）`);
+});
 
 // stdin REPL
 const rl = createInterface({ input: process.stdin });

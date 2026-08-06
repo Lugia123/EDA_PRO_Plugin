@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# 开发期在 EDA 里执行一段 JS —— 需要 dev-bridge.ts 正在运行。
+#
+#   ./scripts/eda 'return await eda.dmt_Project.getCurrentProjectInfo();'
+#   ./scripts/eda -f probe.js          # 从文件读代码
+#   echo 'return 1+1' | ./scripts/eda  # 从 stdin 读
+#
+# 输出为 JSON。仅开发用，正式路径是 MCP 工具。
+set -euo pipefail
+
+PORT=49650
+TOKEN_FILE=/tmp/eda-dev-token
+
+[[ -f $TOKEN_FILE ]] || { echo "找不到 $TOKEN_FILE —— dev-bridge 没在跑？先执行 npm run dev:bridge" >&2; exit 1; }
+
+if [[ ${1:-} == "-f" ]]; then
+    CODE=$(cat "$2")
+elif [[ $# -gt 0 ]]; then
+    CODE="$1"
+else
+    CODE=$(cat)
+fi
+
+python3 -c '
+import json,sys
+print(json.dumps({"code": sys.stdin.read(), "timeout_ms": 60000}))
+' <<<"$CODE" | curl -sS -X POST "http://127.0.0.1:$PORT/exec" \
+    -H "X-Dev-Token: $(cat $TOKEN_FILE)" \
+    -H 'Content-Type: application/json' \
+    --data-binary @- | python3 -m json.tool
