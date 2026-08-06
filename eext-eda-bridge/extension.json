@@ -1,20 +1,23 @@
 {
-	"name": "your-extension-name",
-	"uuid": "",
-	"displayName": "填写你的扩展名称 / Your Extension Name",
-	"description": "",
-	"version": "1.0.0",
-	"publisher": "",
+	"name": "eda-bridge",
+	"uuid": "3882b34b1908ac2c6a5de045f0efaa99",
+	"displayName": "EDA Bridge",
+	"description": "把立创EDA专业版接入 AI 编程工具（Claude Code 等）。仅与本机 127.0.0.1 上的 eda-mcp 通信，需配对后才能执行操作。",
+	"version": "0.1.0",
+	"publisher": "EDA_PRO_Plugin",
 	"engines": {
 		"eda": "^3.2.0"
 	},
-	"license": "Apache-2.0",
+	"license": "MIT",
 	"repository": {
 		"type": "extension-store",
 		"url": ""
 	},
 	"categories": "Other",
 	"keywords": [
+		"AI",
+		"MCP",
+		"Bridge",
 		"Tool"
 	],
 	"images": {
@@ -22,46 +25,87 @@
 	},
 	"homepage": "",
 	"bugs": "",
-	"activationEvents": {},
+	"activationEvents": {
+		"onStartupFinished": true
+	},
 	"entry": "./dist/index",
 	"dependentExtensions": {},
 	"headerMenus": {
 		"home": [
 			{
-				"id": "menuId1",
-				"title": "Ext Menu",
+				"id": "EDABridge",
+				"title": "EDA Bridge",
 				"menuItems": [
-					{
-						"id": "About",
-						"title": "About...",
-						"registerFn": "about"
-					}
+					{ "id": "Pair", "title": "配对(P)...", "registerFn": "pair" },
+					{ "id": "Reconnect", "title": "重新连接(R)", "registerFn": "reconnect" },
+					{ "id": "Disconnect", "title": "断开连接(D)", "registerFn": "disconnect" },
+					{ "id": "Status", "title": "连接状态(S)...", "registerFn": "status" },
+					{ "id": "Unpair", "title": "解除配对(U)...", "registerFn": "unpairLocal" },
+					{ "id": "About", "title": "关于(A)...", "registerFn": "about" }
+				]
+			}
+		],
+		"blank": [
+			{
+				"id": "EDABridge",
+				"title": "EDA Bridge",
+				"menuItems": [
+					{ "id": "Pair", "title": "配对(P)...", "registerFn": "pair" },
+					{ "id": "Reconnect", "title": "重新连接(R)", "registerFn": "reconnect" },
+					{ "id": "Disconnect", "title": "断开连接(D)", "registerFn": "disconnect" },
+					{ "id": "Status", "title": "连接状态(S)...", "registerFn": "status" },
+					{ "id": "Unpair", "title": "解除配对(U)...", "registerFn": "unpairLocal" },
+					{ "id": "About", "title": "关于(A)...", "registerFn": "about" }
 				]
 			}
 		],
 		"sch": [
 			{
-				"id": "menuId2",
-				"title": "Ext Menu",
+				"id": "EDABridge",
+				"title": "EDA Bridge",
 				"menuItems": [
-					{
-						"id": "About",
-						"title": "About...",
-						"registerFn": "about"
-					}
+					{ "id": "Pair", "title": "配对(P)...", "registerFn": "pair" },
+					{ "id": "Reconnect", "title": "重新连接(R)", "registerFn": "reconnect" },
+					{ "id": "Disconnect", "title": "断开连接(D)", "registerFn": "disconnect" },
+					{ "id": "Status", "title": "连接状态(S)...", "registerFn": "status" },
+					{ "id": "Unpair", "title": "解除配对(U)...", "registerFn": "unpairLocal" },
+					{ "id": "About", "title": "关于(A)...", "registerFn": "about" }
 				]
 			}
 		],
 		"pcb": [
 			{
-				"id": "menuId3",
-				"title": "Ext Menu",
+				"id": "EDABridge",
+				"title": "EDA Bridge",
 				"menuItems": [
-					{
-						"id": "About",
-						"title": "About...",
-						"registerFn": "about"
-					}
+					{ "id": "Pair", "title": "配对(P)...", "registerFn": "pair" },
+					{ "id": "Reconnect", "title": "重新连接(R)", "registerFn": "reconnect" },
+					{ "id": "Disconnect", "title": "断开连接(D)", "registerFn": "disconnect" },
+					{ "id": "Status", "title": "连接状态(S)...", "registerFn": "status" },
+					{ "id": "Unpair", "title": "解除配对(U)...", "registerFn": "unpairLocal" },
+					{ "id": "About", "title": "关于(A)...", "registerFn": "about" }
+				]
+			}
+		],
+		"symbol": [
+			{
+				"id": "EDABridge",
+				"title": "EDA Bridge",
+				"menuItems": [
+					{ "id": "Pair", "title": "配对(P)...", "registerFn": "pair" },
+					{ "id": "Status", "title": "连接状态(S)...", "registerFn": "status" },
+					{ "id": "About", "title": "关于(A)...", "registerFn": "about" }
+				]
+			}
+		],
+		"footprint": [
+			{
+				"id": "EDABridge",
+				"title": "EDA Bridge",
+				"menuItems": [
+					{ "id": "Pair", "title": "配对(P)...", "registerFn": "pair" },
+					{ "id": "Status", "title": "连接状态(S)...", "registerFn": "status" },
+					{ "id": "About", "title": "关于(A)...", "registerFn": "about" }
 				]
 			}
 		]

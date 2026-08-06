@@ -1,29 +1,441 @@
 /**
- * 入口文件 / Entry File
+ * EDA Bridge —— 立创EDA专业版扩展端
  *
- * 本文件为默认扩展入口文件，如果你想要配置其它文件作为入口文件，
- * 请修改 `extension.json` 中的 `entry` 字段。
- * This is the default extension entry file. If you want to use another file as the entry,
- * please modify the `entry` field in `extension.json`.
+ * 连上本机 eda-mcp 的 bridge，把 AI 发来的代码在 EDA 环境里执行后回传结果。
  *
- * 请在此处使用 `export`  导出所有你希望在 `headerMenus` 中引用的方法，
- * 方法通过方法名与 `headerMenus` 关联。
- * Please use `export` here to export all methods you want to reference in `headerMenus`.
- * Methods are associated with `headerMenus` by their method names.
+ * ── 两个由平台 API 决定的设计约束 ──────────────────────────────────
+ * 1. `eda.sys_WebSocket` 只有客户端能力（register / send / close），扩展无法监听端口，
+ *    所以连接方向固定是「扩展 → bridge」，端口扫描和重连都得扩展这边自己做。
+ * 2. `register()` 只给 receiveMessageCallFn 和 connectedCallFn，**没有 onClose / onError**。
+ *    连不上表现为「回调一直不来」，断线表现为「消息不再来」——两者都只能靠超时判定，
+ *    这就是下面 HELLO_TIMEOUT_MS 和心跳存在的原因。
  *
- * 如需了解更多开发细节，请阅读：
- * https://prodocs.lceda.cn/cn/api/guide/
- * For more development details, please visit:
- * https://prodocs.easyeda.com/en/api/guide/
+ * 另注：register/send/close 都要求用户在扩展管理器里勾选「允许外部交互」，
+ * 否则一律 throw Error。所有调用点都包了 try/catch 并给出可操作提示。
  */
+import type { ClientInfo, ServerMessage } from '../../shared/protocol.js';
+import { PORT_END, PORT_START, PROTOCOL_VERSION, SERVICE_ID } from '../../shared/protocol.js';
 import extensionConfig from '../extension.json' with { type: 'json' };
 
-// eslint-disable-next-line unused-imports/no-unused-vars
-export function activate(status?: 'onStartupFinished', arg?: string): void {}
+/** WebSocket 连接 ID；固定一个，换端口前必须先 close（同 ID 不同参数会让平台内部状态混乱） */
+const WS_ID = 'eda-mcp-bridge';
+
+/** 单个端口等 hello 的时间 */
+const HELLO_TIMEOUT_MS = 1500;
+/** 一轮全端口都没连上后，隔多久重试 */
+const RETRY_DELAY_MS = 5000;
+/** 心跳发送间隔 */
+const PING_INTERVAL_MS = 15_000;
+/** 超过这个时间没收到任何消息，判定连接已死 */
+const DEAD_AFTER_MS = 45_000;
+
+const STORAGE_KEY_TOKEN = 'bridgeToken';
+
+type Phase = 'idle' | 'scanning' | 'awaiting-pair' | 'authing' | 'ready';
+
+let phase: Phase = 'idle';
+let currentPort = 0;
+let lastMessageAt = 0;
+let autoConnect = true;
+let permissionDenied = false;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 当前端口的 hello 等待器；收到 hello 或超时后置空 */
+let helloWaiter: ((ok: boolean) => void) | null = null;
+
+// ─── 入口 ─────────────────────────────────────────────────────────────
+
+export function activate(status?: 'onStartupFinished', _arg?: string): void {
+	if (status === 'onStartupFinished' && autoConnect) {
+		void connect();
+	}
+}
+
+// ─── 菜单命令（与 extension.json 的 registerFn 对应）─────────────────
+
+export function pair(): void {
+	if (phase !== 'awaiting-pair' && phase !== 'ready' && phase !== 'authing') {
+		// 还没连上 bridge 就配对没有意义，先连
+		toast('尚未连接到 bridge，正在重新扫描…', 'warn');
+		void connect().then(() => promptPairCode());
+		return;
+	}
+	promptPairCode();
+}
+
+export function reconnect(): void {
+	autoConnect = true;
+	permissionDenied = false;
+	toast('正在重新连接 bridge…', 'info');
+	void connect();
+}
+
+export function disconnect(): void {
+	autoConnect = false;
+	stopHeartbeat();
+	clearRetry();
+	safeClose(1000, 'user disconnect');
+	phase = 'idle';
+	toast('已断开与 bridge 的连接（自动重连已关闭）', 'info');
+}
+
+export function status(): void {
+	const lines = [
+		`状态：${phaseText(phase)}`,
+		`端口：${currentPort || '未连接'}`,
+		`自动重连：${autoConnect ? '开' : '关'}`,
+		`已保存配对凭证：${getToken() ? '是' : '否'}`,
+		`外部交互权限：${permissionDenied ? '未开启（需在扩展管理器勾选）' : '正常'}`,
+		`宿主：${hostKind()} / EDA ${editorVersion()}`,
+	];
+	eda.sys_Dialog.showInformationMessage(lines.join('\n'), 'EDA Bridge 状态');
+}
+
+export function unpairLocal(): void {
+	eda.sys_Dialog.showConfirmationMessage(
+		'将清除本机保存的配对凭证，下次连接需要重新输入配对码。确定吗？',
+		'解除配对',
+		'确定',
+		'取消',
+		(confirmed) => {
+			if (!confirmed) return;
+			void setToken('').then(() => {
+				toast('已清除本地配对凭证', 'info');
+				safeClose(1000, 'unpaired');
+				phase = 'idle';
+				if (autoConnect) void connect();
+			});
+		},
+	);
+}
 
 export function about(): void {
 	eda.sys_Dialog.showInformationMessage(
-		eda.sys_I18n.text('EasyEDA extension SDK v', undefined, undefined, extensionConfig.version),
-		eda.sys_I18n.text('About'),
+		`EDA Bridge v${extensionConfig.version}\n\n把立创EDA专业版接入 AI（Claude Code 等）。\n` +
+			`本扩展只与本机 127.0.0.1:${PORT_START}-${PORT_END} 上的 eda-mcp 通信，不会连接任何外部服务器。\n\n` +
+			`协议版本 v${PROTOCOL_VERSION}`,
+		'关于 EDA Bridge',
 	);
+}
+
+// ─── 连接 ─────────────────────────────────────────────────────────────
+
+/** 逐个端口尝试，直到某个端口回了正确的 hello */
+async function connect(): Promise<void> {
+	clearRetry();
+	if (phase === 'scanning') return;
+	phase = 'scanning';
+	safeClose(1000, 'rescan');
+
+	for (let port = PORT_START; port <= PORT_END; port++) {
+		if (permissionDenied) break;
+		const ok = await tryPort(port);
+		if (ok) {
+			currentPort = port;
+			startHeartbeat();
+			return;
+		}
+	}
+
+	phase = 'idle';
+	currentPort = 0;
+	if (permissionDenied) {
+		eda.sys_Dialog.showInformationMessage(
+			'EDA Bridge 无法建立连接：本扩展的「允许外部交互」权限未开启。\n\n' +
+				'请到「高级 → 扩展管理器 → 已安装」中找到 EDA Bridge，勾选「允许外部交互」，然后点菜单「EDA Bridge → 重新连接」。',
+			'需要开启权限',
+		);
+		return;
+	}
+	if (autoConnect) {
+		retryTimer = setTimeout(() => void connect(), RETRY_DELAY_MS);
+	}
+}
+
+function tryPort(port: number): Promise<boolean> {
+	return new Promise<boolean>((resolve) => {
+		let settled = false;
+		const finish = (ok: boolean) => {
+			if (settled) return;
+			settled = true;
+			helloWaiter = null;
+			if (!ok) safeClose(1000, 'wrong port');
+			resolve(ok);
+		};
+
+		helloWaiter = finish;
+		try {
+			eda.sys_WebSocket.register(WS_ID, `ws://127.0.0.1:${port}`, onRawMessage, () => {
+				// 连接已建立，但还要等 hello 验明身份才算数
+			});
+		} catch (e) {
+			// 绝大多数情况是「允许外部交互」没勾
+			permissionDenied = true;
+			finish(false);
+			return;
+		}
+
+		setTimeout(() => finish(false), HELLO_TIMEOUT_MS);
+	});
+}
+
+function onRawMessage(event: MessageEvent<unknown>): void {
+	lastMessageAt = Date.now();
+	let msg: ServerMessage;
+	try {
+		msg = JSON.parse(String(event.data)) as ServerMessage;
+	} catch {
+		return;
+	}
+
+	switch (msg.type) {
+		case 'hello': {
+			// 只有 service 对上才认这个端口；注意这只是「找对了服务」，
+			// 真正的信任建立在配对 token 上。
+			const ok = msg.service === SERVICE_ID && msg.protocol === PROTOCOL_VERSION;
+			helloWaiter?.(ok);
+			if (!ok) return;
+			const token = getToken();
+			if (token) {
+				phase = 'authing';
+				send({ type: 'auth', protocol: PROTOCOL_VERSION, token, client: clientInfo() });
+			} else {
+				phase = 'awaiting-pair';
+				toast('已找到 AI 桥接服务，请点菜单「EDA Bridge → 配对」输入配对码', 'question', 8000);
+			}
+			break;
+		}
+
+		case 'auth_ok':
+			phase = 'ready';
+			toast('已连接到 AI（EDA Bridge 就绪）', 'success');
+			break;
+
+		case 'auth_error':
+			if (msg.error === 'invalid_token') {
+				// token 失效（对面 unpair 过 / 换了机器）→ 清掉，回到待配对
+				void setToken('');
+				phase = 'awaiting-pair';
+				toast('保存的配对凭证已失效，请重新配对', 'warn', 8000);
+			} else {
+				toast('协议版本不一致，请更新扩展或 eda-mcp', 'error', 8000);
+				phase = 'idle';
+			}
+			break;
+
+		case 'paired':
+			void setToken(msg.token).then(() => {
+				phase = 'ready';
+				toast('配对成功，EDA Bridge 就绪', 'success');
+			});
+			break;
+
+		case 'pair_error':
+			toast(pairErrorText(msg.error, msg.attemptsLeft), 'error', 8000);
+			break;
+
+		case 'execute':
+			void runCode(msg.id, msg.code);
+			break;
+
+		case 'ping':
+			send({ type: 'pong', id: msg.id });
+			break;
+
+		case 'pong':
+			break;
+	}
+}
+
+// ─── 代码执行 ─────────────────────────────────────────────────────────
+
+async function runCode(id: string, code: string): Promise<void> {
+	try {
+		// AsyncFunction，使代码体内可直接 await；`eda` 作为参数注入而非依赖全局，
+		// 这样即便宿主把 eda 挂在别处也能工作。
+		const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (
+			arg: string,
+			body: string,
+		) => (eda: unknown) => Promise<unknown>;
+		const fn = new AsyncFunction('eda', code);
+		const result = await fn(eda);
+		send({ type: 'result', id, result: result === undefined ? null : sanitize(result) });
+	} catch (e) {
+		send({
+			type: 'error',
+			id,
+			error: e instanceof Error ? e.message : String(e),
+			stack: e instanceof Error ? e.stack : undefined,
+		});
+	}
+}
+
+/**
+ * 结果要能过 JSON.stringify 才能回传。
+ * EDA API 常返回类实例 / 含循环引用的对象，直接 stringify 会抛异常，
+ * 那样错误会以「执行失败」的形式回去，误导 AI 以为是代码写错了。
+ */
+function sanitize(v: unknown): unknown {
+	const seen = new WeakSet<object>();
+	const walk = (x: unknown, depth: number): unknown => {
+		if (x === null || typeof x !== 'object') {
+			return typeof x === 'bigint' ? String(x) : typeof x === 'function' ? '[Function]' : x;
+		}
+		if (depth > 12) return '[MaxDepth]';
+		if (seen.has(x)) return '[Circular]';
+		seen.add(x);
+		if (Array.isArray(x)) return x.map((i) => walk(i, depth + 1));
+		const out: Record<string, unknown> = {};
+		for (const k of Object.keys(x as Record<string, unknown>)) {
+			try {
+				out[k] = walk((x as Record<string, unknown>)[k], depth + 1);
+			} catch {
+				out[k] = '[Unreadable]';
+			}
+		}
+		return out;
+	};
+	return walk(v, 0);
+}
+
+// ─── 配对 ─────────────────────────────────────────────────────────────
+
+function promptPairCode(): void {
+	eda.sys_Dialog.showInputDialog(
+		'请输入 AI 侧显示的 6 位配对码：',
+		'配对码 5 分钟内有效，最多尝试 5 次。',
+		'EDA Bridge 配对',
+		'text',
+		'',
+		{ maxlength: 6, minlength: 6, placeholder: '例如 048213' },
+		(value: unknown) => {
+			const code = String(value ?? '').trim();
+			if (!/^\d{6}$/.test(code)) {
+				if (code) toast('配对码应为 6 位数字', 'warn');
+				return;
+			}
+			send({ type: 'pair', protocol: PROTOCOL_VERSION, code, client: clientInfo() });
+		},
+	);
+}
+
+function pairErrorText(error: string, attemptsLeft?: number): string {
+	switch (error) {
+		case 'no_pairing_session':
+			return 'AI 侧还没有开启配对，请先让 AI 调用 eda_pair_start 取码';
+		case 'invalid_code':
+			return `配对码不正确${attemptsLeft !== undefined ? `，还可尝试 ${attemptsLeft} 次` : ''}`;
+		case 'expired':
+			return '配对码已过期，请让 AI 重新取一个';
+		case 'too_many_attempts':
+			return '尝试次数过多，本次配对已作废，请让 AI 重新取码';
+		default:
+			return `配对失败：${error}`;
+	}
+}
+
+// ─── 心跳 ─────────────────────────────────────────────────────────────
+
+function startHeartbeat(): void {
+	stopHeartbeat();
+	lastMessageAt = Date.now();
+	heartbeatTimer = setInterval(() => {
+		if (Date.now() - lastMessageAt > DEAD_AFTER_MS) {
+			// 平台不给 onClose，只能这样发现连接已死
+			stopHeartbeat();
+			phase = 'idle';
+			currentPort = 0;
+			if (autoConnect) void connect();
+			return;
+		}
+		send({ type: 'ping', id: `hb-${Date.now()}` });
+	}, PING_INTERVAL_MS);
+}
+
+function stopHeartbeat(): void {
+	if (heartbeatTimer) clearInterval(heartbeatTimer);
+	heartbeatTimer = null;
+}
+
+function clearRetry(): void {
+	if (retryTimer) clearTimeout(retryTimer);
+	retryTimer = null;
+}
+
+// ─── 工具 ─────────────────────────────────────────────────────────────
+
+function send(msg: Record<string, unknown>): void {
+	try {
+		eda.sys_WebSocket.send(WS_ID, JSON.stringify(msg));
+	} catch {
+		permissionDenied = true;
+	}
+}
+
+function safeClose(code?: number, reason?: string): void {
+	try {
+		eda.sys_WebSocket.close(WS_ID, code, reason);
+	} catch {
+		/* 未连接或无权限，忽略 */
+	}
+}
+
+function getToken(): string {
+	try {
+		const cfg = eda.sys_Storage.getExtensionAllUserConfigs();
+		const t = cfg?.[STORAGE_KEY_TOKEN];
+		return typeof t === 'string' ? t : '';
+	} catch {
+		return '';
+	}
+}
+
+async function setToken(token: string): Promise<void> {
+	try {
+		const cfg = eda.sys_Storage.getExtensionAllUserConfigs() ?? {};
+		await eda.sys_Storage.setExtensionAllUserConfigs({ ...cfg, [STORAGE_KEY_TOKEN]: token });
+	} catch {
+		toast('无法保存配对凭证，下次启动需重新配对', 'warn');
+	}
+}
+
+function clientInfo(): ClientInfo {
+	return { host: hostKind(), extVersion: extensionConfig.version, edaVersion: editorVersion() };
+}
+
+function hostKind(): ClientInfo['host'] {
+	try {
+		if (eda.sys_Environment.isClient()) return 'desktop';
+		if (eda.sys_Environment.isWeb()) return 'web';
+	} catch {
+		/* ignore */
+	}
+	return 'unknown';
+}
+
+function editorVersion(): string {
+	try {
+		return eda.sys_Environment.getEditorCurrentVersion();
+	} catch {
+		return '?';
+	}
+}
+
+function phaseText(p: Phase): string {
+	return {
+		idle: '未连接',
+		scanning: '正在扫描端口',
+		'awaiting-pair': '已连接，等待配对',
+		authing: '正在认证',
+		ready: '就绪',
+	}[p];
+}
+
+function toast(message: string, type: 'info' | 'warn' | 'error' | 'success' | 'question' = 'info', timer = 4000): void {
+	try {
+		eda.sys_Message.showToastMessage(message, type as never, timer);
+	} catch {
+		/* ignore */
+	}
 }

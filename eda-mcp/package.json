@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "tsx src/index.ts",
+    "dev:bridge": "tsx scripts/dev-bridge.ts",
     "typecheck": "tsc --noEmit",
     "deploy": "npm run build && bash scripts/deploy-to-plugin.sh"
   },

@@ -22,7 +22,11 @@
 		"allowSyntheticDefaultImports": true,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
-		"isolatedModules": true
+		"isolatedModules": true,
+		// @jlceda/pro-api-types 的 d.ts 依赖 react 类型（脚手架未附带），
+		// 不跳过会刷屏几百条与本项目无关的报错，掩盖我们自己的类型问题。
+		// 只影响 .d.ts 检查，不降低本项目源码的类型严格度。
+		"skipLibCheck": true
 	},
-	"include": ["./src/**/*", "./node_modules/@jlceda/pro-api-types/**/*"]
+	"include": ["./src/**/*", "../shared/**/*", "./node_modules/@jlceda/pro-api-types/**/*"]
 }
