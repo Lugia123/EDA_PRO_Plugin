@@ -61,8 +61,12 @@ const EXPECTED_TOOLS = [
 	'eda_library_device',
 	'eda_library_search',
 	'eda_list_projects',
+	'eda_open_document',
 	'eda_open_project',
 	'eda_pair_start',
+	'eda_pcb_drc',
+	'eda_pcb_nets',
+	'eda_pcb_overview',
 	'eda_project_overview',
 	'eda_rename_board',
 	'eda_schematic_components',
@@ -355,8 +359,64 @@ if (connected) {
 	console.log('\n[10] 创建类工具 —— 跳过（扩展未连入）');
 }
 
-// 11. 参数校验
-console.log('\n[11] 参数校验');
+// 11. PCB 只读工具（M3-3）
+if (connected) {
+	console.log('\n[11] PCB 只读工具');
+
+	// pcb_* 绑定活动画布：先确认没开 PCB 时给的是可操作提示，而不是内部错误
+	if (editorKind === 'schematic') {
+		const notPcb = parse(await client.callTool({ name: 'eda_pcb_overview', arguments: {} }));
+		check('未开 PCB 时给出可操作提示', String(notPcb.error ?? '').includes('绑定活动画布') && Array.isArray(notPcb.available_pcbs), notPcb);
+		check('提示里列出了可用的 PCB', ((notPcb.available_pcbs ?? []) as unknown[]).length > 0, notPcb.available_pcbs);
+	}
+
+	// 找当前板的 PCB 并打开
+	const ov = parse(await client.callTool({ name: 'eda_project_overview', arguments: {} }));
+	const boards = (ov.boards ?? []) as Array<{ name?: string; pcb?: { uuid?: string } | null }>;
+	const cc0 = parse(await client.callTool({ name: 'eda_current_context', arguments: {} }));
+	const curBoardName = (cc0.board as { name?: string } | null)?.name;
+	const target = boards.find((b) => b.name === curBoardName && b.pcb?.uuid) ?? boards.find((b) => b.pcb?.uuid);
+
+	if (target?.pcb?.uuid) {
+		const opened = parse(await client.callTool({ name: 'eda_open_document', arguments: { document_uuid: target.pcb.uuid } }));
+		check('打开 PCB 文档成功', opened.ok === true && opened.editor === 'pcb', opened);
+
+		const pov = parse(await client.callTool({ name: 'eda_pcb_overview', arguments: {} }));
+		check('PCB 概况返回层数', typeof pov.copper_layers === 'number', pov);
+		check('PCB 概况返回网络数', typeof pov.net_count === 'number', pov);
+		console.log(`     PCB「${JSON.stringify(pov.pcb)}」${String(pov.copper_layers)} 层，${String(pov.net_count)} 个网络`);
+
+		const pnets = parse(await client.callTool({ name: 'eda_pcb_nets', arguments: {} }));
+		const nl = (pnets.nets ?? []) as Array<{ name?: string; length?: number; routed?: boolean }>;
+		check('PCB 网络列表非空', nl.length > 0, pnets);
+		check('每个网络带长度与是否已布线', nl.every((n) => 'length' in n && 'routed' in n), nl[0]);
+		check('按长度降序', nl.every((n, i) => i === 0 || (nl[i - 1]!.length ?? 0) >= (n.length ?? 0)));
+		check('标注了长度单位的不确定性', String(pnets.length_unit_note ?? '').includes('单位'), pnets.length_unit_note);
+		console.log(`     ${nl.length} 网络，未布线 ${String(pnets.unrouted)}，最长 ${String(nl[0]?.name)}=${String(nl[0]?.length)}`);
+
+		const pdrc = parse(await client.callTool({ name: 'eda_pcb_drc', arguments: {} }));
+		const cats = (pdrc.categories ?? []) as Array<{ category?: string; count?: number; items?: Array<{ message?: string }> }>;
+		check('PCB DRC 返回结果', typeof pdrc.passed === 'boolean' && typeof pdrc.total_issues === 'number', pdrc);
+		if ((pdrc.total_issues as number) > 0) {
+			check('PCB DRC 带明细描述（区别于原理图 DRC）', cats.length > 0 && cats.some((c) => (c.items ?? []).some((i) => !!i.message)), cats);
+			console.log(`     DRC ${String(pdrc.total_issues)} 项：${cats.map((c) => `${c.category}`).join(', ')}`);
+			console.log(`     首条：${String(cats[0]?.items?.[0]?.message ?? '').slice(0, 90)}`);
+		}
+
+		// 把编辑器还原到原理图，避免影响后续测试与用户视图
+		const back = boards.find((b) => b.name === curBoardName);
+		const schPage = (ov.boards as Array<{ name?: string; schematic?: { pages?: Array<{ uuid?: string }> } }>)
+			.find((b) => b.name === back?.name)?.schematic?.pages?.[0]?.uuid;
+		if (schPage) await client.callTool({ name: 'eda_open_document', arguments: { document_uuid: schPage } });
+	} else {
+		console.log('     当前工程没有 PCB，跳过');
+	}
+} else {
+	console.log('\n[11] PCB 只读工具 —— 跳过（扩展未连入）');
+}
+
+// 12. 参数校验
+console.log('\n[12] 参数校验');
 const bad = parse(await client.callTool({ name: 'eda_execute', arguments: { code: '' } }));
 check('空 code 被拒绝', JSON.stringify(bad).includes('必填'), bad);
 

@@ -20149,6 +20149,175 @@ var libraryTools = [
   }
 ];
 
+// src/tools/pcb.ts
+var PCB_TIMEOUT_MS = 9e4;
+var ENSURE_PCB = `
+	const _pcb = await eda.dmt_Pcb.getCurrentPcbInfo().catch(() => null);
+	if (!_pcb) {
+		const boards = await eda.dmt_Board.getAllBoardsInfo();
+		return { error: 'NOT_PCB_EDITOR', available_pcbs: boards.filter(b => b.pcb).map(b => ({ board: b.name, pcb_uuid: b.pcb.uuid, pcb_name: b.pcb.name })) };
+	}
+`;
+function pcbHint(result) {
+  if (result?.error !== "NOT_PCB_EDITOR") return result;
+  return {
+    error: "\u5F53\u524D\u7F16\u8F91\u5668\u91CC\u6CA1\u6709\u6253\u5F00 PCB \u2014\u2014 pcb_* \u63A5\u53E3\u7ED1\u5B9A\u6D3B\u52A8\u753B\u5E03\uFF0C\u5FC5\u987B\u5148\u628A PCB \u5207\u5230\u524D\u53F0\u3002",
+    available_pcbs: result.available_pcbs,
+    next_step: "\u7528 eda_open_document(document_uuid: <\u4E0A\u9762\u67D0\u4E2A pcb_uuid>) \u6253\u5F00\u540E\u91CD\u8BD5\u3002"
+  };
+}
+var pcbTools = [
+  {
+    name: "eda_open_document",
+    description: "\u5728 EDA \u7F16\u8F91\u5668\u91CC\u6253\u5F00\u5E76\u6FC0\u6D3B\u4E00\u4E2A\u6587\u6863\uFF08PCB \u6216\u539F\u7406\u56FE\u9875\uFF09\uFF0Cuuid \u4ECE eda_project_overview \u62FF\u3002\n\n\u7528\u9014\uFF1A\u539F\u7406\u56FE\u7C7B\u63A5\u53E3\u548C PCB \u7C7B\u63A5\u53E3\u90FD**\u53EA\u5BF9\u5F53\u524D\u6D3B\u52A8\u753B\u5E03\u751F\u6548**\uFF0C\u8981\u8BFB PCB \u5C31\u5F97\u5148\u628A PCB \u6253\u5F00\u3002\u672C\u5DE5\u5177\u662F\u5728\u540C\u4E00\u5DE5\u7A0B\u5185\u5207\u6807\u7B7E\u9875\uFF0C\u4E0D\u4F1A\u91CD\u8F7D\u9875\u9762\u3001\u4E0D\u4F1A\u65AD\u5F00\u8FDE\u63A5\uFF08\u4E0E eda_open_project \u5207\u6362\u5DE5\u7A0B\u4E0D\u540C\uFF09\u3002",
+    inputSchema: {
+      type: "object",
+      properties: { document_uuid: { type: "string", description: "PCB uuid \u6216\u539F\u7406\u56FE\u9875 uuid" } },
+      required: ["document_uuid"]
+    },
+    handler: async (args, ctx2) => {
+      const uuid2 = requireString(args, "document_uuid");
+      return ctx2.exec(
+        `
+				const tabId = await eda.dmt_EditorControl.openDocument(${JSON.stringify(uuid2)});
+				if (!tabId) return { ok: false, error: '\u6253\u5F00\u5931\u8D25\uFF0C\u8BF7\u786E\u8BA4 uuid \u662F\u672C\u5DE5\u7A0B\u5185\u7684 PCB \u6216\u539F\u7406\u56FE\u9875' };
+				await eda.dmt_EditorControl.activateDocument(tabId);
+				await new Promise(r => setTimeout(r, 1200));   // \u753B\u5E03\u8BA2\u9605\u5EFA\u7ACB\u9700\u8981\u4E00\u70B9\u65F6\u95F4
+				const pcb = await eda.dmt_Pcb.getCurrentPcbInfo().catch(() => null);
+				const page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
+				return { ok: true, tab_id: tabId, editor: pcb ? 'pcb' : page ? 'schematic' : 'other',
+					opened: pcb ? { type: 'pcb', name: pcb.name, uuid: pcb.uuid } : page ? { type: 'schematic_page', name: page.name, uuid: page.uuid } : null };
+			`,
+        PCB_TIMEOUT_MS
+      );
+    }
+  },
+  {
+    name: "eda_pcb_overview",
+    description: "\u5F53\u524D PCB \u7684\u6982\u51B5\uFF1A\u540D\u79F0\u3001\u94DC\u5C42\u6570\u3001\u7F51\u7EDC\u6570\u91CF\u3001\u5F53\u524D\u6240\u5728\u5C42\u3002\n\n\u9700\u8981\u7F16\u8F91\u5668\u91CC\u6B63\u5F00\u7740 PCB\uFF1B\u6CA1\u5F00\u4F1A\u8FD4\u56DE\u53EF\u7528\u7684 PCB \u5217\u8868\u548C\u6253\u5F00\u65B9\u6CD5\u3002",
+    inputSchema: { type: "object", properties: {} },
+    handler: async (_args, ctx2) => pcbHint(
+      await ctx2.exec(
+        `
+				${ENSURE_PCB}
+				const layers = await eda.pcb_Layer.getTheNumberOfCopperLayers().catch(() => null);
+				const names = await eda.pcb_Net.getAllNetsName().catch(() => []);
+				const cur = eda.pcb_Layer.getCurrentLayer?.() ?? null;
+				return {
+					pcb: { name: _pcb.name, uuid: _pcb.uuid },
+					copper_layers: layers,
+					net_count: names.length,
+					current_layer: cur && typeof cur === 'object' ? { id: cur.id, name: cur.name } : cur,
+				};
+			`,
+        PCB_TIMEOUT_MS
+      )
+    )
+  },
+  {
+    name: "eda_pcb_nets",
+    description: "\u5F53\u524D PCB \u7684\u7F51\u7EDC\u5217\u8868\u4E0E\u8D70\u7EBF\u957F\u5EA6\u3002\u7528\u4E8E\u957F\u5EA6\u5339\u914D\u6838\u5BF9\u3001\u627E\u672A\u5E03\u7EBF\u7F51\u7EDC\u3002\n\n\u957F\u5EA6\u4E3A 0 \u8868\u793A\u8BE5\u7F51\u7EDC\u5728 PCB \u4E0A\u8FD8\u6CA1\u6709\u8D70\u7EBF\uFF08\u53EA\u6709\u98DE\u7EBF\uFF09\u3002\n**\u5355\u4F4D**\uFF1A\u5B98\u65B9\u6587\u6863\u672A\u8BF4\u660E getNetLength \u7684\u5355\u4F4D\uFF0C\u5B9E\u6D4B\u6570\u503C\u5728 mil \u91CF\u7EA7\uFF08\u4F8B\uFF1A\u4E00\u6761\u7EA6 2339 \u7684\u8D70\u7EBF\uFF09\u3002\u7528\u4E8E\u76F8\u5BF9\u6BD4\u8F83\u662F\u53EF\u9760\u7684\uFF0C\u9700\u8981\u7EDD\u5BF9\u503C\u65F6\u8BF7\u5728 EDA \u754C\u9762\u6838\u5BF9\u4E00\u6761\u5DF2\u77E5\u8D70\u7EBF\u518D\u6362\u7B97\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        net_name: { type: "string", description: "\u53EA\u67E5\u6307\u5B9A\u7F51\u7EDC" },
+        include_auto_named: { type: "boolean", description: "\u662F\u5426\u5305\u542B $1N\u2026 \u81EA\u52A8\u547D\u540D\u7F51\u7EDC\uFF0C\u9ED8\u8BA4 true\uFF08PCB \u4FA7\u8FD9\u7C7B\u5F88\u5E38\u89C1\uFF09" }
+      }
+    },
+    handler: async (args, ctx2) => {
+      const one = optionalString(args, "net_name");
+      const includeAuto = optionalBool(args, "include_auto_named", true);
+      return pcbHint(
+        await ctx2.exec(
+          `
+				${ENSURE_PCB}
+				const one = ${JSON.stringify(one ?? null)};
+				const includeAuto = ${includeAuto};
+				let names = await eda.pcb_Net.getAllNetsName();
+				if (one) {
+					names = names.filter(n => n.toLowerCase() === one.toLowerCase());
+					if (!names.length) return { error: '\u627E\u4E0D\u5230\u7F51\u7EDC ' + one, available: (await eda.pcb_Net.getAllNetsName()).slice(0, 40) };
+				} else if (!includeAuto) {
+					names = names.filter(n => !/^\\$\\d*N\\d+$/.test(n));
+				}
+				const out = [];
+				for (const n of names) {
+					const len = await eda.pcb_Net.getNetLength(n).catch(() => null);
+					out.push({ name: n, length: len, routed: typeof len === 'number' && len > 0 });
+				}
+				out.sort((a, b) => (b.length ?? 0) - (a.length ?? 0));
+				return {
+					pcb: _pcb.name,
+					total: out.length,
+					unrouted: out.filter(x => !x.routed).length,
+					nets: out,
+					length_unit_note: '\u5355\u4F4D\u672A\u5728\u5B98\u65B9\u6587\u6863\u4E2D\u8BF4\u660E\uFF0C\u6570\u503C\u5728 mil \u91CF\u7EA7\uFF1B\u76F8\u5BF9\u6BD4\u8F83\u53EF\u9760\uFF0C\u7EDD\u5BF9\u503C\u8BF7\u81EA\u884C\u6838\u5BF9',
+				};
+			`,
+          PCB_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_pcb_drc",
+    description: "\u5BF9\u5F53\u524D PCB \u8DD1 DRC\uFF0C\u8FD4\u56DE**\u5E26\u660E\u7EC6\u7684\u9519\u8BEF\u6811**\uFF1A\u5206\u7C7B\u3001\u6761\u6570\u3001\u6BCF\u6761\u7684\u5177\u4F53\u63CF\u8FF0\u3002\n\n\u6CE8\u610F\u4E0E eda_schematic_drc \u4E0D\u540C \u2014\u2014 \u539F\u7406\u56FE DRC \u53EA\u80FD\u62FF\u5230\u5206\u7C7B\u8BA1\u6570\uFF0CPCB DRC \u80FD\u62FF\u5230\u5177\u4F53\u95EE\u9898\u63CF\u8FF0\u3002\n\n\u5E38\u89C1\u5206\u7C7B\uFF1AConnection Error\uFF08\u8FDE\u63A5\u9519\u8BEF\uFF0C\u901A\u5E38\u662F\u672A\u5E03\u7EBF\uFF09\u3001Netlist Error\uFF08PCB \u4E0E\u539F\u7406\u56FE\u7F51\u8868\u4E0D\u4E00\u81F4\uFF0C\u9700\u8981\u5728 EDA \u91CC\u6267\u884C\u300C\u5BFC\u5165\u53D8\u66F4\u300D\uFF09\u3001\u95F4\u8DDD/\u7EBF\u5BBD\u7B49\u89C4\u5219\u9519\u8BEF\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        show_ui: { type: "boolean", description: "\u662F\u5426\u540C\u65F6\u5728 EDA \u5E95\u90E8\u6253\u5F00 DRC \u9762\u677F\uFF0C\u9ED8\u8BA4 false" },
+        max_items_per_category: { type: "integer", description: "\u6BCF\u4E2A\u5206\u7C7B\u6700\u591A\u8FD4\u56DE\u51E0\u6761\u660E\u7EC6\uFF0C\u9ED8\u8BA4 20" }
+      }
+    },
+    handler: async (args, ctx2) => {
+      const showUi = optionalBool(args, "show_ui");
+      const maxItems = typeof args.max_items_per_category === "number" ? args.max_items_per_category : 20;
+      return pcbHint(
+        await ctx2.exec(
+          `
+				${ENSURE_PCB}
+				const raw = await eda.pcb_Drc.check(true, ${showUi}, true);
+				const MAX = ${maxItems};
+				const title = t => Array.isArray(t) ? t.join(' ') : String(t ?? '');
+				// \u7ED3\u6784\u662F [{ name, title, count, list: [ { title, count, list: [ {explanation, objs, ...} ] } ] }]
+				const flatten = (nodes) => {
+					const out = [];
+					for (const n of nodes || []) {
+						const kids = n.list || [];
+						const leaves = kids.filter(k => k.explanation || k.globalIndex);
+						const branches = kids.filter(k => !(k.explanation || k.globalIndex));
+						if (leaves.length) {
+							out.push({
+								category: title(n.title) || n.name,
+								count: n.count ?? leaves.length,
+								items: leaves.slice(0, MAX).map(l => ({
+									message: l.explanation?.str ?? title(l.title),
+									objects: Array.isArray(l.objs) ? l.objs.slice(0, 8) : undefined,
+								})),
+								truncated: leaves.length > MAX ? leaves.length - MAX : undefined,
+							});
+						}
+						if (branches.length) out.push(...flatten(branches));
+					}
+					return out;
+				};
+				const cats = flatten(raw);
+				const total = cats.reduce((s, c) => s + (c.count || 0), 0);
+				return {
+					pcb: _pcb.name,
+					passed: total === 0,
+					total_issues: total,
+					categories: cats,
+					ui_opened: ${showUi},
+				};
+			`,
+          PCB_TIMEOUT_MS
+        )
+      );
+    }
+  }
+];
+
 // src/tools/project.ts
 var projectTools = [
   {
@@ -20432,7 +20601,8 @@ var allTools = [
   ...schematicTools,
   ...libraryTools,
   ...datasheetTools,
-  ...createTools
+  ...createTools,
+  ...pcbTools
 ];
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 

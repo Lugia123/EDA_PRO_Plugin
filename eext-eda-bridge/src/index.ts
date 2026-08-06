@@ -369,7 +369,12 @@ function send(msg: Record<string, unknown>): void {
 	try {
 		eda.sys_WebSocket.send(WS_ID, JSON.stringify(msg));
 	} catch {
-		permissionDenied = true;
+		// 这里**不能**置 permissionDenied —— 连接断掉之后 send 必然抛错，
+		// 若据此判定"没有外部交互权限"，connect() 会跳过所有端口，
+		// 扩展就再也连不回来了（只能靠用户刷新页面）。
+		// 权限问题只以 register() 抛错为准。
+		// 发不出去意味着连接已经没了，交给心跳判死后重连。
+		lastMessageAt = 0;
 	}
 }
 

@@ -3,6 +3,7 @@ import { connectionTools } from './connection.js';
 import { createTools } from './create.js';
 import { datasheetTools } from './datasheet.js';
 import { libraryTools } from './library.js';
+import { pcbTools } from './pcb.js';
 import { projectTools } from './project.js';
 import { schematicTools } from './schematic.js';
 import type { ToolDef } from './types.js';
@@ -14,6 +15,7 @@ export const allTools: ToolDef[] = [
 	...libraryTools,
 	...datasheetTools,
 	...createTools,
+	...pcbTools,
 ];
 
 export const toolMap = new Map<string, ToolDef>(allTools.map((t) => [t.name, t]));
