@@ -10,7 +10,8 @@
     "dev:bridge": "tsx scripts/dev-bridge.ts",
     "typecheck": "tsc --noEmit",
     "test:mcp": "npm run build && tsx scripts/test-mcp.ts",
-    "deploy": "npm run build && bash scripts/deploy-to-plugin.sh"
+    "deploy": "npm run build && bash scripts/deploy-to-plugin.sh",
+    "gen:api": "tsx scripts/gen-api-index.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
