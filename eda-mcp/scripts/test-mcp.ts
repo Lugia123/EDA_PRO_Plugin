@@ -59,6 +59,7 @@ const EXPECTED_TOOLS = [
 	'eda_pair_start',
 	'eda_project_overview',
 	'eda_schematic_components',
+	'eda_schematic_drc',
 	'eda_schematic_nets',
 	'eda_status',
 	'eda_unpair',
@@ -204,8 +205,21 @@ if (connected) {
 	console.log('\n[6] 原理图读取 —— 跳过（扩展未连入）');
 }
 
-// 7. 参数校验
-console.log('\n[7] 参数校验');
+// 7. 原理图 DRC（M1-4）
+if (connected) {
+	console.log('\n[7] 原理图 DRC');
+	const drc = parse(await client.callTool({ name: 'eda_schematic_drc', arguments: {} }));
+	check('DRC 返回通过与否', typeof drc.passed === 'boolean', drc);
+	check('DRC 返回 error/warning 计数', typeof drc.errors === 'number' && typeof drc.warnings === 'number', drc);
+	check('未要求 UI 时不打开面板', drc.ui_opened === false, drc);
+	check('说明了 API 只给汇总的限制', String(drc.note ?? '').includes('分类计数'), drc.note);
+	console.log(`     passed=${String(drc.passed)} errors=${String(drc.errors)} warnings=${String(drc.warnings)}`);
+} else {
+	console.log('\n[7] 原理图 DRC —— 跳过（扩展未连入）');
+}
+
+// 8. 参数校验
+console.log('\n[8] 参数校验');
 const bad = parse(await client.callTool({ name: 'eda_execute', arguments: { code: '' } }));
 check('空 code 被拒绝', JSON.stringify(bad).includes('必填'), bad);
 

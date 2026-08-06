@@ -93,6 +93,44 @@ export const schematicTools: ToolDef[] = [
 		},
 	},
 	{
+		name: 'eda_schematic_drc',
+		description:
+			'对当前原理图跑 DRC（设计规则检查），返回各类问题的数量汇总。' +
+			'\n\n**注意 API 的限制**：立创只返回分类计数（如 error 2 条、warn 1 条），' +
+			'不返回每条问题的描述和位置 —— 这是官方接口本身的限制（该接口标记为 @beta），不是本工具没取到。' +
+			'要看具体是哪些问题，用 show_ui=true 在 EDA 底部呼出 DRC 面板，让用户自己看；' +
+			'或让用户把面板内容贴过来。' +
+			'\n\n典型用法：改完原理图跑一次，确认没有新增 error；有 error 时提示用户打开面板核对。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				show_ui: { type: 'boolean', description: '是否在 EDA 里呼出底部 DRC 面板供用户查看明细，默认 false' },
+				strict: { type: 'boolean', description: '严格模式，默认 true（官方说明：原理图当前统一按严格模式检查）' },
+			},
+		},
+		handler: async (args, ctx) => {
+			const showUi = optionalBool(args, 'show_ui');
+			const strict = args.strict === undefined ? true : optionalBool(args, 'strict', true);
+			const raw = await ctx.exec<Array<{ type?: string; count?: number }>>(
+				`return await eda.sch_Drc.check(${strict}, ${showUi}, true);`,
+				NETLIST_TIMEOUT_MS,
+			);
+			const issues = (raw ?? []).map((i) => ({ type: i.type ?? 'unknown', count: i.count ?? 0 }));
+			const errors = issues.filter((i) => i.type === 'error').reduce((s, i) => s + i.count, 0);
+			const warnings = issues.filter((i) => i.type === 'warn').reduce((s, i) => s + i.count, 0);
+			return {
+				passed: errors === 0,
+				errors,
+				warnings,
+				issues,
+				ui_opened: showUi,
+				note:
+					'立创的 DRC 接口只返回分类计数，不含每条问题的描述与位置。' +
+					(showUi ? '已在 EDA 底部打开 DRC 面板，请让用户查看明细。' : '需要明细时用 show_ui=true 打开面板。'),
+			};
+		},
+	},
+	{
 		name: 'eda_schematic_nets',
 		description:
 			'当前原理图的网络（连接关系）：每个网络名下挂着哪些器件的哪些引脚。' +
