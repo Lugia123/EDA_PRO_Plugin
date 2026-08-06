@@ -1,0 +1,17 @@
+{
+  "name": "eda-pro-plugins",
+  "owner": {
+    "name": "EDA_PRO_Plugin contributors"
+  },
+  "metadata": {
+    "description": "立创EDA专业版（EasyEDA Pro）的 AI 接入。通过本地 MCP + EDA 官方扩展点操作原理图、PCB、器件库，全链路在本机 loopback 内完成。",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "eda-pro",
+      "source": "./plugins/eda-pro",
+      "description": "读工程结构与原理图、查器件与网络连接、跑 DRC、元器件库选型、下载数据手册。需在立创EDA里安装配套的 eda-bridge 扩展并完成一次配对。"
+    }
+  ]
+}

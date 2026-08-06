@@ -1,10 +1,13 @@
 # 依赖
 node_modules/
 
-# 构建产物（bundle 由 deploy 脚本生成后复制进 plugin/，不入库源目录）
+# 构建产物：源目录里的不入库，plugin/ 里的必须入库
+# —— plugin 是分发形态，用户 clone 后要能直接安装使用，产物不在仓库里就装不了
+# （同 Tinia_Plugins 的做法：bundle 随 plugin 仓库分发）
 dist/
 eext-eda-bridge/build/dist/
 *.eext
+!plugin/plugins/*/extension/*.eext
 
 # 凭证 —— 绝不入库
 # 正常情况下配对 token 在 ~/.eda-mcp/pairing.json（不在本仓库内），

@@ -37,6 +37,47 @@ eda_pair_start → 6 位配对码 → 用户在 EDA 扩展面板输入 → 换�
 
 不用 OAuth：全链路在 loopback，没有远程 server、没有账号体系，OAuth 在这里只是自我加戏。
 
+## 安装使用
+
+### 1. 装 plugin
+
+```bash
+# 在 Claude Code 里
+/plugin marketplace add /Users/lugia/hardware/EDA_PRO_Plugin/plugin
+/plugin install eda-pro@eda-pro-plugins
+```
+
+装完**需要重启 Claude Code 会话**才会加载 MCP。
+
+### 2. 装 EDA 扩展
+
+扩展包在 `plugin/plugins/eda-pro/extension/eda-bridge_v*.eext`。
+
+1. 立创EDA专业版 →「高级 → 扩展管理器 → 已安装 → 导入」→ 选那个 `.eext`
+2. 在扩展管理器里勾选 **允许外部交互**（必须）和 **显示在顶部菜单**
+3. 刷新网页版页面 / 重启客户端，顶部会出现「EDA Bridge」菜单
+
+### 3. 配对一次
+
+对 Claude 说「连接 EDA」，它会：调 `eda_pair_start` 拿 6 位配对码 → 你在
+「EDA Bridge → 配对(P)...」输入 → 完成。之后重连自动认证，不用再输。
+
+### 已有的能力
+
+| 工具 | 作用 |
+|---|---|
+| `eda_status` / `eda_pair_start` / `eda_unpair` | 连接与配对 |
+| `eda_project_overview` / `eda_current_context` | 工程结构、当前编辑对象 |
+| `eda_list_projects` / `eda_open_project` | 列出、切换工程 |
+| `eda_schematic_components` / `eda_component_detail` | 器件清单、单器件参数与引脚 |
+| `eda_schematic_nets` | 网络连接关系 |
+| `eda_schematic_drc` | 原理图 DRC（仅分类计数，见 skill 说明） |
+| `eda_library_search` / `eda_library_device` | 器件库检索、选型 |
+| `eda_download_datasheet` | 数据手册 PDF 下载到本地 |
+| `eda_execute` | 兜底：在 EDA 里执行任意 API 代码 |
+
+配套 4 个 skill：`eda-connect`、`eda-project`、`eda-schematic`、`eda-library`。
+
 ## 依赖前提
 
 - Node.js ≥ 18（MCP 运行时）／≥ 20.5 （构建扩展）
