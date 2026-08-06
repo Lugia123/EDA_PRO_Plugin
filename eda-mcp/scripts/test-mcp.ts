@@ -50,12 +50,23 @@ console.log('\n═══ MCP 工具层自测 ═══\n');
 await client.connect(transport);
 console.log('▶ 已连接 MCP server（stdio）\n');
 
+const EXPECTED_TOOLS = [
+	'eda_current_context',
+	'eda_execute',
+	'eda_list_projects',
+	'eda_open_project',
+	'eda_pair_start',
+	'eda_project_overview',
+	'eda_status',
+	'eda_unpair',
+];
+
 // 1. tools/list
 console.log('[1] tools/list');
 const { tools } = await client.listTools();
 const names = tools.map((t) => t.name).sort();
-check('返回 4 个工具', tools.length === 4, names);
-check('工具名符合预期', JSON.stringify(names) === JSON.stringify(['eda_execute', 'eda_pair_start', 'eda_status', 'eda_unpair']), names);
+check(`返回 ${EXPECTED_TOOLS.length} 个工具`, tools.length === EXPECTED_TOOLS.length, names);
+check('工具名符合预期', JSON.stringify(names) === JSON.stringify(EXPECTED_TOOLS), names);
 check('每个工具都有描述', tools.every((t) => (t.description ?? '').length > 20));
 check('eda_execute 声明了必填 code', JSON.stringify((tools.find((t) => t.name === 'eda_execute')?.inputSchema as { required?: string[] })?.required) === '["code"]');
 
@@ -103,8 +114,51 @@ if (connected) {
 	console.log('\n[4] eda_execute —— 跳过（扩展未连入）');
 }
 
-// 5. 参数校验
-console.log('\n[5] 参数校验');
+// 5. 工程结构工具（M1-1）
+if (connected) {
+	console.log('\n[5] 工程结构工具');
+
+	const ov = parse(await client.callTool({ name: 'eda_project_overview', arguments: {} }));
+	const project = ov.project as { uuid?: string; name?: string } | undefined;
+	const boards = (ov.boards ?? []) as Array<{ name?: string; schematic?: unknown; pcb?: unknown }>;
+	check('overview 返回工程名与 uuid', !!project?.name && !!project?.uuid, project);
+	check('overview 返回板子列表', boards.length > 0, boards.map((b) => b.name));
+	check('每块板都带原理图或 PCB', boards.every((b) => b.schematic !== undefined && b.pcb !== undefined), boards[0]);
+	check('已裁掉噪音字段 itemType', !JSON.stringify(ov).includes('itemType'));
+	check('已裁掉噪音字段 titleBlockData', !JSON.stringify(ov).includes('titleBlockData'));
+	console.log(`     工程「${String(project?.name)}」共 ${boards.length} 块板：${boards.map((b) => b.name).join(', ')}`);
+
+	const cc = parse(await client.callTool({ name: 'eda_current_context', arguments: {} }));
+	check('current_context 能判断编辑器类型', ['schematic', 'pcb', 'other'].includes(String(cc.editor)), cc);
+	check('current_context 返回当前板', !!(cc.board as { name?: string } | null)?.name, cc.board);
+	console.log(`     当前：editor=${String(cc.editor)} board=${JSON.stringify(cc.board)}`);
+
+	const lp = parse(await client.callTool({ name: 'eda_list_projects', arguments: {} }));
+	const projects = (lp.projects ?? []) as Array<{ uuid?: string; name?: string; team?: string }>;
+	check('list_projects 返回工程', projects.length > 0, lp);
+	check('每个工程含 uuid/name/team', projects.every((p) => !!p.uuid && !!p.name && !!p.team), projects[0]);
+	console.log(`     可见工程 ${projects.length} 个：${projects.map((p) => p.name).join(', ')}`);
+
+	// 打开「当前已打开的工程」——幂等，不会改变用户看到的内容
+	if (project?.uuid) {
+		const op = parse(await client.callTool({ name: 'eda_open_project', arguments: { project_uuid: project.uuid } }));
+		check('open_project 幂等打开当前工程成功', op.ok === true, op);
+	}
+
+	// 无效 uuid 必须被"拦在调用之前"。
+	// 早期版本这里直接调 openProject 试错，结果 EDA 把编辑器切到「开始页」、
+	// 清空了当前工程上下文，导致后续所有测试连环失败 —— 该行为已在工具里做前置校验拦截。
+	const badOpen = parse(await client.callTool({ name: 'eda_open_project', arguments: { project_uuid: 'not-a-real-uuid' } }));
+	check('open_project 拦截无效 uuid', badOpen.ok === false && String(badOpen.error ?? '').includes('不在可访问列表'), badOpen);
+
+	const stillThere = parse(await client.callTool({ name: 'eda_current_context', arguments: {} }));
+	check('拦截后当前工程上下文未被破坏', !!(stillThere.board as { name?: string } | null)?.name, stillThere);
+} else {
+	console.log('\n[5] 工程结构工具 —— 跳过（扩展未连入）');
+}
+
+// 6. 参数校验
+console.log('\n[6] 参数校验');
 const bad = parse(await client.callTool({ name: 'eda_execute', arguments: { code: '' } }));
 check('空 code 被拒绝', JSON.stringify(bad).includes('必填'), bad);
 

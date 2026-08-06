@@ -134,6 +134,45 @@ eda_pair_start ──► 6 位码（内存态，5min TTL，≤5 次尝试，成�
 - **必须 `return`**，否则拿到 `null`
 - 返回值经 `sanitize()` 处理循环引用、类实例、函数、BigInt——EDA API 常返回不可直接 `JSON.stringify` 的对象，不处理会让"序列化失败"伪装成"执行失败"
 
+## §4.5 读取文档内容的正确路径（实测结论）
+
+**`sch_Document` 的区域查询在扩展执行环境里拿不到东西。** 实测：
+
+```
+getPrimitivesInRegion(±1e3 … ±1e8)  → 一律返回 0 个
+navigateToRegion(...)               → 返回 false
+getPrimitiveAtPoint 网格扫描        → 全部 undefined
+```
+
+排除过的因素：坐标量级、参数顺序、页面可见性、`DMT_EditorControl.activateDocument()`
+（返回 true 但无改善）。推测这组 API 绑定编辑器画布上下文，而扩展的 WebSocket 回调不在该上下文。
+**没有继续深挖，因为找到了更好的路径。**
+
+**正路是 `SYS_FileManager.getDocumentSource()`** —— 返回当前文档的完整源码：
+
+```
+{"type":"DOCHEAD"}||{"docType":"SCH_PAGE","uuid":"...","client":"..."}|
+{"type":"COMPONENT","ticket":2,"id":"e1"}||{"partId":"pid8a0e77...","x":0,"y":0,"rotation":0,...}|
+{"type":"ATTR","ticket":3,"id":"e1155"}||{"key":"Description","value":"...","parentId":"e1",...}|
+```
+
+实测 SV30 的 V2.0_Encoder 原理图页：1473 行 / 408 KB，含 COMPONENT 140、ATTR 999、
+WIRE 99、LINE 224、TEXT 9。
+
+格式要点（官方 V3 格式规范，见 https://prodocs.easyeda.com/cn/format/）：
+
+- 每行 = 两个 JSON 拼接，前者供一致性框架用，后者是**原子结构对象**
+- 首行必须是 `DOCHEAD`，`docType` 区分 `PROJECT_CONFIG` / `BOARD` / `SCH` / `SCH_PAGE` / `PCB`
+- **坐标与长度单位统一是 `0.01 inch`**（即 10 mil），旋转角逆时针为正、角度制
+- 布尔用 `1`/`0`，颜色 `"#RRGGBB"`，无色为 `""`
+- 器件属性不在 COMPONENT 里，而是独立的 ATTR 行，用 `parentId` 挂到器件
+
+### 解析放在 MCP 侧，不放扩展里
+
+408 KB 源码经 WebSocket 传回 MCP 完全无压力（不进 AI context），在 Node 里解析成结构化摘要再返回。
+这样解析逻辑是可测试、可维护的 TypeScript，而不是塞在字符串里的一次性代码。
+**这正是"本地 MCP"相对纯扩展方案的价值所在。**
+
 ## §5 目录
 
 ```
