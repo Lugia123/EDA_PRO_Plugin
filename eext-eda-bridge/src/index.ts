@@ -44,6 +44,8 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 /** 当前端口的 hello 等待器；收到 hello 或超时后置空 */
 let helloWaiter: ((ok: boolean) => void) | null = null;
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 // ─── 入口 ─────────────────────────────────────────────────────────────
 
 export function activate(status?: 'onStartupFinished', _arg?: string): void {
@@ -127,6 +129,10 @@ async function connect(): Promise<void> {
 	if (phase === 'scanning') return;
 	phase = 'scanning';
 	safeClose(1000, 'rescan');
+	// close 之后必须让平台把这个 ID 的旧连接状态清理干净再 register。
+	// 官方文档明确警告过「不要尝试相同 ID 不同参数的连接」——
+	// 不等的话新连接会建起来又被旧的关闭事件带走（日志表现为刚认证通过就 code=1000 关闭）。
+	await sleep(250);
 
 	for (let port = PORT_START; port <= PORT_END; port++) {
 		if (permissionDenied) break;
@@ -365,16 +371,25 @@ function clearRetry(): void {
 
 // ─── 工具 ─────────────────────────────────────────────────────────────
 
+/** 扩展环境里 console 可用；只在异常路径打，正常不刷屏 */
+function logWarn(msg: string): void {
+	try { console.warn('[eda-bridge]', msg); } catch { /* ignore */ }
+}
+
 function send(msg: Record<string, unknown>): void {
 	try {
 		eda.sys_WebSocket.send(WS_ID, JSON.stringify(msg));
 	} catch {
-		// 这里**不能**置 permissionDenied —— 连接断掉之后 send 必然抛错，
-		// 若据此判定"没有外部交互权限"，connect() 会跳过所有端口，
-		// 扩展就再也连不回来了（只能靠用户刷新页面）。
-		// 权限问题只以 register() 抛错为准。
-		// 发不出去意味着连接已经没了，交给心跳判死后重连。
-		lastMessageAt = 0;
+		// 两件**不能**做的事：
+		// 1. 不能置 permissionDenied —— 连接断掉后 send 必然抛错，据此判定"无权限"
+		//    会让 connect() 跳过所有端口，扩展再也连不回来（只能靠刷新页面）。
+		//    权限问题只以 register() 抛错为准。
+		// 2. 不能把 lastMessageAt 清零来"催促"心跳判死 —— 那会让下一次心跳
+		//    立即认定连接已死并重连，把正在进行的请求打断。写入操作期间
+		//    send 偶尔抖一下就会自杀，表现为「刚执行完一步就断连」。
+		// 正确做法：什么都不做。真断了的话自然收不到消息，心跳会在
+		// DEAD_AFTER_MS 后正常判死。
+		logWarn('send 失败（连接可能已断），交给心跳按正常节奏判定');
 	}
 }
 

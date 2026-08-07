@@ -51,12 +51,16 @@ await client.connect(transport);
 console.log('▶ 已连接 MCP server（stdio）\n');
 
 const EXPECTED_TOOLS = [
+	'eda_add_net_identifier',
+	'eda_add_schematic_text',
 	'eda_component_detail',
 	'eda_create_board',
 	'eda_create_project',
 	'eda_create_schematic_page',
 	'eda_current_context',
+	'eda_delete_primitives',
 	'eda_download_datasheet',
+	'eda_draw_wire',
 	'eda_execute',
 	'eda_library_device',
 	'eda_library_search',
@@ -67,11 +71,13 @@ const EXPECTED_TOOLS = [
 	'eda_pcb_drc',
 	'eda_pcb_nets',
 	'eda_pcb_overview',
+	'eda_place_component',
 	'eda_project_overview',
 	'eda_rename_board',
 	'eda_schematic_components',
 	'eda_schematic_drc',
 	'eda_schematic_nets',
+	'eda_schematic_primitives',
 	'eda_status',
 	'eda_unpair',
 ];
@@ -198,35 +204,46 @@ if (connected && editorKind === 'schematic') {
 	check('清单口径为真实器件（少于原理图图元数）', (all.total_in_schematic as number) < 140, all.total_in_schematic);
 	console.log(`     ${String(all.total_in_schematic)} 个器件，例：${JSON.stringify(comps[0])}`);
 
-	const res = parse(await client.callTool({ name: 'eda_schematic_components', arguments: { designator_filter: 'R' } }));
+	// 用当前原理图里真实存在的位号前缀来测，避免依赖某个特定工程的内容
+	const anyDes = String(comps[0]?.designator ?? 'U1');
+	const prefix = (/^([A-Za-z]+)/.exec(anyDes)?.[1] ?? 'U').toUpperCase();
+	const res = parse(await client.callTool({ name: 'eda_schematic_components', arguments: { designator_filter: prefix } }));
 	const rs = (res.components ?? []) as Array<{ designator?: string }>;
-	check('位号前缀筛选只命中同类', rs.length > 0 && rs.every((c) => /^R\d+$/i.test(String(c.designator))), rs.slice(0, 5));
-	console.log(`     位号前缀 R 命中 ${rs.length} 个：${rs.slice(0, 8).map((c) => c.designator).join(', ')}`);
+	const sameKind = new RegExp(`^${prefix}\\d+$`, 'i');
+	check('位号前缀筛选只命中同类', rs.length > 0 && rs.every((c) => sameKind.test(String(c.designator))), rs.slice(0, 5));
+	console.log(`     位号前缀 ${prefix} 命中 ${rs.length} 个：${rs.slice(0, 8).map((c) => c.designator).join(', ')}`);
 
-	const kw = parse(await client.callTool({ name: 'eda_schematic_components', arguments: { keyword: 'AMS1117' } }));
-	check('关键词搜索命中型号', ((kw.components ?? []) as unknown[]).length > 0, kw);
+	const kwWord = String((comps[0] as { part?: string })?.part ?? '').slice(0, 6) || 'AMS';
+	const kw = parse(await client.callTool({ name: 'eda_schematic_components', arguments: { keyword: kwWord } }));
+	check('关键词搜索命中型号', ((kw.components ?? []) as unknown[]).length > 0, { kwWord, kw });
 
-	const u1 = parse(await client.callTool({ name: 'eda_component_detail', arguments: { designator: 'U1' } }));
+	const u1 = parse(await client.callTool({ name: 'eda_component_detail', arguments: { designator: anyDes } }));
 	const u1pins = (u1.pins ?? []) as Array<{ net?: string | null }>;
 	check('器件详情返回属性', Object.keys((u1.props ?? {}) as object).length > 5, Object.keys((u1.props ?? {}) as object).length);
-	check('器件详情返回引脚及其网络', u1pins.length > 0 && u1pins.some((p) => !!p.net), u1pins);
+	// net 为 null 是合法的（器件还没连线），只要求引脚结构完整
+	check('器件详情返回引脚', u1pins.length > 0 && u1pins.every((p) => 'net' in p), u1pins);
 	check('剔除了内部标识字段', !Object.keys((u1.props ?? {}) as object).includes('3D Model Transform'));
-	console.log(`     U1 = ${String(u1.part)}，${u1pins.length} 脚，datasheet=${String(u1.datasheet ?? '无')}`);
+	console.log(`     ${anyDes} = ${String(u1.part)}，${u1pins.length} 脚，datasheet=${String(u1.datasheet ?? '无')}`);
 
 	const bad = parse(await client.callTool({ name: 'eda_component_detail', arguments: { designator: 'ZZ999' } }));
 	check('未知位号给出可读错误', String(bad.error ?? '').includes('找不到'), bad);
 
 	const nets = parse(await client.callTool({ name: 'eda_schematic_nets', arguments: {} }));
 	const netList = (nets.nets ?? []) as Array<{ name?: string; pin_count?: number }>;
-	check('网络概览非空', netList.length > 0, nets);
+	// 全未连线的原理图没有网络，是合法状态
+	check('网络查询返回结构正确', typeof nets.total_nets === 'number' && Array.isArray(nets.nets), nets);
 	check('默认折叠自动命名网络', !netList.some((n) => /^\$\d*N\d+$/.test(String(n.name))), netList.slice(0, 5));
 	check('按连接数降序', netList.every((n, i) => i === 0 || (netList[i - 1]!.pin_count ?? 0) >= (n.pin_count ?? 0)));
 	console.log(`     ${String(nets.total_nets)} 个网络，前三：${netList.slice(0, 3).map((n) => `${n.name}(${n.pin_count})`).join(', ')}`);
 
-	const gnd = parse(await client.callTool({ name: 'eda_schematic_nets', arguments: { net_name: String(netList[0]?.name) } }));
-	const nodes = (gnd.nodes ?? []) as Array<{ designator?: string; pin?: string }>;
-	check('指定网络返回节点明细', nodes.length > 0 && nodes.every((n) => !!n.designator && !!n.pin), nodes.slice(0, 3));
-	console.log(`     ${String(gnd.net)} 挂 ${nodes.length} 个引脚，例：${nodes.slice(0, 3).map((n) => `${n.designator}.${n.pin}`).join(' ')}`);
+	if (netList.length > 0) {
+		const gnd = parse(await client.callTool({ name: 'eda_schematic_nets', arguments: { net_name: String(netList[0]?.name) } }));
+		const nodes = (gnd.nodes ?? []) as Array<{ designator?: string; pin?: string }>;
+		check('指定网络返回节点明细', nodes.length > 0 && nodes.every((n) => !!n.designator && !!n.pin), nodes.slice(0, 3));
+		console.log(`     ${String(gnd.net)} 挂 ${nodes.length} 个引脚，例：${nodes.slice(0, 3).map((n) => `${n.designator}.${n.pin}`).join(' ')}`);
+	} else {
+		console.log('     当前原理图没有已命名网络，跳过网络明细断言');
+	}
 	}
 } else {
 	console.log(`\n[6] 原理图读取 —— 跳过（${connected ? `编辑器当前是 ${editorKind}，不是原理图` : '扩展未连入'}）`);
@@ -274,16 +291,15 @@ if (connected && editorKind === 'schematic' && hasComponents) {
 	console.log('\n[9] 数据手册下载');
 	const tmpDir = '/tmp/eda-mcp-datasheet-test';
 
-	// RF1 是 atta.szlcsc.com 直链 PDF，应能真正下载下来
-	const ok = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { designator: 'RF1', save_dir: tmpDir } }));
-	check('按位号下载 PDF 成功', ok.ok === true && typeof ok.saved_path === 'string', ok);
-	check('落地文件有内容', (ok.size_kb as number) > 0, ok.size_kb);
-	console.log(`     RF1 → ${String(ok.saved_path)} (${String(ok.size_kb)} KB)`);
-
-	// U1 是 item.szlcsc.com 的网页链接，必须如实报告而不是假装成功
-	const html = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { designator: 'U1', save_dir: tmpDir } }));
-	check('网页链接如实报告非 PDF', String(html.error ?? '').includes('不是 PDF'), html);
-	check('给出让用户在浏览器打开的提示', String(html.hint ?? '').includes('浏览器'), html.hint);
+	// 从当前原理图里挑一个真实位号，不写死某个工程的器件
+	const listForDs = parse(await client.callTool({ name: 'eda_schematic_components', arguments: {} }));
+	const dsDes = String(((listForDs.components ?? []) as Array<{ designator?: string }>)[0]?.designator ?? '');
+	const ok = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { designator: dsDes, save_dir: tmpDir } }));
+	// 两种结果都算通过：直链 PDF 下载成功，或链接是网页时如实报告（实测 54 个器件里 29 个是网页）
+	const downloaded = ok.ok === true && typeof ok.saved_path === 'string' && (ok.size_kb as number) > 0;
+	const honestlyRefused = String(ok.error ?? '').includes('不是 PDF') && String(ok.hint ?? '').includes('浏览器');
+	check('按位号取手册：下载成功或如实报告非 PDF', downloaded || honestlyRefused, ok);
+	console.log(`     ${dsDes} → ${downloaded ? `${String(ok.saved_path)} (${String(ok.size_kb)} KB)` : String(ok.error)}`);
 
 	// SSRF 防护
 	const ssrf = parse(await client.callTool({ name: 'eda_download_datasheet', arguments: { url: 'http://127.0.0.1:49630/health' } }));
@@ -388,7 +404,8 @@ if (connected) {
 
 		const pnets = parse(await client.callTool({ name: 'eda_pcb_nets', arguments: {} }));
 		const nl = (pnets.nets ?? []) as Array<{ name?: string; length?: number; routed?: boolean }>;
-		check('PCB 网络列表非空', nl.length > 0, pnets);
+		// 刚建的空 PCB 没有任何网络，这是合法状态 —— 只要求接口正确返回结构
+		check('PCB 网络查询返回结构正确', typeof pnets.total === 'number' && Array.isArray(pnets.nets), pnets);
 		check('每个网络带长度与是否已布线', nl.every((n) => 'length' in n && 'routed' in n), nl[0]);
 		check('按长度降序', nl.every((n, i) => i === 0 || (nl[i - 1]!.length ?? 0) >= (n.length ?? 0)));
 		check('标注了长度单位的不确定性', String(pnets.length_unit_note ?? '').includes('单位'), pnets.length_unit_note);
@@ -415,8 +432,61 @@ if (connected) {
 	console.log('\n[11] PCB 只读工具 —— 跳过（扩展未连入）');
 }
 
-// 12. 参数校验
-console.log('\n[12] 参数校验');
+// 12. 原理图写入（M3-2）—— 只在沙箱工程 + 打开着原理图时跑
+if (connected && editorKind === 'schematic') {
+	const ovS = parse(await client.callTool({ name: 'eda_project_overview', arguments: {} }));
+	const pname = String((ovS.project as { name?: string } | undefined)?.name ?? '');
+	if (!/测试|test|sandbox/i.test(pname)) {
+		console.log(`\n[12] 原理图写入 —— 跳过：当前工程「${pname}」不是沙箱工程`);
+	} else {
+		console.log(`\n[12] 原理图写入（沙箱「${pname}」）`);
+
+		const p0 = parse(await client.callTool({ name: 'eda_schematic_primitives', arguments: {} }));
+		const n0 = (p0.count as number) ?? 0;
+		check('能列出画布图元并给出 primitive_id', typeof p0.count === 'number', p0);
+
+		const place = parse(await client.callTool({ name: 'eda_place_component', arguments: { lcsc_id: 'C347222', x: 300, y: 300 } }));
+		check('放置器件成功', place.ok === true, place);
+		const placed = place.placed as { primitive_id?: string; designator?: string } | null;
+		check('返回图元 id 与位号', !!placed?.primitive_id, placed);
+		console.log(`     放置 ${String(placed?.designator)} @ (300,300) id=${String(placed?.primitive_id)}`);
+
+		const wire = parse(await client.callTool({ name: 'eda_draw_wire', arguments: { points: [600, 300, 700, 300, 700, 400], net: 'AI_TEST_NET' } }));
+		check('画导线成功', wire.ok === true, wire);
+
+		// 顺序有意为之：netLabel 在前、netFlag 在后。
+		// 实测 createNetFlag 执行后扩展会重连一次，把紧跟其后的请求打断，
+		// 所以把会引发断连的操作放在这一组的最后。
+		const label = parse(await client.callTool({ name: 'eda_add_net_identifier', arguments: { kind: 'label', net: 'AI_TEST_NET', x: 620, y: 290 } }));
+		check('放置网络标签成功', label.ok === true, label);
+
+		const flag = parse(await client.callTool({ name: 'eda_add_net_identifier', arguments: { kind: 'ground', net: 'GND', x: 700, y: 450 } }));
+		check('放置地符号成功', flag.ok === true, flag);
+
+		const text = parse(await client.callTool({ name: 'eda_add_schematic_text', arguments: { content: 'AI test', x: 300, y: 200 } }));
+		check('放置文字成功', text.ok === true, text);
+
+		const p1 = parse(await client.callTool({ name: 'eda_schematic_primitives', arguments: {} }));
+		check('图元数量增加', ((p1.count as number) ?? 0) > n0, { before: n0, after: p1.count });
+
+		// 删掉刚放的器件，验证删除并保持沙箱整洁
+		if (placed?.primitive_id) {
+			const del = parse(await client.callTool({
+				name: 'eda_delete_primitives',
+				arguments: { primitive_ids: [placed.primitive_id], kind: 'component' },
+			}));
+			check('删除图元成功', del.ok === true, del);
+		}
+
+		const badWire = parse(await client.callTool({ name: 'eda_draw_wire', arguments: { points: [1, 2, 3] } }));
+		check('非法 points 被拒绝', JSON.stringify(badWire).includes('偶数个数字'), badWire);
+	}
+} else {
+	console.log(`\n[12] 原理图写入 —— 跳过（${connected ? `编辑器是 ${editorKind}` : '扩展未连入'}）`);
+}
+
+// 13. 参数校验
+console.log('\n[13] 参数校验');
 const bad = parse(await client.callTool({ name: 'eda_execute', arguments: { code: '' } }));
 check('空 code 被拒绝', JSON.stringify(bad).includes('必填'), bad);
 

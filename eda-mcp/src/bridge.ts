@@ -26,6 +26,8 @@ const AUTH_TIMEOUT_MS = 60_000;
 const DEFAULT_EXEC_TIMEOUT_MS = 30_000;
 /** 心跳间隔 */
 const HEARTBEAT_MS = 20_000;
+/** 执行期间断连后，等扩展重连的最长时间 */
+const RECONNECT_WAIT_MS = 30_000;
 
 const VERSION = process.env.EDA_MCP_VERSION ?? '0.1.0';
 
@@ -179,6 +181,17 @@ export class Bridge {
 			this.clients.delete(client.id);
 			if (this.activeId === client.id) this.activeId = null;
 			log(`连接 ${client.id.slice(0, 8)} 关闭 code=${code}`);
+			// 连接没了，挂在上面的请求永远等不到回包 —— 立刻以可识别的错误结束，
+			// 让 execute 能等重连后重试，而不是干等到 30/60 秒超时。
+			// （实测某些 EDA 操作如 createNetFlag 会让扩展重连一次。）
+			if (this.pending.size) {
+				log(`连接关闭时有 ${this.pending.size} 个请求在等待，标记为断连`);
+				for (const [id, p] of this.pending) {
+					clearTimeout(p.timer);
+					this.pending.delete(id);
+					p.reject(new Error('DISCONNECTED'));
+				}
+			}
 		});
 		ws.on('error', (e) => logError(`连接 ${client.id.slice(0, 8)} 出错`, e));
 		ws.on('pong', () => {
@@ -272,8 +285,26 @@ export class Bridge {
 		}
 	}
 
-	/** 在 EDA 里执行一段 JS（AsyncFunction，可 await，`eda` 已注入） */
-	execute(code: string, timeoutMs = DEFAULT_EXEC_TIMEOUT_MS): Promise<unknown> {
+	/**
+	 * 在 EDA 里执行一段 JS（AsyncFunction，可 await，`eda` 已注入）。
+	 *
+	 * 断连会自动重试一次：部分 EDA 操作（实测 createNetFlag）会让扩展重连，
+	 * 此时请求已经发出但回包永远不会来。扩展几秒内就会自己连回来，重试即可成功 ——
+	 * 比把一个本可恢复的抖动报成失败要好。
+	 */
+	async execute(code: string, timeoutMs = DEFAULT_EXEC_TIMEOUT_MS): Promise<unknown> {
+		try {
+			return await this.executeOnce(code, timeoutMs);
+		} catch (e) {
+			if (!(e instanceof Error) || e.message !== 'DISCONNECTED') throw e;
+			log('执行期间连接断开，等待扩展重连后重试一次');
+			const back = await this.waitForClient(RECONNECT_WAIT_MS);
+			if (!back) throw new Error('执行期间连接断开，且扩展未在 30 秒内重连。可让用户在 EDA 里点「EDA Bridge → 重新连接」。');
+			return await this.executeOnce(code, timeoutMs);
+		}
+	}
+
+	private executeOnce(code: string, timeoutMs: number): Promise<unknown> {
 		const client = this.activeClient();
 		if (!client) return Promise.reject(new Error('NO_CLIENT'));
 		const id = randomUUID();
@@ -284,6 +315,23 @@ export class Bridge {
 			}, timeoutMs);
 			this.pending.set(id, { resolve, reject, timer });
 			this.send(client.ws, { type: 'execute', id, code });
+		});
+	}
+
+	/** 等待有已认证连接；已有则立即返回 */
+	private waitForClient(maxMs: number): Promise<boolean> {
+		if (this.activeClient()) return Promise.resolve(true);
+		return new Promise((resolve) => {
+			const started = Date.now();
+			const tick = setInterval(() => {
+				if (this.activeClient()) {
+					clearInterval(tick);
+					resolve(true);
+				} else if (Date.now() - started > maxMs) {
+					clearInterval(tick);
+					resolve(false);
+				}
+			}, 300);
 		});
 	}
 
