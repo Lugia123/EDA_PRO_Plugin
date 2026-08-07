@@ -1,11 +1,11 @@
 {
-	"name": "pro-api-sdk",
+	"name": "eda-bridge",
 	"type": "module",
-	"version": "1.6.4",
-	"description": "JLCEDA & EasyEDA Professional Extension API Development Toolkit",
-	"author": "JLCEDA <support@lceda.cn>",
+	"version": "0.1.15",
+	"description": "立创EDA专业版扩展：连接本机 eda-mcp，在 EDA 内执行 AI 下发的代码。派生自 easyeda/pro-api-sdk 脚手架。",
+	"author": "EDA_PRO_Plugin contributors",
 	"license": "Apache-2.0",
-	"homepage": "https://pro.lceda.cn/",
+	"homepage": "",
 	"bin": {
 		"create-easyeda-api-sdk": "./build/create.js"
 	},
@@ -13,7 +13,7 @@
 		"node": ">=20.17.0"
 	},
 	"scripts": {
-		"prebuild": "node scripts/stamp-version.mjs",
+		"prebuild": "node ../scripts/stamp-version.mjs",
 		"compile": "rimraf ./dist/ && ts-node ./config/esbuild.prod.ts",
 		"lint": "eslint",
 		"fix": "eslint --fix",
@@ -46,5 +46,6 @@
 	},
 	"lint-staged": {
 		"*": "eslint --fix"
-	}
+	},
+	"private": true
 }

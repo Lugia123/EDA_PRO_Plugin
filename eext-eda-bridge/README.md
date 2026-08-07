@@ -1,59 +1,33 @@
-[简体中文](#) | [English](./README.en.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
+# eda-bridge
 
-# pro-api-sdk
+立创EDA专业版扩展。连上本机 `eda-mcp` 的 bridge，把 AI 发来的代码在 EDA 环境里执行后回传结果。
 
-嘉立创EDA & EasyEDA 专业版扩展 API 开发工具
+只与 `127.0.0.1:49630-49639` 通信，不连接任何外部服务器。未配对的连接除握手外什么都做不了。
 
-<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/stars/easyeda/pro-api-sdk" alt="GitHub Repo Stars" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk/issues" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/issues/easyeda/pro-api-sdk" alt="GitHub Issues" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/repo-size/easyeda/pro-api-sdk" alt="GitHub Repo Size" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/v/%40jlceda%2Fpro-api-types?label=pro-api-types" alt="NPM Version" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/d18m/%40jlceda%2Fpro-api-types" alt="NPM Downloads" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## 构建
 
-> [!NOTE]
->
-> 详细开发文档请访问：[https://prodocs.lceda.cn/cn/api/guide/](https://prodocs.lceda.cn/cn/api/guide/)
+```bash
+npm install
+npm run build      # → build/dist/eda-bridge_v<版本>.eext
+```
 
-## 进入开发
+`prebuild` 钩子会把 `extension.json` 的 patch 位刷成当前 git commit 数。
 
-本开发工具组包含了用于开发 [嘉立创EDA专业版](https://pro.lceda.cn/) 扩展包的所有环境和工具，并内置了 ESLint 的推荐规则。
+## 安装到 EDA
 
-1. 克隆 [pro-api-sdk](https://github.com/easyeda/pro-api-sdk) 项目仓库到本地
+1. 高级 → 扩展管理器 → 已安装 → 导入 → 选 `.eext`
+2. 勾选 **允许外部交互**（必须，否则 `SYS_WebSocket` 直接抛错）和 **显示在顶部菜单**
+3. 刷新网页版页面 / 重启客户端
 
-    Gitee:
+重新导入会清空扩展的 `SYS_Storage`，配对凭证丢失需重新配对；扩展权限会保留。
 
-    ```shell
-    git clone --depth=1 https://gitee.com/jlceda/pro-api-sdk.git
-    ```
+## 目录来源与许可
 
-    GitHub:
+本目录派生自官方脚手架 [easyeda/pro-api-sdk](https://github.com/easyeda/pro-api-sdk)（Apache-2.0）。
 
-    ```shell
-    git clone --depth=1 https://github.com/easyeda/pro-api-sdk.git
-    ```
+- `build/`、`config/`、`iframe/`、`.sdk-manifest.json` 等构建设施来自官方，沿用 Apache-2.0，见 [LICENSE](./LICENSE)
+- `src/` 与 `scripts/` 是本项目代码，以 MIT 提供（见仓库根 LICENSE）
 
-2. 初始化开发环境（安装依赖）
+## 更多
 
-    ```shell
-    npm install
-    ```
-
-3. 进行些许变更 ...
-
-    - 修改文件夹名称为你的项目名称
-    - 参考 [开发指南](https://prodocs.lceda.cn/cn/api/guide/how-to-start.html#ii-%E6%89%A9%E5%B1%95%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6) 修改 `extension.json` 中的 `name`、`displayName`、`description`、`publisher` 字段
-    - 结合 [扩展 API 参考文档](https://prodocs.lceda.cn/cn/api/reference/pro-api.html) 编写你的代码
-
-> [!NOTE]
->
-> 推荐使用 AI 编程工具，结合官方 SKILL 加快开发进度。详情请查阅：[easyeda-api-skill](https://github.com/easyeda/easyeda-api-skill)
-
-4. 编译扩展包
-
-    ```shell
-    npm run build
-    ```
-
-5. 在 嘉立创EDA专业版 中安装生成在 `./build/dist/` 下的扩展包
-
-## 开源许可
-
-<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
-
-本开发工具组使用 [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/) 开源许可协议，你仅可以将 **嘉立创EDA**、**EasyEDA** 商标信息用于依托于本工具组开发的扩展包的 **功能描述部分** 和 **开源发布的标题部分**。
+架构、协议与配对机制见仓库根的 [docs/design.md](../docs/design.md)。

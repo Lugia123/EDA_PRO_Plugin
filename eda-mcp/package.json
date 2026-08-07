@@ -1,6 +1,6 @@
 {
   "name": "eda-mcp",
-  "version": "0.1.0",
+  "version": "0.1.15",
   "private": true,
   "description": "立创EDA专业版 本地 MCP Server —— 内置 bridge（WebSocket）与 EDA 扩展通信，esbuild bundle 后随 Claude Code plugin 分发（不走 npm registry）",
   "type": "module",
@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test:mcp": "npm run build && tsx scripts/test-mcp.ts",
     "deploy": "npm run build && bash scripts/deploy-to-plugin.sh",
-    "gen:api": "tsx scripts/gen-api-index.ts"
+    "gen:api": "tsx scripts/gen-api-index.ts",
+    "predeploy": "node ../scripts/stamp-version.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
