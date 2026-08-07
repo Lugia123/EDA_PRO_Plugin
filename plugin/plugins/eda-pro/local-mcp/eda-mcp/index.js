@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 3e4;
-var VERSION = "0.1.0";
+var VERSION = "0.1.17";
 var Bridge = class {
   http = null;
   wss = null;
@@ -20927,7 +20927,7 @@ var allTools = [
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.0";
+var VERSION2 = "0.1.17";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var ctx = {
@@ -20953,15 +20953,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text", text: `\u9519\u8BEF: ${msg}` }], isError: true };
   }
 });
+async function shutdown(reason) {
+  log(`\u9000\u51FA\uFF08${reason}\uFF09`);
+  await bridge.stop().catch(() => {
+  });
+  process.exit(0);
+}
 async function main() {
   const paired = await loadPairing() !== null;
   await bridge.start();
   const transport = new StdioServerTransport();
+  transport.onclose = () => void shutdown("stdio \u5DF2\u5173\u95ED");
+  process.stdin.on("end", () => void shutdown("stdin \u7ED3\u675F"));
   await server.connect(transport);
   log(`EDA MCP v${VERSION2} \u5DF2\u542F\u52A8\uFF08stdio\uFF09\uFF0C${allTools.length} \u4E2A\u5DE5\u5177\uFF0C\u914D\u5BF9\u72B6\u6001\uFF1A${paired ? "\u5DF2\u914D\u5BF9" : "\u672A\u914D\u5BF9"}`);
 }
-process.on("SIGINT", () => void bridge.stop().then(() => process.exit(0)));
-process.on("SIGTERM", () => void bridge.stop().then(() => process.exit(0)));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
 main().catch((err) => {
   logError("\u542F\u52A8\u5931\u8D25", err);
   process.exit(1);

@@ -3,6 +3,27 @@
 立创EDA专业版扩展，把 EDA 接入本机的 eda-mcp。
 版本号的 patch 位由构建脚本自动刷成当前 git commit 数。
 
+## 0.1.18
+
+### 修正
+
+1. 提示框长时间不消失、反复重连时堆叠盖住画布。
+   `sys_Message.showToastMessage` 的 `timer` 参数单位是**秒**（官方注释：「自动关闭倒计时秒数」），
+   此前按毫秒传了 4000/8000，等于让提示挂 66 分钟到 2 小时。
+
+### 变更
+
+1. 重新界定什么时候该弹提示：自动重连成功不再打扰用户（状态可从「连接状态」菜单查看），
+   只有手动点「重新连接」才回一句；「待配对」提示在同一状态里只弹一次，
+   端口反复扫描不会刷屏。配对成功、凭证失效、配对失败等仍会提示。
+2. 清理官方脚手架残留：`CHANGELOG.md` / `README.md` 换成本扩展自己的，
+   删掉官方的 en/ja/ru/zh-Hant 四份 README，`package.json` 身份由 `pro-api-sdk / 1.6.4`
+   改为 `eda-bridge`。
+3. 版本号改由仓库根的 `scripts/stamp-version.mjs` 统一维护，扩展、MCP、plugin、
+   marketplace 五处版本号必定一致。
+4. 发版流程固化为项目 skill（`.claude/skills/release/`），含版本号规则、
+   CHANGELOG 写入时机、以及「哪些改动需要用户重新导入扩展」的判断表。
+
 ## 0.1.14
 
 ### 修正
