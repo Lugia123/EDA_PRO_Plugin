@@ -818,6 +818,15 @@ export const schematicEditTools: ToolDef[] = [
 				// 而且原理图 y 轴向上，所以 topLeftY 要取较大的那个 y，高度往下算。
 				// 照两点式传会画出一个宽高等于对角坐标的巨框，跑到图纸外面去。
 				const rc = await eda.sch_PrimitiveRectangle.create(${Math.min(x1, x2)}, ${Math.max(y1, y2)}, ${Math.abs(x2 - x1)}, ${Math.abs(y2 - y1)});
+				// 默认样式（color/lineWidth 都是 null）画出来极淡，缩放一小就完全看不见了，
+				// 等于白框。给个明确的灰蓝虚线，既能一眼看清分区边界，又不会跟信号线抢眼。
+				if (rc) {
+					await eda.sch_PrimitiveRectangle.modify(rc.primitiveId, {
+						color: '#5B7FA6',
+						lineWidth: 2,
+						lineType: 1,
+					}).catch(() => undefined);
+				}
 				// 标题放在框**内**左上角。放框外看着清爽，但区框常常紧贴图纸边缘，
 				// 往外挪一点标题就掉到图纸外面去了 —— 实测 A4 上就这么丢过一次。
 				const t = await eda.sch_PrimitiveText.create(${JSON.stringify(title)}, ${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 25);
