@@ -774,8 +774,11 @@ export const schematicEditTools: ToolDef[] = [
 			'【写操作】给一个功能区画边框、标题和说明 —— 让人一眼看出这块电路是干什么的。' +
 			'\n\n分区不是摆位置就完事了：框起来、写上「电源 +5V→+3V3」这样的标题，' +
 			'再补一句功能说明，读图的人不用逐个器件推敲就知道每块在做什么。' +
-			'\n\n框要留出余量（比器件包围盒每边多 40 以上），标题放在框的左上角外侧。' +
-			'先把这一区的器件都摆好、量出实际范围，再画框。',
+			'\n\n框要留出余量（比器件包围盒每边多 40 以上），标题写在框内左上角。' +
+			'先把这一区的器件都摆好、量出实际范围，再画框 —— 器件动了框不会跟着动。' +
+			'\n\n坐标给两个对角点即可（工具内部会转成 EDA 要的 topLeft+宽高；' +
+			'`sch_PrimitiveRectangle.create` 的实际签名是 (topLeftX, topLeftY, width, height)，' +
+			'不是两点式，直接按两点传会画出一个巨框跑到图纸外）。',
 		inputSchema: {
 			type: 'object',
 			properties: {
@@ -800,11 +803,15 @@ export const schematicEditTools: ToolDef[] = [
 				await ctx.exec<Record<string, unknown>>(
 					`
 				${ENSURE_SCH}
-				const rc = await eda.sch_PrimitiveRectangle.create(${Math.min(x1, x2)}, ${Math.min(y1, y2)}, ${Math.max(x1, x2)}, ${Math.max(y1, y2)});
-				// 标题放框顶外侧，不压住里面的器件
-				const t = await eda.sch_PrimitiveText.create(${JSON.stringify(title)}, ${Math.min(x1, x2)} + 10, ${Math.max(y1, y2)} + 25);
+				// 实测签名是 (topLeftX, topLeftY, width, height)，**不是两个对角点**；
+				// 而且原理图 y 轴向上，所以 topLeftY 要取较大的那个 y，高度往下算。
+				// 照两点式传会画出一个宽高等于对角坐标的巨框，跑到图纸外面去。
+				const rc = await eda.sch_PrimitiveRectangle.create(${Math.min(x1, x2)}, ${Math.max(y1, y2)}, ${Math.abs(x2 - x1)}, ${Math.abs(y2 - y1)});
+				// 标题放在框**内**左上角。放框外看着清爽，但区框常常紧贴图纸边缘，
+				// 往外挪一点标题就掉到图纸外面去了 —— 实测 A4 上就这么丢过一次。
+				const t = await eda.sch_PrimitiveText.create(${JSON.stringify(title)}, ${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 25);
 				let n = null;
-				${note ? `n = await eda.sch_PrimitiveText.create(${JSON.stringify(note)}, ${Math.min(x1, x2)} + 10, ${Math.max(y1, y2)} + 8);` : ''}
+				${note ? `n = await eda.sch_PrimitiveText.create(${JSON.stringify(note)}, ${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 45);` : ''}
 				return {
 					ok: !!rc, rect_id: rc && rc.primitiveId, title_id: t && t.primitiveId, note_id: n && n.primitiveId,
 					box: [${Math.min(x1, x2)}, ${Math.min(y1, y2)}, ${Math.max(x1, x2)}, ${Math.max(y1, y2)}],
@@ -1281,8 +1288,12 @@ export const schematicEditTools: ToolDef[] = [
 					if (!hit || !hit.length) return { ok: false, error: '库里找不到立创编号 ' + lcsc };
 					uuid = hit[0].uuid; libUuid = hit[0].libraryUuid;
 				}
-				// 位号在整份原理图（所有页）内唯一，算下一个编号要看全部页
-				const usedAll = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+				// 位号唯一性只看**当前页**。
+				// getAll(undefined, true) 实测跨越整个工程的所有原理图 —— 连别的 Board 都算进来，
+				// 于是新建一块板放 C1 会被另一块板上的 C1 挡住、顺延成 C2，位号跟设计对不上。
+				// 不同 Board 是各自独立的设计，网表也按 Board 生成，本就不该互相占用位号。
+				// 代价：同一原理图分多页时跨页可能撞号，需要调用方自己避让。
+				const usedAll = await eda.sch_PrimitiveComponent.getAll();
 				const used = new Set(usedAll.map(x => String(x.designator || '').toUpperCase()));
 				const before = (await eda.sch_PrimitiveComponent.getAll()).length;
 
@@ -1304,7 +1315,7 @@ export const schematicEditTools: ToolDef[] = [
 						assignError = '位号 ' + want + ' 已被占用，已保留自动分配的编号';
 					} else {
 						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: want });
-						const fresh = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+						const fresh = await eda.sch_PrimitiveComponent.getAll();
 						const dup = fresh.filter(x => String(x.designator || '').toUpperCase() === want.toUpperCase()).length;
 						if (m && dup === 1) { finalDes = want; assigned = true; }
 						else assignError = dup > 1 ? '位号 ' + want + ' 出现重复，已放弃指定' : '设置指定位号失败';
@@ -1324,7 +1335,7 @@ export const schematicEditTools: ToolDef[] = [
 						const auto = prefix + n;
 						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: auto });
 						if (!m) { assignError = '自动编号失败，位号仍是占位符 ' + raw; break; }
-						const fresh = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+						const fresh = await eda.sch_PrimitiveComponent.getAll();
 						const dup = fresh.filter(x => String(x.designator || '').toUpperCase() === auto).length;
 						if (dup === 1) { finalDes = auto; assigned = true; }
 						else { fresh.forEach(x => used.add(String(x.designator || '').toUpperCase())); n++; }

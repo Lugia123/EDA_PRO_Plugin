@@ -2,12 +2,34 @@
 # 调一次 MCP 工具（需要 mcp-daemon 在跑）
 #   ./scripts/mcp eda_status
 #   ./scripts/mcp eda_place_component '{"lcsc_id":"C347222","x":200,"y":150}'
+#
+# 调用前会先确认扩展在线。这不是多余的谨慎：不少 EDA 操作（新建板子、
+# 切换文档、getNetlist、删除图元）会让扩展断开重连几十秒，期间所有调用都
+# 拿不到回包。不等就发，得到的是一串「无响应」，还容易被误读成工具坏了。
+#   MCP_NO_WAIT=1  跳过等待
+#   MCP_WAIT_SEC   最长等多久，默认 120 秒
 set -euo pipefail
 TOOL="${1:?用法: ./scripts/mcp <tool> [json-args]}"
 ARGS="${2:-}"
 [ -z "$ARGS" ] && ARGS='{}'
-python3 -c '
+
+post() {
+  python3 -c '
 import json,sys
 print(json.dumps({"tool": sys.argv[1], "args": json.loads(sys.argv[2])}))
-' "$TOOL" "$ARGS" | curl -sS -X POST http://127.0.0.1:49655 \
-  -H "Content-Type: application/json" --data-binary @- | python3 -m json.tool
+' "$1" "$2" | curl -sS -X POST http://127.0.0.1:49655 \
+    -H "Content-Type: application/json" --data-binary @-
+}
+
+if [ "${MCP_NO_WAIT:-0}" != "1" ] && [ "$TOOL" != "eda_status" ]; then
+  deadline=$(( $(date +%s) + ${MCP_WAIT_SEC:-120} ))
+  until post eda_status '{}' | grep -q '"active": *true'; do
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      echo '{"error":"扩展未连接（等待超时）。EDA 页面刷新一下，或点 EDA Bridge → 重新连接。"}'
+      exit 1
+    fi
+    sleep 3
+  done
+fi
+
+post "$TOOL" "$ARGS" | python3 -m json.tool
