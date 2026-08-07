@@ -2,7 +2,7 @@
 
 用 AI 操作**立创EDA专业版**（EasyEDA Pro）—— 一个 Claude Code plugin，把 EDA 的原理图 / PCB / 器件库能力接进 AI 的工具箱。
 
-> 状态：只读能力与基础创建能力已可用，真机验证通过（68 项自测全通过）。写入类（画原理图 / 布线）尚未实现。
+> 状态：读能力、工程/文档创建、原理图写入已可用并经真机验证；PCB 写入尚未实现。
 
 ## 它由两半组成
 
@@ -77,6 +77,8 @@ eda_pair_start → 6 位配对码 → 用户在 EDA 扩展面板输入 → 换�
 | `eda_create_project` / `eda_create_board` / `eda_create_schematic_page` / `eda_rename_board` | 新建工程、板子、原理图页（写操作） |
 | `eda_open_document` | 同工程内切换编辑器标签（PCB / 原理图页） |
 | `eda_pcb_overview` / `eda_pcb_nets` / `eda_pcb_drc` | PCB 层数、走线长度、DRC（带明细） |
+| `eda_place_component` / `eda_draw_wire` / `eda_add_net_identifier` / `eda_add_schematic_text` | 原理图写入：放器件、画导线、网络标识、文字 |
+| `eda_schematic_primitives` / `eda_delete_primitives` | 画布图元的定位与删除 |
 | `eda_execute` | 兜底：在 EDA 里执行任意 API 代码 |
 
 配套 6 个 skill：`eda-connect`、`eda-project`、`eda-schematic`、`eda-library`、`eda-pcb`、`eda-api`
@@ -84,9 +86,17 @@ eda_pair_start → 6 位配对码 → 用户在 EDA 扩展面板输入 → 换�
 
 ### 还没做的
 
-- 原理图写入（放器件、连线）
-- PCB 写入（走线、铺铜）
+- PCB 写入（走线、铺铜）—— PCB 侧的 create 类接口很完整（`PCB_PrimitiveLine.create` 等），
+  只是还没做成工具
 - 板子改名：EDA 侧接口不稳定，工具会如实报失败，请在界面手动改
+
+### 更新扩展的注意事项
+
+重新导入 `.eext` 会**清空扩展的 SYS_Storage**，也就是配对凭证会丢失，需要重新配对一次
+（`eda_pair_start` 取码 → 在 EDA 里输入）。扩展权限（允许外部交互）则会保留。
+
+扩展版本号的 patch 位由 `npm run build` 自动刷成当前 git commit 数
+（`0.1.<count>`），所以报问题时带上版本号就能定位到具体代码。
 
 ## 依赖前提
 

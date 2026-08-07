@@ -7259,26 +7259,26 @@ var require_permessage_deflate = __commonJS({
             value = value[0];
             if (key === "client_max_window_bits") {
               if (value !== true) {
-                const num = +value;
-                if (!Number.isInteger(num) || num < 8 || num > 15) {
+                const num2 = +value;
+                if (!Number.isInteger(num2) || num2 < 8 || num2 > 15) {
                   throw new TypeError(
                     `Invalid value for parameter "${key}": ${value}`
                   );
                 }
-                value = num;
+                value = num2;
               } else if (!this._isServer) {
                 throw new TypeError(
                   `Invalid value for parameter "${key}": ${value}`
                 );
               }
             } else if (key === "server_max_window_bits") {
-              const num = +value;
-              if (!Number.isInteger(num) || num < 8 || num > 15) {
+              const num2 = +value;
+              if (!Number.isInteger(num2) || num2 < 8 || num2 > 15) {
                 throw new TypeError(
                   `Invalid value for parameter "${key}": ${value}`
                 );
               }
-              value = num;
+              value = num2;
             } else if (key === "client_no_context_takeover" || key === "server_no_context_takeover") {
               if (value !== true) {
                 throw new TypeError(
@@ -7992,8 +7992,8 @@ var require_receiver = __commonJS({
           return;
         }
         const buf = this.consume(8);
-        const num = buf.readUInt32BE(0);
-        if (num > Math.pow(2, 53 - 32) - 1) {
+        const num2 = buf.readUInt32BE(0);
+        if (num2 > Math.pow(2, 53 - 32) - 1) {
           const error2 = this.createError(
             RangeError,
             "Unsupported WebSocket frame: payload length > 2^53 - 1",
@@ -8004,7 +8004,7 @@ var require_receiver = __commonJS({
           cb(error2);
           return;
         }
-        this._payloadLength = num * Math.pow(2, 32) + buf.readUInt32BE(4);
+        this._payloadLength = num2 * Math.pow(2, 32) + buf.readUInt32BE(4);
         this.haveLength(cb);
       }
       /**
@@ -19301,6 +19301,7 @@ function constantTimeEqual(a, b) {
 var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
+var RECONNECT_WAIT_MS = 3e4;
 var VERSION = "0.1.0";
 var Bridge = class {
   http = null;
@@ -19422,6 +19423,14 @@ var Bridge = class {
       this.clients.delete(client.id);
       if (this.activeId === client.id) this.activeId = null;
       log(`\u8FDE\u63A5 ${client.id.slice(0, 8)} \u5173\u95ED code=${code}`);
+      if (this.pending.size) {
+        log(`\u8FDE\u63A5\u5173\u95ED\u65F6\u6709 ${this.pending.size} \u4E2A\u8BF7\u6C42\u5728\u7B49\u5F85\uFF0C\u6807\u8BB0\u4E3A\u65AD\u8FDE`);
+        for (const [id, p] of this.pending) {
+          clearTimeout(p.timer);
+          this.pending.delete(id);
+          p.reject(new Error("DISCONNECTED"));
+        }
+      }
     });
     ws.on("error", (e) => logError(`\u8FDE\u63A5 ${client.id.slice(0, 8)} \u51FA\u9519`, e));
     ws.on("pong", () => {
@@ -19510,8 +19519,25 @@ ${msg.stack}` : msg.error));
         logDebug(`\u6536\u5230\u672A\u77E5\u6D88\u606F\u7C7B\u578B ${msg.type}`);
     }
   }
-  /** 在 EDA 里执行一段 JS（AsyncFunction，可 await，`eda` 已注入） */
-  execute(code, timeoutMs = DEFAULT_EXEC_TIMEOUT_MS) {
+  /**
+   * 在 EDA 里执行一段 JS（AsyncFunction，可 await，`eda` 已注入）。
+   *
+   * 断连会自动重试一次：部分 EDA 操作（实测 createNetFlag）会让扩展重连，
+   * 此时请求已经发出但回包永远不会来。扩展几秒内就会自己连回来，重试即可成功 ——
+   * 比把一个本可恢复的抖动报成失败要好。
+   */
+  async execute(code, timeoutMs = DEFAULT_EXEC_TIMEOUT_MS) {
+    try {
+      return await this.executeOnce(code, timeoutMs);
+    } catch (e) {
+      if (!(e instanceof Error) || e.message !== "DISCONNECTED") throw e;
+      log("\u6267\u884C\u671F\u95F4\u8FDE\u63A5\u65AD\u5F00\uFF0C\u7B49\u5F85\u6269\u5C55\u91CD\u8FDE\u540E\u91CD\u8BD5\u4E00\u6B21");
+      const back = await this.waitForClient(RECONNECT_WAIT_MS);
+      if (!back) throw new Error("\u6267\u884C\u671F\u95F4\u8FDE\u63A5\u65AD\u5F00\uFF0C\u4E14\u6269\u5C55\u672A\u5728 30 \u79D2\u5185\u91CD\u8FDE\u3002\u53EF\u8BA9\u7528\u6237\u5728 EDA \u91CC\u70B9\u300CEDA Bridge \u2192 \u91CD\u65B0\u8FDE\u63A5\u300D\u3002");
+      return await this.executeOnce(code, timeoutMs);
+    }
+  }
+  executeOnce(code, timeoutMs) {
     const client = this.activeClient();
     if (!client) return Promise.reject(new Error("NO_CLIENT"));
     const id = randomUUID();
@@ -19522,6 +19548,22 @@ ${msg.stack}` : msg.error));
       }, timeoutMs);
       this.pending.set(id, { resolve: resolve2, reject, timer });
       this.send(client.ws, { type: "execute", id, code });
+    });
+  }
+  /** 等待有已认证连接；已有则立即返回 */
+  waitForClient(maxMs) {
+    if (this.activeClient()) return Promise.resolve(true);
+    return new Promise((resolve2) => {
+      const started = Date.now();
+      const tick = setInterval(() => {
+        if (this.activeClient()) {
+          clearInterval(tick);
+          resolve2(true);
+        } else if (Date.now() - started > maxMs) {
+          clearInterval(tick);
+          resolve2(false);
+        }
+      }, 300);
     });
   }
   send(ws, msg) {
@@ -20457,6 +20499,283 @@ var projectTools = [
   }
 ];
 
+// src/tools/schematic-edit.ts
+var EDIT_TIMEOUT_MS = 6e4;
+var ENSURE_SCH = `
+	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
+	if (!_page) return { error: 'NOT_SCH_EDITOR' };
+`;
+function schHint(r) {
+  if (r?.error !== "NOT_SCH_EDITOR") return r;
+  return {
+    error: "\u5F53\u524D\u7F16\u8F91\u5668\u91CC\u6CA1\u6709\u6253\u5F00\u539F\u7406\u56FE\u9875 \u2014\u2014 \u539F\u7406\u56FE\u63A5\u53E3\u7ED1\u5B9A\u6D3B\u52A8\u753B\u5E03\u3002",
+    next_step: "\u5148\u7528 eda_project_overview \u627E\u5230\u76EE\u6807\u9875 uuid\uFF0C\u518D\u7528 eda_open_document \u6253\u5F00\uFF0C\u7136\u540E\u91CD\u8BD5\u3002"
+  };
+}
+function num(args, key) {
+  const v = args[key];
+  if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${key} \u5FC5\u586B\uFF08number\uFF0C\u5355\u4F4D 0.01 inch\uFF09`);
+  return v;
+}
+var schematicEditTools = [
+  {
+    name: "eda_place_component",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u4E00\u4E2A\u5143\u5668\u4EF6\u3002\n\n\u7528\u7ACB\u521B\u5546\u57CE\u7F16\u53F7\uFF08lcsc_id\uFF09\u6700\u65B9\u4FBF\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7ED9 device_uuid + library_uuid\uFF08\u4ECE eda_library_search \u62FF\uFF09\u3002\n\n**\u5750\u6807\u5355\u4F4D\u662F 0.01 inch**\uFF08A4 \u56FE\u7EB8\u7EA6 1170 \xD7 830\uFF09\uFF0Crotation \u9006\u65F6\u9488\u4E3A\u6B63\u3002\u653E\u7F6E\u540E\u4F4D\u53F7\u7531 EDA \u6309\u5668\u4EF6\u7684\u9ED8\u8BA4\u524D\u7F00\u81EA\u52A8\u7F16\u53F7\u3002\n\n\u653E\u5B8C\u5EFA\u8BAE\u8C03 eda_schematic_components \u786E\u8BA4\uFF0C\u518D\u8DD1 eda_schematic_drc \u770B\u6709\u6CA1\u6709\u65B0\u589E error\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        lcsc_id: { type: "string", description: "\u7ACB\u521B\u5546\u57CE\u7F16\u53F7\uFF0C\u5982 C347222" },
+        device_uuid: { type: "string", description: "\u5668\u4EF6 uuid\uFF08\u4E0E library_uuid \u914D\u5408\uFF09" },
+        library_uuid: { type: "string", description: "\u5E93 uuid" },
+        x: { type: "number", description: "X \u5750\u6807\uFF0C\u5355\u4F4D 0.01 inch" },
+        y: { type: "number", description: "Y \u5750\u6807\uFF0C\u5355\u4F4D 0.01 inch" },
+        rotation: { type: "number", description: "\u65CB\u8F6C\u89D2\u5EA6\uFF08\u9006\u65F6\u9488\u4E3A\u6B63\uFF09\uFF0C\u9ED8\u8BA4 0" },
+        mirror: { type: "boolean", description: "\u662F\u5426\u955C\u50CF\uFF0C\u9ED8\u8BA4 false" }
+      },
+      required: ["x", "y"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const lcsc = optionalString(args, "lcsc_id");
+      const du = optionalString(args, "device_uuid");
+      const lu = optionalString(args, "library_uuid");
+      if (!lcsc && !(du && lu)) throw new Error("\u8BF7\u7ED9\u51FA lcsc_id\uFF0C\u6216 device_uuid + library_uuid");
+      const x = num(args, "x");
+      const y = num(args, "y");
+      const rotation = typeof args.rotation === "number" ? args.rotation : 0;
+      const mirror = args.mirror === true;
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				let uuid = ${JSON.stringify(du ?? null)}, libUuid = ${JSON.stringify(lu ?? null)};
+				const lcsc = ${JSON.stringify(lcsc ?? null)};
+				if (!uuid && lcsc) {
+					const hit = await eda.lib_Device.getByLcscIds([lcsc]);
+					if (!hit || !hit.length) return { ok: false, error: '\u5E93\u91CC\u627E\u4E0D\u5230\u7ACB\u521B\u7F16\u53F7 ' + lcsc };
+					uuid = hit[0].uuid; libUuid = hit[0].libraryUuid;
+				}
+				const before = (await eda.sch_PrimitiveComponent.getAll()).length;
+				const c = await eda.sch_PrimitiveComponent.create(
+					{ libraryUuid: libUuid, uuid }, ${x}, ${y}, undefined, ${rotation}, ${mirror}
+				);
+				const after = await eda.sch_PrimitiveComponent.getAll();
+				if (!c && after.length === before) return { ok: false, error: '\u653E\u7F6E\u5931\u8D25\uFF0CEDA \u672A\u8FD4\u56DE\u56FE\u5143\u4E14\u5668\u4EF6\u6570\u6CA1\u6709\u589E\u52A0' };
+				return {
+					ok: true,
+					placed: c ? { primitive_id: c.primitiveId, designator: c.designator, x: c.x, y: c.y } : null,
+					component_count: { before, after: after.length },
+					page: _page.name,
+				};
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_draw_wire",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u753B\u5BFC\u7EBF\u3002points \u662F\u5750\u6807\u6570\u7EC4 [x1,y1,x2,y2,\u2026]\uFF0C\u5355\u4F4D 0.01 inch\u3002\n\n\u7F51\u7EDC\u5F52\u5C5E\u89C4\u5219\uFF08\u5B98\u65B9\uFF09\uFF1A\u4E0D\u6307\u5B9A net \u65F6\u2014\u2014\u6CA1\u6709\u7AEF\u70B9\u843D\u5728\u56FE\u5143\u4E0A\u5219\u4E3A\u7A7A\u7F51\u7EDC\uFF1B\u6709\u4E00\u4E2A\u7AEF\u70B9\u843D\u5728\u67D0\u7F51\u7EDC\u7684\u56FE\u5143\u4E0A\u5219\u8DDF\u968F\u8BE5\u7F51\u7EDC\uFF1B\u7AEF\u70B9\u843D\u5728\u591A\u4E2A\u4E0D\u540C\u7F51\u7EDC\u4E0A\u5219**\u521B\u5EFA\u5931\u8D25**\u3002\u6307\u5B9A net \u65F6\u2014\u2014\u672A\u663E\u5F0F\u547D\u540D\u7F51\u7EDC\u7684\u76F8\u63A5\u56FE\u5143\u4F1A\u8DDF\u968F\u672C\u7F51\u7EDC\uFF1B\u5DF2\u663E\u5F0F\u547D\u540D\u7684\u5219\u521B\u5EFA\u5931\u8D25\u3002\n\n\u6240\u4EE5\u7ED9\u591A\u70B9\u8FDE\u7EBF\u65F6\uFF0C\u5148\u786E\u8BA4\u4E24\u7AEF\u5F15\u811A\u7684\u7F51\u7EDC\u72B6\u6001\uFF0C\u907F\u514D\u649E\u7F51\u7EDC\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        points: {
+          type: "array",
+          items: { type: "number" },
+          description: "\u6298\u7EBF\u5750\u6807 [x1,y1,x2,y2,...]\uFF0C\u81F3\u5C11\u4E24\u4E2A\u70B9\uFF084 \u4E2A\u6570\uFF09\uFF0C\u5355\u4F4D 0.01 inch"
+        },
+        net: { type: "string", description: "\u7F51\u7EDC\u540D\uFF0C\u53EF\u9009\uFF1B\u4E0D\u7ED9\u5219\u6309\u7AEF\u70B9\u6240\u89E6\u56FE\u5143\u63A8\u65AD" }
+      },
+      required: ["points"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const pts = args.points;
+      if (!Array.isArray(pts) || pts.length < 4 || pts.length % 2 !== 0 || pts.some((n) => typeof n !== "number")) {
+        throw new Error("points \u5FC5\u987B\u662F\u5076\u6570\u4E2A\u6570\u5B57\u4E14\u81F3\u5C11 4 \u4E2A\uFF08\u4E24\u4E2A\u70B9\uFF09\uFF0C\u5355\u4F4D 0.01 inch");
+      }
+      const net = optionalString(args, "net");
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const w = await eda.sch_PrimitiveWire.create(${JSON.stringify(pts)}, ${JSON.stringify(net ?? void 0)});
+				if (!w) return { ok: false, error: '\u5BFC\u7EBF\u521B\u5EFA\u5931\u8D25\u3002\u5E38\u89C1\u539F\u56E0\uFF1A\u7AEF\u70B9\u843D\u5728\u591A\u4E2A\u4E0D\u540C\u7F51\u7EDC\u7684\u56FE\u5143\u4E0A\uFF0C\u6216\u4E0E\u5DF2\u663E\u5F0F\u547D\u540D\u7F51\u7EDC\u7684\u56FE\u5143\u51B2\u7A81\u3002' };
+				return { ok: true, wire: { primitive_id: w.primitiveId, net: w.net ?? ${JSON.stringify(net ?? null)} }, page: _page.name };
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_add_net_identifier",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u7F51\u7EDC\u6807\u8BC6\uFF1A\u7F51\u7EDC\u6807\u7B7E\uFF08NetLabel\uFF09\u3001\u7535\u6E90/\u5730\u7B26\u53F7\uFF08NetFlag\uFF09\u6216\u7F51\u7EDC\u7AEF\u53E3\uFF08NetPort\uFF09\u3002\n\n- kind=label\uFF1A\u666E\u901A\u7F51\u7EDC\u6807\u7B7E\uFF0C\u8D34\u5728\u5BFC\u7EBF\u4E0A\u7ED9\u7F51\u7EDC\u547D\u540D\n- kind=power / ground / analog_ground / protect_ground\uFF1A\u7535\u6E90\u4E0E\u5404\u7C7B\u5730\u7B26\u53F7\n- kind=port_in / port_out / port_bi\uFF1A\u5C42\u6B21\u56FE\u7F51\u7EDC\u7AEF\u53E3\n\n\u5750\u6807\u5355\u4F4D 0.01 inch\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          enum: ["label", "power", "ground", "analog_ground", "protect_ground", "port_in", "port_out", "port_bi"],
+          description: "\u6807\u8BC6\u7C7B\u578B"
+        },
+        net: { type: "string", description: "\u7F51\u7EDC\u540D\uFF0C\u5982 GND / VCC_3V3" },
+        x: { type: "number", description: "X \u5750\u6807\uFF0C\u5355\u4F4D 0.01 inch" },
+        y: { type: "number", description: "Y \u5750\u6807\uFF0C\u5355\u4F4D 0.01 inch" },
+        rotation: { type: "number", description: "\u65CB\u8F6C\u89D2\u5EA6\uFF0C\u9ED8\u8BA4 0\uFF08label \u4E0D\u9002\u7528\uFF09" }
+      },
+      required: ["kind", "net", "x", "y"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const kind = requireString(args, "kind");
+      const net = requireString(args, "net");
+      const x = num(args, "x");
+      const y = num(args, "y");
+      const rotation = typeof args.rotation === "number" ? args.rotation : 0;
+      const FLAG = {
+        power: "Power",
+        ground: "Ground",
+        analog_ground: "AnalogGround",
+        protect_ground: "ProtectGround"
+      };
+      const PORT = { port_in: "IN", port_out: "OUT", port_bi: "BI" };
+      let call;
+      if (kind === "label") {
+        call = `await eda.sch_PrimitiveAttribute.createNetLabel(${x}, ${y}, ${JSON.stringify(net)})`;
+      } else if (FLAG[kind]) {
+        call = `await eda.sch_PrimitiveComponent.createNetFlag(${JSON.stringify(FLAG[kind])}, ${JSON.stringify(net)}, ${x}, ${y}, ${rotation})`;
+      } else if (PORT[kind]) {
+        call = `await eda.sch_PrimitiveComponent.createNetPort(${JSON.stringify(PORT[kind])}, ${JSON.stringify(net)}, ${x}, ${y}, ${rotation})`;
+      } else {
+        throw new Error(`\u672A\u77E5 kind: ${kind}`);
+      }
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const p = ${call};
+				if (!p) return { ok: false, error: '\u521B\u5EFA\u5931\u8D25\uFF0C\u8BF7\u786E\u8BA4\u5750\u6807\u5728\u56FE\u7EB8\u8303\u56F4\u5185\u3001\u7F51\u7EDC\u540D\u5408\u6CD5' };
+				return { ok: true, kind: ${JSON.stringify(kind)}, net: ${JSON.stringify(net)}, primitive_id: p.primitiveId, page: _page.name };
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_add_schematic_text",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u4E00\u6BB5\u6587\u5B57\uFF08\u6CE8\u91CA\u3001\u6807\u9898\u7B49\uFF09\u3002\u5750\u6807\u5355\u4F4D 0.01 inch\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        content: { type: "string", description: "\u6587\u5B57\u5185\u5BB9" },
+        x: { type: "number", description: "X \u5750\u6807\uFF0C\u5355\u4F4D 0.01 inch" },
+        y: { type: "number", description: "Y \u5750\u6807\uFF0C\u5355\u4F4D 0.01 inch" },
+        rotation: { type: "number", description: "\u65CB\u8F6C\u89D2\u5EA6\uFF0C\u9ED8\u8BA4 0" },
+        font_size: { type: "number", description: "\u5B57\u53F7\uFF0C\u53EF\u9009" }
+      },
+      required: ["content", "x", "y"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const content = requireString(args, "content");
+      const x = num(args, "x");
+      const y = num(args, "y");
+      const rotation = typeof args.rotation === "number" ? args.rotation : 0;
+      const size = typeof args.font_size === "number" ? args.font_size : null;
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const t = await eda.sch_PrimitiveText.create(${x}, ${y}, ${JSON.stringify(content)}, ${rotation}, null, null, ${size});
+				if (!t) return { ok: false, error: '\u6587\u5B57\u521B\u5EFA\u5931\u8D25' };
+				return { ok: true, primitive_id: t.primitiveId, page: _page.name };
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_delete_primitives",
+    description: "\u3010\u5199\u64CD\u4F5C\xB7\u4E0D\u53EF\u64A4\u9500\u3011\u5220\u9664\u5F53\u524D\u539F\u7406\u56FE\u9875\u4E0A\u7684\u56FE\u5143\uFF0C\u6309\u56FE\u5143 id\u3002\n\nid \u4ECE eda_schematic_primitives \u6216\u5404\u521B\u5EFA\u5DE5\u5177\u7684\u8FD4\u56DE\u503C\u91CC\u62FF\u3002\n\n**\u52A8\u624B\u524D\u5FC5\u987B\u8DDF\u7528\u6237\u786E\u8BA4\u8981\u5220\u4EC0\u4E48**\u2014\u2014\u672C\u5DE5\u5177\u4E0D\u505A\u4E8C\u6B21\u786E\u8BA4\uFF0CEDA \u4FA7\u4E5F\u4E0D\u4E00\u5B9A\u80FD\u64A4\u9500\u3002\u4E0D\u8981\u51ED\u731C\u6D4B\u5220\u9664\uFF0C\u4E0D\u786E\u5B9A\u5C31\u5148\u5217\u51FA\u6765\u7ED9\u7528\u6237\u770B\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        primitive_ids: { type: "array", items: { type: "string" }, description: "\u8981\u5220\u9664\u7684\u56FE\u5143 id \u6570\u7EC4" },
+        kind: {
+          type: "string",
+          enum: ["component", "wire", "text", "attribute"],
+          description: "\u56FE\u5143\u7C7B\u578B\uFF0C\u51B3\u5B9A\u7528\u54EA\u4E2A\u63A5\u53E3\u5220\u9664"
+        }
+      },
+      required: ["primitive_ids", "kind"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const ids = args.primitive_ids;
+      if (!Array.isArray(ids) || !ids.length || ids.some((i) => typeof i !== "string")) {
+        throw new Error("primitive_ids \u5FC5\u987B\u662F\u975E\u7A7A\u5B57\u7B26\u4E32\u6570\u7EC4");
+      }
+      const kind = requireString(args, "kind");
+      const API = {
+        component: "sch_PrimitiveComponent",
+        wire: "sch_PrimitiveWire",
+        text: "sch_PrimitiveText",
+        attribute: "sch_PrimitiveAttribute"
+      };
+      const api = API[kind];
+      if (!api) throw new Error(`\u672A\u77E5 kind: ${kind}`);
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const ok = await eda.${api}.delete(${JSON.stringify(ids)});
+				return { ok: ok === true, deleted_count: ${ids.length}, kind: ${JSON.stringify(kind)}, page: _page.name,
+					note: ok ? undefined : '\u63A5\u53E3\u8FD4\u56DE false\uFF0C\u53EF\u80FD id \u4E0D\u5B58\u5728\u6216\u7C7B\u578B\u4E0D\u5339\u914D' };
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_schematic_primitives",
+    description: '\u5217\u51FA\u5F53\u524D\u539F\u7406\u56FE\u9875\u4E0A\u7684\u5668\u4EF6\u56FE\u5143\uFF08\u542B\u56FE\u5143 id\u3001\u4F4D\u53F7\u3001\u5750\u6807\uFF09\u3002\n\n\u4E0E eda_schematic_components \u7684\u533A\u522B\uFF1A\u90A3\u4E2A\u8BFB\u7F51\u8868\uFF08\u542B\u578B\u53F7/\u5C01\u88C5/\u53C2\u6570\uFF0C\u53E3\u5F84\u662F"\u4F1A\u4E0A PCB \u7684\u5668\u4EF6"\uFF09\uFF1B\u8FD9\u4E2A\u8BFB\u753B\u5E03\u56FE\u5143\uFF08\u542B primitive_id \u548C\u5750\u6807\uFF0C\u5305\u542B\u7F51\u7EDC\u6807\u5FD7\u7B49\u975E BOM \u56FE\u5143\uFF09\uFF0C\u7528\u4E8E**\u5B9A\u4F4D\u548C\u7F16\u8F91**\u3002\u8981\u6539\u52A8\u6216\u5220\u9664\u56FE\u5143\u65F6\u7528\u8FD9\u4E2A\u62FF id\u3002',
+    inputSchema: {
+      type: "object",
+      properties: {
+        all_pages: { type: "boolean", description: "\u662F\u5426\u8DE8\u6240\u6709\u539F\u7406\u56FE\u9875\uFF0C\u9ED8\u8BA4 false\uFF08\u53EA\u5F53\u524D\u9875\uFF09" }
+      }
+    },
+    handler: async (args, ctx2) => {
+      const allPages = args.all_pages === true;
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const list = await eda.sch_PrimitiveComponent.getAll(undefined, ${allPages});
+				return {
+					page: _page.name,
+					all_pages: ${allPages},
+					count: list.length,
+					primitives: list.map(c => ({
+						primitive_id: c.primitiveId,
+						designator: c.designator,
+						x: c.x, y: c.y,
+						rotation: c.rotation,
+						locked: c.locked,
+					})),
+				};
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  }
+];
+
 // src/tools/schematic.ts
 var NETLIST_TIMEOUT_MS = 9e4;
 async function fetchComponents(ctx2) {
@@ -20599,6 +20918,7 @@ var allTools = [
   ...connectionTools,
   ...projectTools,
   ...schematicTools,
+  ...schematicEditTools,
   ...libraryTools,
   ...datasheetTools,
   ...createTools,

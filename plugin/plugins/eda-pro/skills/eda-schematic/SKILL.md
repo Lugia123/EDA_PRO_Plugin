@@ -80,6 +80,54 @@ eda_current_context     → 看 board 是不是用户想要的那块
 如果不是，要么让用户在 EDA 里切过去，要么用 `eda_open_project` 切工程。
 工具返回「EDA 没有返回网表」时，通常是当前打开的是 PCB 或开始页，不是原理图。
 
+## 写原理图
+
+写入工具都作用于**当前打开的原理图页**，先用 `eda_current_context` 确认位置对。
+
+```
+eda_place_component(lcsc_id:"C347222", x:300, y:300)   → 放器件，返回 primitive_id 与位号
+eda_draw_wire(points:[400,300,500,300], net:"VCC_3V3") → 画导线
+eda_add_net_identifier(kind:"ground", net:"GND", x:500, y:450)
+eda_add_schematic_text(content:"电源部分", x:300, y:200)
+eda_schematic_primitives                                → 列画布图元拿 primitive_id
+eda_delete_primitives(primitive_ids:[...], kind:"component")
+```
+
+### 坐标系
+
+**单位是 0.01 inch**，A4 图纸约 1170 × 830。旋转角逆时针为正、角度制。
+放置前先用 `eda_schematic_primitives` 看现有器件的坐标分布，别把新器件叠在旧的上面。
+
+### 导线的网络归属有规则
+
+不指定 `net` 时：端点不碰任何图元 → 空网络；碰到一个网络的图元 → 跟随它；
+碰到**多个不同网络** → 创建失败。
+
+指定 `net` 时：相接的、未显式命名过网络的图元会跟随你指定的网络；
+若对方已经显式命名（有网络标签或端口）→ 创建失败。
+
+所以连两个已命名网络的引脚时，不要指望画根线就能合并它们——那会失败。
+
+### 两类"器件列表"别混用
+
+| 工具 | 数据源 | 给你什么 | 用途 |
+|---|---|---|---|
+| `eda_schematic_components` | 网表 | 型号、封装、立创编号、参数 | 看 BOM、查规格 |
+| `eda_schematic_primitives` | 画布图元 | **primitive_id**、坐标、位号 | 定位、修改、删除 |
+
+要改动或删除，必须用后者拿 `primitive_id`。
+
+### 删除很危险
+
+`eda_delete_primitives` 不可撤销，工具本身不做二次确认。**删之前先列出来给用户看**，
+确认清楚再动手。不确定就别删。
+
+### 写完记得验
+
+放完器件、连完线，跑一次 `eda_schematic_drc` 看 error 有没有增加。
+写入操作偶尔会让扩展短暂重连，bridge 会自动等待并重试一次，所以偶发的一次卡顿不必惊慌；
+连续失败才说明真有问题。
+
 ## 已知不可用的路径
 
 不要用 `eda.sch_Document.getPrimitivesInRegion()` 去枚举图元 —— 实测在扩展执行环境里
