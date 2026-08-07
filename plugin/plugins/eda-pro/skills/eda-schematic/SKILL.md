@@ -85,13 +85,28 @@ eda_current_context     → 看 board 是不是用户想要的那块
 写入工具都作用于**当前打开的原理图页**，先用 `eda_current_context` 确认位置对。
 
 ```
-eda_place_component(lcsc_id:"C347222", x:300, y:300)   → 放器件，返回 primitive_id 与位号
-eda_draw_wire(points:[400,300,500,300], net:"VCC_3V3") → 画导线
+eda_place_component(lcsc_id:"C347222", x:300, y:300)   → 放器件，自动分配位号
+eda_component_pins(designator:"U1")                    → 看引脚号/名/坐标/朝向
+eda_connect_pins(from:"U1.3", to:"C1.1", net:"VIN")    → 按引脚连线（主力工具）
+eda_draw_wire(points:[400,300,500,300], net:"VCC_3V3") → 手工画线（连不到引脚时才用）
 eda_add_net_identifier(kind:"ground", net:"GND", x:500, y:450)
 eda_add_schematic_text(content:"电源部分", x:300, y:200)
 eda_schematic_primitives                                → 列画布图元拿 primitive_id
 eda_delete_primitives(primitive_ids:[...], kind:"component")
 ```
+
+### 连线优先用 eda_connect_pins
+
+它会自己查引脚坐标、按引脚朝向选走线方向（顺着引脚引出，不会把线压在符号上）。
+手工算坐标调 `eda_draw_wire` 容易差之毫厘连不上。
+
+引脚用「位号.引脚号」或「位号.引脚名」指定：`U1.3`、`U1.VIN` 都行。
+
+### 位号是自动分配的
+
+EDA 的放置接口给出来的位号是库里的**占位符**（`U?`），不编号的话多个器件全叫 `U?`，
+没法引用也没法连线。`eda_place_component` 会扫全图已用位号补上下一个编号（U1、U2…），
+返回值里的 `designator` 就是最终位号 —— **后续连线要用它**，不要自己猜。
 
 ### 坐标系
 
@@ -121,6 +136,15 @@ eda_delete_primitives(primitive_ids:[...], kind:"component")
 
 `eda_delete_primitives` 不可撤销，工具本身不做二次确认。**删之前先列出来给用户看**，
 确认清楚再动手。不确定就别删。
+
+### 网络标签必须贴在导线上
+
+`eda_add_net_identifier(kind:"label")` 的坐标要落在**一条已有导线**上。放在空白处时
+EDA 会进入等待鼠标点击的交互模式，接口一直不返回。所以顺序是：先画线 → 再取线上一点贴标签。
+
+另外实测这个操作每次都会让扩展重连一次，回包必丢。工具不会报成普通失败，而是明确告诉你
+**动作很可能已经生效** —— 这时**不要直接重试**（会放两个标签），先用 `eda_schematic_nets`
+核实网络在不在，再决定。
 
 ### 写完记得验
 

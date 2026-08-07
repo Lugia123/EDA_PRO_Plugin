@@ -299,8 +299,25 @@ export class Bridge {
 			if (!(e instanceof Error) || e.message !== 'DISCONNECTED') throw e;
 			log('执行期间连接断开，等待扩展重连后重试一次');
 			const back = await this.waitForClient(RECONNECT_WAIT_MS);
-			if (!back) throw new Error('执行期间连接断开，且扩展未在 30 秒内重连。可让用户在 EDA 里点「EDA Bridge → 重新连接」。');
-			return await this.executeOnce(code, timeoutMs);
+			if (!back) {
+				throw new Error(
+					'执行期间连接断开，且扩展未在 30 秒内重连。' +
+						'**这段代码可能已经在 EDA 里执行过了** —— 断的是回包，不是执行本身，' +
+						'重试写操作前请先核实当前状态。可让用户在 EDA 里点「EDA Bridge → 重新连接」。',
+				);
+			}
+			try {
+				return await this.executeOnce(code, timeoutMs);
+			} catch (e2) {
+				if (!(e2 instanceof Error) || e2.message !== 'DISCONNECTED') throw e2;
+				// 连着两次都在同一处断开，说明这个 EDA 操作本身会让扩展重连（实测 createNetLabel 会）。
+				// 关键是：断的是回包，动作很可能已经生效 —— 报成"失败"会诱导上层重复执行。
+				throw new Error(
+					'该操作每次执行都会让 EDA 扩展重连，拿不到返回值。' +
+						'**动作很可能已经生效**（断开的是回包，不是执行）—— ' +
+						'请先用只读工具核实结果（如 eda_schematic_nets / eda_schematic_primitives），确认后再决定是否重做，不要直接重试。',
+				);
+			}
 		}
 	}
 
