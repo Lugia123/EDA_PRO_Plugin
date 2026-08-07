@@ -147,6 +147,125 @@ export const schematicEditTools: ToolDef[] = [
 		},
 	},
 	{
+		name: 'eda_arrange_block',
+		description:
+			'【写操作】把一个功能块排布好：核心芯片居中，外围器件按**它接在芯片哪一侧的引脚**放到对应方位。' +
+			'\n\n这一步是纯几何计算，交给工具做；**哪些器件属于同一个功能块是你的判断**，' +
+			'要先读 eda-schematic-layout skill 想清楚再调。' +
+			'\n\n工具会读取每个器件符号的实际尺寸（bbox）来决定间距，避免互相压住 —— ' +
+			'固定间距在大芯片（十几个引脚）上必然重叠。' +
+			'\n\n外围器件与核心共享哪条网络、那条网络接在核心的哪个引脚上，决定它被放到左/右/上/下。' +
+			'接电源网络的（去耦电容）放上方，接地的放下方，其余按引脚方位。' +
+			'\n\n排完整块再调 eda_auto_route。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				core: { type: 'string', description: '核心器件位号，通常是芯片，如 U5' },
+				members: { type: 'array', items: { type: 'string' }, description: '块内其余器件位号，如 ["R15","R16","C19"]' },
+				center_x: { type: 'number', description: '块中心 X（0.01 inch）' },
+				center_y: { type: 'number', description: '块中心 Y（0.01 inch）' },
+				gap: { type: 'number', description: '器件之间的净间隙，默认 60（0.01 inch）' },
+			},
+			required: ['core', 'members', 'center_x', 'center_y'],
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const core = requireString(args, 'core');
+			const members = Array.isArray(args.members) ? (args.members as string[]) : [];
+			const cx = num(args, 'center_x');
+			const cy = num(args, 'center_y');
+			const gap = typeof args.gap === 'number' ? args.gap : 60;
+			return schHint(
+				await ctx.exec<Record<string, unknown>>(
+					`
+				${ENSURE_SCH}
+				const CORE = ${JSON.stringify(core)}.toUpperCase();
+				const MEMBERS = ${JSON.stringify(members)}.map(s => String(s).toUpperCase());
+				const CX = ${cx}, CY = ${cy}, GAP = ${gap};
+
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+				const coreC = byDes[CORE];
+				if (!coreC) return { ok: false, error: '找不到核心器件 ' + CORE };
+
+				const sizeOf = async (c) => {
+					const b = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => undefined);
+					if (!b) return { w: 60, h: 60 };
+					return { w: Math.max(20, b.maxX - b.minX), h: Math.max(20, b.maxY - b.minY) };
+				};
+
+				// 先把核心摆到块中心
+				await eda.sch_PrimitiveComponent.modify(coreC.primitiveId, { x: CX, y: CY });
+				const coreSize = await sizeOf(coreC);
+				const corePins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(coreC.primitiveId);
+
+				// 核心每条网络挂在哪一侧：比较引脚相对核心中心的位置
+				const netSide = {};
+				for (const p of (corePins || [])) {
+					if (!p.net) continue;
+					const dx = p.x - CX, dy = p.y - CY;
+					const side = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'L' : 'R') : (dy < 0 ? 'T' : 'B');
+					if (!netSide[p.net]) netSide[p.net] = side;
+				}
+				const isPower = (n) => /^(GND|AGND|DGND|PGND|SGND|VSS|VEE)$/i.test(n);
+				const isSupply = (n) => /^(VCC|VDD|VBAT|\+?\d+V|V\+)/i.test(n);
+
+				// 每个外围器件按它与核心共享的网络定方位；接地朝下、接电源朝上
+				const buckets = { L: [], R: [], T: [], B: [] };
+				const unresolved = [];
+				for (const des of MEMBERS) {
+					const c = byDes[des];
+					if (!c) { unresolved.push(des + '(找不到)'); continue; }
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId);
+					let side = null;
+					for (const p of (pins || [])) {
+						if (!p.net) continue;
+						if (isPower(p.net)) { side = side || 'B'; continue; }
+						if (isSupply(p.net)) { side = side || 'T'; continue; }
+						if (netSide[p.net]) { side = netSide[p.net]; break; }
+					}
+					if (!side) { side = 'R'; unresolved.push(des); }
+					buckets[side].push({ des, c });
+				}
+
+				// 同一侧依次排开，间距用各自实际尺寸算，避免压住
+				const placed = [];
+				const halfW = coreSize.w / 2, halfH = coreSize.h / 2;
+				for (const side of ['L', 'R', 'T', 'B']) {
+					const list = buckets[side];
+					let offset = 0;
+					for (let i = 0; i < list.length; i++) {
+						const { des, c } = list[i];
+						const sz = await sizeOf(c);
+						let x = CX, y = CY;
+						if (side === 'L' || side === 'R') {
+							const dir = side === 'L' ? -1 : 1;
+							x = CX + dir * (halfW + GAP + sz.w / 2);
+							y = CY - ((list.length - 1) * (sz.h + GAP)) / 2 + i * (sz.h + GAP);
+						} else {
+							const dir = side === 'T' ? -1 : 1;
+							y = CY + dir * (halfH + GAP + sz.h / 2);
+							x = CX - ((list.length - 1) * (sz.w + GAP)) / 2 + i * (sz.w + GAP);
+						}
+						await eda.sch_PrimitiveComponent.modify(c.primitiveId, { x: Math.round(x), y: Math.round(y) });
+						placed.push({ des, side, x: Math.round(x), y: Math.round(y) });
+						offset += 1;
+					}
+				}
+				return {
+					ok: true, core: CORE, core_size: coreSize,
+					placed_count: placed.length, placed,
+					unresolved: unresolved.length ? unresolved : undefined,
+					note: '块内已按引脚方位排布。整张图排完后跑 eda_auto_route。',
+				};
+			`,
+					180_000,
+				),
+			);
+		},
+	},
+	{
 		name: 'eda_arrange_components',
 		description:
 			'【写操作】批量移动 / 旋转器件 —— 功能分区布局的执行手段。' +
@@ -481,9 +600,12 @@ export const schematicEditTools: ToolDef[] = [
 				const c = all.find(x => String(x.designator || '').toUpperCase() === want);
 				if (!c) return { error: '当前原理图页里没有位号 ' + want, available: all.map(x => x.designator).filter(Boolean).slice(0, 40) };
 				const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId);
+				// 符号实际占多大是布局的必要输入 —— 不知道尺寸就只能猜间距，器件会互相压住
+				const bbox = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => undefined);
 				return {
 					designator: c.designator,
 					component: { primitive_id: c.primitiveId, x: c.x, y: c.y, rotation: c.rotation },
+					bbox: bbox ? { ...bbox, width: bbox.maxX - bbox.minX, height: bbox.maxY - bbox.minY } : undefined,
 					pin_count: (pins || []).length,
 					pins: (pins || []).map(p => ({
 						number: p.pinNumber, name: p.pinName,

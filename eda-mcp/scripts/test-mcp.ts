@@ -53,6 +53,7 @@ console.log('▶ 已连接 MCP server（stdio）\n');
 const EXPECTED_TOOLS = [
 	'eda_add_net_identifier',
 	'eda_add_schematic_text',
+	'eda_arrange_block',
 	'eda_arrange_components',
 	'eda_auto_layout',
 	'eda_auto_route',
