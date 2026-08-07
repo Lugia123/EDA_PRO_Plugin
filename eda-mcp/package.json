@@ -12,7 +12,8 @@
     "test:mcp": "npm run build && tsx scripts/test-mcp.ts",
     "deploy": "npm run build && bash scripts/deploy-to-plugin.sh",
     "gen:api": "tsx scripts/gen-api-index.ts",
-    "predeploy": "node ../scripts/stamp-version.mjs"
+    "predeploy": "node ../scripts/stamp-version.mjs",
+    "mcp:daemon": "tsx scripts/mcp-daemon.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# 调一次 MCP 工具（需要 mcp-daemon 在跑）
+#   ./scripts/mcp eda_status
+#   ./scripts/mcp eda_place_component '{"lcsc_id":"C347222","x":200,"y":150}'
+set -euo pipefail
+TOOL="${1:?用法: ./scripts/mcp <tool> [json-args]}"
+ARGS="${2:-}"
+[ -z "$ARGS" ] && ARGS='{}'
+python3 -c '
+import json,sys
+print(json.dumps({"tool": sys.argv[1], "args": json.loads(sys.argv[2])}))
+' "$TOOL" "$ARGS" | curl -sS -X POST http://127.0.0.1:49655 \
+  -H "Content-Type: application/json" --data-binary @- | python3 -m json.tool

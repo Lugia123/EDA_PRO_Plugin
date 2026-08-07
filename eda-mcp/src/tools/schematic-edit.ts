@@ -61,6 +61,21 @@ export const schematicEditTools: ToolDef[] = [
 			const size = optionalString(args, 'size');
 			const w = typeof args.width === 'number' ? args.width : null;
 			const h = typeof args.height === 'number' ? args.height : null;
+			// 实测：只写 Size / Page Size 不生效（返回 ok，图纸仍是 A4）。
+			// 从界面改图纸规格时真正变的是「图纸宽度 / 图纸高度」（单位 inch），
+			// 所以把规格换算成尺寸一并写下去，并按写回后的实际值判定成败。
+			// 单位是 **0.01 inch**，和图元坐标一致 —— 不是 inch。
+			// 实测：写 11.7 进去图纸会缩成 0.117 inch；界面上显示的 "11.7inch" 是换算后的展示值。
+			const SHEETS: Record<string, [number, number]> = {
+				A5: [827, 583], A4: [1170, 825], A3: [1655, 1170],
+				A2: [2340, 1655], A1: [3310, 2340], A0: [4680, 3310],
+			};
+			const key = size ? size.toUpperCase() : '';
+			if (size && !SHEETS[key] && !(w && h)) {
+				throw new Error(`不认识的图纸规格 ${size}，可选 ${Object.keys(SHEETS).join(' / ')}，或直接给 width/height（inch）`);
+			}
+			// width/height 参数按 inch 收（对用户更自然），内部换算成 0.01 inch
+			const [sw, sh] = SHEETS[key] ?? [Math.round((w ?? 0) * 100), Math.round((h ?? 0) * 100)];
 			if (!size && !(w && h)) throw new Error('请给出 size（如 A3），或同时给出 width 与 height（inch）');
 			return schHint(
 				await ctx.exec<Record<string, unknown>>(
@@ -73,16 +88,20 @@ export const schematicEditTools: ToolDef[] = [
 				const data = JSON.parse(JSON.stringify(before));
 				const put = (k, v) => { data[k] = Object.assign({}, data[k] || {}, { value: String(v) }); };
 				${size ? `put('Size', ${JSON.stringify(size)}); put('Page Size', ${JSON.stringify(size)});` : ''}
-				${w ? `put('Width', ${w});` : ''}
-				${h ? `put('Height', ${h});` : ''}
+				put('Width', ${sw});
+				put('Height', ${sh});
 				const ok = await eda.dmt_Schematic.modifySchematicPageTitleBlock(undefined, data);
+				// getCurrentSchematicPageInfo 读的是缓存，写完立刻读会拿到**上一次**的值
+				// （实测写 1655 读回 16.55 —— 正是前一次写进去的数），等一下再读才是新值。
+				await new Promise((r) => setTimeout(r, 400));
 				const after = (await eda.dmt_Schematic.getCurrentSchematicPageInfo())?.titleBlockData || {};
 				const read = (k) => after[k] && after[k].value !== undefined ? String(after[k].value) : undefined;
 				return {
-					ok: ok === true,
+					ok: ok === true && Math.abs(Number(read('Width')) - ${sw}) < 0.05 && Math.abs(Number(read('Height')) - ${sh}) < 0.05,
 					page: _page.name,
 					size: read('Size'), page_size: read('Page Size'),
-					width: read('Width'), height: read('Height'),
+					canvas: { width: Number(read('Width')), height: Number(read('Height')) },
+					inch: { width: Number(read('Width')) / 100, height: Number(read('Height')) / 100 },
 					before: { size: before.Size && before.Size.value, width: before.Width && before.Width.value, height: before.Height && before.Height.value },
 				};
 			`,
@@ -147,6 +166,87 @@ export const schematicEditTools: ToolDef[] = [
 		},
 	},
 	{
+		name: 'eda_label_nets',
+		description:
+			'【写操作】按一份网络声明批量标注引脚 —— eda_label_pin_net 的批量版，' +
+			'吃的是和 eda_arrange_block 完全相同的 nets 参数：' +
+			'{ "+24V": ["U1.3","C11.1"], "GND": ["U1.1","C11.2"] }。' +
+			'\n\n**同一份声明先排布、再标注**，写一次用两处，也保证了摆位依据和电气连接是同一套东西。' +
+			'一个功能块动辄十几二十个引脚，逐个调用要几分钟，这里一次搞定。' +
+			'\n\n顺序很重要：**先把块排布定稿再标注**。标注会在引脚旁画出短导线，' +
+			'之后再移动器件，导线会留在原地，连接就断了。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				nets: {
+					type: 'object',
+					description: '{ 网络名: ["位号.引脚号", …] }，与 eda_arrange_block 的 nets 同格式',
+					additionalProperties: { type: 'array', items: { type: 'string' } },
+				},
+				length: { type: 'number', description: '每个引脚引出线的长度（0.01 inch），默认 20' },
+			},
+			required: ['nets'],
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const nets = (args.nets && typeof args.nets === 'object' ? args.nets : {}) as Record<string, string[]>;
+			const len = typeof args.length === 'number' && args.length > 0 ? args.length : 20;
+			const jobs: Array<{ des: string; pin: string; net: string }> = [];
+			for (const [net, refs] of Object.entries(nets)) {
+				for (const ref of Array.isArray(refs) ? refs : []) {
+					const dot = String(ref).lastIndexOf('.');
+					if (dot <= 0) continue;
+					jobs.push({ des: String(ref).slice(0, dot).toUpperCase(), pin: String(ref).slice(dot + 1), net });
+				}
+			}
+			if (!jobs.length) throw new Error('nets 里没有可解析的 "位号.引脚号" 条目');
+
+			const r = await ctx.exec<Record<string, unknown>>(
+				`
+				${ENSURE_SCH}
+				const JOBS = ${JSON.stringify(jobs)};
+				const L = ${len};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+
+				const pinCache = {};
+				const getPins = async (des) => {
+					if (!pinCache[des]) {
+						const c = byDes[des];
+						pinCache[des] = c ? (await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId) || []) : [];
+					}
+					return pinCache[des];
+				};
+
+				const done = [], failed = [];
+				for (const j of JOBS) {
+					if (!byDes[j.des]) { failed.push({ ref: j.des + '.' + j.pin, why: '图上没有这个位号' }); continue; }
+					const pins = await getPins(j.des);
+					const key = String(j.pin).toUpperCase();
+					let p = null;
+					for (const x of pins) if (String(x.pinNumber || '').toUpperCase() === key) { p = x; break; }
+					if (!p) for (const x of pins) if (String(x.pinName || '').toUpperCase() === key) { p = x; break; }
+					if (!p) {
+						const avail = pins.map((x) => x.pinNumber + ':' + x.pinName).join(' ');
+						failed.push({ ref: j.des + '.' + j.pin, why: '找不到该引脚', pins: avail });
+						continue;
+					}
+					// 顺着引脚朝向往外引，从符号内侧接入的话 EDA 不认这个连接
+					const rot = ((Number(p.rotation) % 360) + 360) % 360;
+					const d = rot === 0 ? [L, 0] : rot === 90 ? [0, -L] : rot === 180 ? [-L, 0] : rot === 270 ? [0, L] : [L, 0];
+					const w = await eda.sch_PrimitiveWire.create([p.x, p.y, p.x + d[0], p.y + d[1]], j.net);
+					if (w) done.push(j.des + '.' + p.pinNumber + '=' + j.net);
+					else failed.push({ ref: j.des + '.' + j.pin, why: '引出线创建失败（该引脚可能已属于别的网络）' });
+				}
+				return { ok: failed.length === 0, labeled: done.length, total: JOBS.length, done, failed };
+			`,
+				180_000,
+			);
+			return schHint(r);
+		},
+	},
+	{
 		name: 'eda_arrange_block',
 		description:
 			'【写操作】把一个功能块排布好：核心芯片居中，外围器件按**它接在芯片哪一侧的引脚**放到对应方位。' +
@@ -165,106 +265,225 @@ export const schematicEditTools: ToolDef[] = [
 				center_x: { type: 'number', description: '块中心 X（0.01 inch）' },
 				center_y: { type: 'number', description: '块中心 Y（0.01 inch）' },
 				gap: { type: 'number', description: '器件之间的净间隙，默认 60（0.01 inch）' },
+				nets: {
+					type: 'object',
+					description:
+						'本块的连接声明，**强烈建议传**：{ "+24V": ["U1.3","C11.1"], "GND": ["U1.1","C11.2"] }，' +
+						'键是网络名、值是 "位号.引脚号" 列表。器件刚放下时图上还没有任何网络，' +
+						'不传这个参数工具就无从判断谁该放左、谁该放右，只能全堆到右边一列。' +
+						'同一份声明可以原样喂给 eda_label_pin_net 做标注 —— 写一次，用两处。',
+					additionalProperties: { type: 'array', items: { type: 'string' } },
+				},
+				max_per_lane: {
+					type: 'number',
+					description: '同一侧排满几个就换下一列/行，默认 3。防止外围器件排成长条顶出图框。',
+				},
 			},
 			required: ['core', 'members', 'center_x', 'center_y'],
 		},
 		mutating: true,
 		handler: async (args, ctx) => {
-			const core = requireString(args, 'core');
-			const members = Array.isArray(args.members) ? (args.members as string[]) : [];
+			const core = requireString(args, 'core').toUpperCase();
+			const members = (Array.isArray(args.members) ? (args.members as string[]) : []).map((m) => String(m).toUpperCase());
 			const cx = num(args, 'center_x');
 			const cy = num(args, 'center_y');
 			const gap = typeof args.gap === 'number' ? args.gap : 60;
-			return schHint(
-				await ctx.exec<Record<string, unknown>>(
-					`
-				${ENSURE_SCH}
-				const CORE = ${JSON.stringify(core)}.toUpperCase();
-				const MEMBERS = ${JSON.stringify(members)}.map(s => String(s).toUpperCase());
-				const CX = ${cx}, CY = ${cy}, GAP = ${gap};
+			const nets = (args.nets && typeof args.nets === 'object' ? args.nets : {}) as Record<string, string[]>;
+			// 一侧最多排几个才换列。默认 3：再多就顶出图框，也超出了「一眼看清一组」的范围
+			const MAX_PER_LANE = typeof args.max_per_lane === 'number' && args.max_per_lane > 0 ? args.max_per_lane : 3;
 
+			// 位号.引脚号 -> 网络名。AI 声明的连接关系是排布的唯一依据 ——
+			// 器件刚放下时图上还没有网络，靠读 p.net 什么都判断不出来。
+			const declared = new Map<string, string>();
+			const netsOfDes = new Map<string, Set<string>>();
+			for (const [net, refs] of Object.entries(nets)) {
+				for (const ref of Array.isArray(refs) ? refs : []) {
+					const dot = String(ref).lastIndexOf('.');
+					if (dot <= 0) continue;
+					const des = String(ref).slice(0, dot).toUpperCase();
+					declared.set(`${des}.${String(ref).slice(dot + 1)}`, net);
+					if (!netsOfDes.has(des)) netsOfDes.set(des, new Set());
+					netsOfDes.get(des)?.add(net);
+				}
+			}
+
+			// ── 第一趟：只取数据，不做判断 ──
+			type Info = { des: string; id: string; w: number; h: number; pins: Array<{ n: string; x: number; y: number }> };
+			const snap = await ctx.exec<{ items?: Info[] }>(
+				`
+				${ENSURE_SCH}
+				const WANT = ${JSON.stringify([core, ...members])};
 				const all = await eda.sch_PrimitiveComponent.getAll();
 				const byDes = {};
 				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
-				const coreC = byDes[CORE];
-				if (!coreC) return { ok: false, error: '找不到核心器件 ' + CORE };
-
-				const sizeOf = async (c) => {
-					const b = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => undefined);
-					if (!b) return { w: 60, h: 60 };
-					return { w: Math.max(20, b.maxX - b.minX), h: Math.max(20, b.maxY - b.minY) };
-				};
-
-				// 先把核心摆到块中心
-				await eda.sch_PrimitiveComponent.modify(coreC.primitiveId, { x: CX, y: CY });
-				const coreSize = await sizeOf(coreC);
-				const corePins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(coreC.primitiveId);
-
-				// 核心每条网络挂在哪一侧：比较引脚相对核心中心的位置
-				const netSide = {};
-				for (const p of (corePins || [])) {
-					if (!p.net) continue;
-					const dx = p.x - CX, dy = p.y - CY;
-					const side = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'L' : 'R') : (dy < 0 ? 'T' : 'B');
-					if (!netSide[p.net]) netSide[p.net] = side;
-				}
-				const isPower = (n) => /^(GND|AGND|DGND|PGND|SGND|VSS|VEE)$/i.test(n);
-				const isSupply = (n) => /^(VCC|VDD|VBAT|\+?\d+V|V\+)/i.test(n);
-
-				// 每个外围器件按它与核心共享的网络定方位；接地朝下、接电源朝上
-				const buckets = { L: [], R: [], T: [], B: [] };
-				const unresolved = [];
-				for (const des of MEMBERS) {
+				const items = [];
+				for (const des of WANT) {
 					const c = byDes[des];
-					if (!c) { unresolved.push(des + '(找不到)'); continue; }
-					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId);
-					let side = null;
-					for (const p of (pins || [])) {
-						if (!p.net) continue;
-						if (isPower(p.net)) { side = side || 'B'; continue; }
-						if (isSupply(p.net)) { side = side || 'T'; continue; }
-						if (netSide[p.net]) { side = netSide[p.net]; break; }
-					}
-					if (!side) { side = 'R'; unresolved.push(des); }
-					buckets[side].push({ des, c });
+					if (!c) continue;
+					const b = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => undefined);
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					items.push({
+						des: des,
+						id: c.primitiveId,
+						w: b ? Math.max(20, b.maxX - b.minX) : 60,
+						h: b ? Math.max(20, b.maxY - b.minY) : 60,
+						pins: (pins || []).map((p) => ({
+							n: String(p.pinNumber != null ? p.pinNumber : (p.number != null ? p.number : '')),
+							x: p.x, y: p.y,
+						})),
+					});
 				}
-
-				// 同一侧依次排开，间距用各自实际尺寸算，避免压住
-				const placed = [];
-				const halfW = coreSize.w / 2, halfH = coreSize.h / 2;
-				for (const side of ['L', 'R', 'T', 'B']) {
-					const list = buckets[side];
-					let offset = 0;
-					for (let i = 0; i < list.length; i++) {
-						const { des, c } = list[i];
-						const sz = await sizeOf(c);
-						let x = CX, y = CY;
-						if (side === 'L' || side === 'R') {
-							const dir = side === 'L' ? -1 : 1;
-							x = CX + dir * (halfW + GAP + sz.w / 2);
-							y = CY - ((list.length - 1) * (sz.h + GAP)) / 2 + i * (sz.h + GAP);
-						} else {
-							const dir = side === 'T' ? -1 : 1;
-							y = CY + dir * (halfH + GAP + sz.h / 2);
-							x = CX - ((list.length - 1) * (sz.w + GAP)) / 2 + i * (sz.w + GAP);
-						}
-						await eda.sch_PrimitiveComponent.modify(c.primitiveId, { x: Math.round(x), y: Math.round(y) });
-						placed.push({ des, side, x: Math.round(x), y: Math.round(y) });
-						offset += 1;
-					}
-				}
-				return {
-					ok: true, core: CORE, core_size: coreSize,
-					placed_count: placed.length, placed,
-					unresolved: unresolved.length ? unresolved : undefined,
-					note: '块内已按引脚方位排布。整张图排完后跑 eda_auto_route。',
-				};
+				return { ok: true, items };
 			`,
-					180_000,
-				),
+				120_000,
 			);
+			const items = new Map((snap.items ?? []).map((i) => [i.des, i]));
+			const coreInfo = items.get(core);
+			if (!coreInfo) return { ok: false, error: `找不到核心器件 ${core}` };
+
+			// ── 几何计算全在 Node 侧：可打印、可回归，不用为了看一个中间值重启整条链路 ──
+			const GND = ['GND', 'AGND', 'DGND', 'PGND', 'SGND', 'VSS', 'VEE'];
+			const isGnd = (n: string) => GND.includes(n.toUpperCase());
+			const isSupply = (n: string) => {
+				const u = n.toUpperCase();
+				if (u.startsWith('VCC') || u.startsWith('VDD') || u.startsWith('VBAT') || u === 'V+') return true;
+				return /^[+0-9]/.test(u) && u.includes('V');
+			};
+
+			// 核心的每条网络挂在哪一侧 —— 拿核心自己的引脚坐标跟引脚重心比
+			const gx = coreInfo.pins.reduce((a, q) => a + q.x, 0) / Math.max(1, coreInfo.pins.length);
+			const gy = coreInfo.pins.reduce((a, q) => a + q.y, 0) / Math.max(1, coreInfo.pins.length);
+			const netSide = new Map<string, 'L' | 'R' | 'T' | 'B'>();
+			for (const p of coreInfo.pins) {
+				const net = declared.get(`${core}.${p.n}`);
+				if (!net) continue;
+				const dx = p.x - gx, dy = p.y - gy;
+				// EDA 原理图 y 轴**向上为正**（实测：y=1010 的器件显示在 y=220 的上方）。
+				// dy > 0 才是「在核心上方」，别照搬屏幕坐标的直觉写反。
+				const side = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'L' : 'R') : dy > 0 ? 'T' : 'B';
+				if (!netSide.has(net)) netSide.set(net, side);
+			}
+
+			const buckets: Record<'L' | 'R' | 'T' | 'B', string[]> = { L: [], R: [], T: [], B: [] };
+			const unresolved: string[] = [];
+			const anchorOf = new Map<string, { x: number; y: number } | null>();
+			for (const des of members) {
+				if (!items.has(des)) {
+					unresolved.push(`${des}(图上没有)`);
+					continue;
+				}
+				const mine = [...(netsOfDes.get(des) ?? [])];
+				// 优先跟着核心的引脚方位走；只接电源/地的（去耦电容）按惯例上电源下地
+				let side = mine.map((n) => netSide.get(n)).find(Boolean) as 'L' | 'R' | 'T' | 'B' | undefined;
+				if (!side && mine.some(isSupply)) side = 'T';
+				if (!side && mine.some(isGnd)) side = 'B';
+				if (!side) {
+					side = 'R';
+					unresolved.push(des);
+				}
+				// 记下它挂在核心的哪个引脚上 —— 同侧多个器件要按这个坐标排序，
+				// 否则接 VIN 的和接 VOUT 的混着放，线必然交叉。
+				const anchorPin = coreInfo.pins.find((cp) => {
+					const n = declared.get(`${core}.${cp.n}`);
+					return n != null && mine.includes(n);
+				});
+				anchorOf.set(des, anchorPin ? { x: anchorPin.x, y: anchorPin.y } : null);
+				buckets[side].push(des);
+			}
+
+			const moves: Array<{ des: string; id: string; x: number; y: number; side: string }> = [
+				{ des: core, id: coreInfo.id, x: Math.round(cx), y: Math.round(cy), side: 'core' },
+			];
+			const halfW = coreInfo.w / 2;
+			const halfH = coreInfo.h / 2;
+			for (const side of ['L', 'R', 'T', 'B'] as const) {
+				const list = buckets[side];
+				if (!list.length) continue;
+				// 按所连核心引脚的坐标排序，让连线顺着引脚顺序走，不交叉
+				const key = (d: string) => {
+					const a = anchorOf.get(d);
+					if (!a) return Number.MAX_SAFE_INTEGER;
+					return side === 'L' || side === 'R' ? a.y : a.x;
+				};
+				list.sort((a, b) => key(a) - key(b));
+				const sizes = list.map((d) => items.get(d) as Info);
+				// 同一侧器件多了要分多列/多行排，不能一条线排下去 ——
+				// AMS1117 这类「信号脚全在同一侧」的符号，外围器件会全归到一边，
+				// 排成一列的话七八个器件就顶出图框了（实测 y 跑到 -25）。
+				const lanes = Math.ceil(list.length / MAX_PER_LANE);
+				const perLane = Math.ceil(list.length / lanes);
+				const maxW = Math.max(...sizes.map((s) => s.w));
+				const maxH = Math.max(...sizes.map((s) => s.h));
+				if (side === 'L' || side === 'R') {
+					const pitch = maxH + gap;
+					const dir = side === 'L' ? -1 : 1;
+					list.forEach((des, i) => {
+						const lane = Math.floor(i / perLane);
+						const inLane = i % perLane;
+						const n = Math.min(perLane, list.length - lane * perLane);
+						moves.push({
+							des,
+							id: (items.get(des) as Info).id,
+							side,
+							x: Math.round(cx + dir * (halfW + gap + maxW / 2 + lane * (maxW + gap))),
+							y: Math.round(cy - ((n - 1) * pitch) / 2 + inLane * pitch),
+						});
+					});
+				} else {
+					const pitch = maxW + gap;
+					const dir = side === 'T' ? 1 : -1; // T = 图纸上方 = y 更大
+					list.forEach((des, i) => {
+						const lane = Math.floor(i / perLane);
+						const inLane = i % perLane;
+						const n = Math.min(perLane, list.length - lane * perLane);
+						moves.push({
+							des,
+							id: (items.get(des) as Info).id,
+							side,
+							x: Math.round(cx - ((n - 1) * pitch) / 2 + inLane * pitch),
+							y: Math.round(cy + dir * (halfH + gap + maxH / 2 + lane * (maxH + gap))),
+						});
+					});
+				}
+			}
+
+			// ── 第二趟：批量写回 ──
+			const w = await ctx.exec<{ moved?: number }>(
+				`
+				${ENSURE_SCH}
+				const MOVES = ${JSON.stringify(moves.map((m) => ({ id: m.id, x: m.x, y: m.y })))};
+				let moved = 0;
+				for (const m of MOVES) {
+					const r = await eda.sch_PrimitiveComponent.modify(m.id, { x: m.x, y: m.y });
+					if (r !== false) moved += 1;
+				}
+				return { ok: true, moved };
+			`,
+				180_000,
+			);
+
+			const minY = Math.min(...moves.map((m) => m.y));
+			const minX = Math.min(...moves.map((m) => m.x));
+			const outOfFrame = minX < 40 ? `x=${minX}` : minY < 40 ? `y=${minY}` : null;
+			return schHint({
+				ok: true,
+				core,
+				core_size: { w: coreInfo.w, h: coreInfo.h },
+				declared_pins: declared.size,
+				moved: w.moved,
+				placed: moves.map((m) => ({ des: m.des, side: m.side, x: m.x, y: m.y })),
+				unresolved: unresolved.length ? unresolved : undefined,
+				warning:
+					declared.size === 0
+						? '没传 nets 声明，无从判断方位，器件全堆到了右边一列 —— 补上 nets 再排一次'
+						: minY < 40
+							? `最上面的器件 y=${minY} 已贴近图框上沿，把 center_y 调大些`
+							: undefined,
+				note: '块内已按声明的连接关系排布。整张图排完后跑 eda_auto_route。',
+			});
 		},
 	},
+
 	{
 		name: 'eda_arrange_components',
 		description:
