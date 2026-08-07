@@ -26,8 +26,14 @@ const AUTH_TIMEOUT_MS = 60_000;
 const DEFAULT_EXEC_TIMEOUT_MS = 30_000;
 /** 心跳间隔 */
 const HEARTBEAT_MS = 20_000;
-/** 执行期间断连后，等扩展重连的最长时间 */
-const RECONNECT_WAIT_MS = 30_000;
+/**
+ * 执行期间断连后，等扩展重连的最长时间。
+ *
+ * 给到 2 分钟是因为：EDA 页面在后台标签时，Chrome 会把 setInterval 节流到 1 分钟以上，
+ * 扩展的断线检测与重连随之变慢。30 秒的窗口在后台场景下几乎必然超时，
+ * 会把一个本可自愈的抖动变成整批操作失败。
+ */
+const RECONNECT_WAIT_MS = 120_000;
 
 const VERSION = process.env.EDA_MCP_VERSION ?? '0.1.0';
 

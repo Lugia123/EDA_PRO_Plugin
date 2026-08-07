@@ -64,6 +64,7 @@ const EXPECTED_TOOLS = [
 	'eda_download_datasheet',
 	'eda_draw_wire',
 	'eda_execute',
+	'eda_label_pin_net',
 	'eda_library_device',
 	'eda_library_search',
 	'eda_list_projects',
@@ -80,6 +81,7 @@ const EXPECTED_TOOLS = [
 	'eda_schematic_drc',
 	'eda_schematic_nets',
 	'eda_schematic_primitives',
+	'eda_set_page_size',
 	'eda_status',
 	'eda_unpair',
 ];

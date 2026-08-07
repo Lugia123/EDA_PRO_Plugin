@@ -41,6 +41,112 @@ function num(args: Record<string, unknown>, key: string): number {
 
 export const schematicEditTools: ToolDef[] = [
 	{
+		name: 'eda_set_page_size',
+		description:
+			'【写操作】设置当前原理图页的图纸尺寸。默认新建的页是 A4（11.7 × 8.25 inch），' +
+			'器件坐标超出这个范围就会掉到图框外面。' +
+			'\n\n画大图前先设好尺寸：A4 约 1170×825、A3 约 1650×1170（单位 0.01 inch）。' +
+			'不确定要多大时，先看蓝本/目标器件的坐标范围再选。' +
+			'\n\n也可以用 width/height 直接给自定义尺寸（单位 inch）。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				size: { type: 'string', description: '图纸规格，如 A4 / A3 / A2 / A1 / A0' },
+				width: { type: 'number', description: '自定义宽度（inch），与 size 二选一' },
+				height: { type: 'number', description: '自定义高度（inch），与 size 二选一' },
+			},
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const size = optionalString(args, 'size');
+			const w = typeof args.width === 'number' ? args.width : null;
+			const h = typeof args.height === 'number' ? args.height : null;
+			if (!size && !(w && h)) throw new Error('请给出 size（如 A3），或同时给出 width 与 height（inch）');
+			return schHint(
+				await ctx.exec<Record<string, unknown>>(
+					`
+				${ENSURE_SCH}
+				// modifySchematicPageTitleBlock 只给部分字段会抛
+				// 「Cannot set properties of undefined」—— 它内部按完整结构遍历，
+				// 所以必须把现有 titleBlockData 整份读回来、改完再写回去。
+				const before = _page.titleBlockData || {};
+				const data = JSON.parse(JSON.stringify(before));
+				const put = (k, v) => { data[k] = Object.assign({}, data[k] || {}, { value: String(v) }); };
+				${size ? `put('Size', ${JSON.stringify(size)}); put('Page Size', ${JSON.stringify(size)});` : ''}
+				${w ? `put('Width', ${w});` : ''}
+				${h ? `put('Height', ${h});` : ''}
+				const ok = await eda.dmt_Schematic.modifySchematicPageTitleBlock(undefined, data);
+				const after = (await eda.dmt_Schematic.getCurrentSchematicPageInfo())?.titleBlockData || {};
+				const read = (k) => after[k] && after[k].value !== undefined ? String(after[k].value) : undefined;
+				return {
+					ok: ok === true,
+					page: _page.name,
+					size: read('Size'), page_size: read('Page Size'),
+					width: read('Width'), height: read('Height'),
+					before: { size: before.Size && before.Size.value, width: before.Width && before.Width.value, height: before.Height && before.Height.value },
+				};
+			`,
+					EDIT_TIMEOUT_MS,
+				),
+			);
+		},
+	},
+	{
+		name: 'eda_label_pin_net',
+		description:
+			'【写操作】给一个引脚引出一小段导线并标上网络名 —— **批量连接的首选方式**。' +
+			'\n\n为什么不用长距离连线：原理图里交叉重合的导线会被 EDA 判定为电气相连。' +
+			'自动生成的 L 型长路径在密集图里必然大量交叉，会把本不相干的网络连成一片' +
+			'（实测一次复刻中 81 个引脚被误并进同一个网络）。' +
+			'\n\n同名网络本来就电气相连，所以只要给每个引脚引出一小段带网络名的线，' +
+			'不需要物理连通，也就不会误连。密集图、总线、电源地网络都该用这个。' +
+			'\n\n两个引脚之间确实要画看得见的连线时，才用 eda_connect_pins。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				designator: { type: 'string', description: '器件位号，如 U1' },
+				pin: { type: 'string', description: '引脚号或引脚名，如 3 或 VIN' },
+				net: { type: 'string', description: '网络名，如 VCC_3V3' },
+				length: { type: 'number', description: '引出线长度（0.01 inch），默认 20' },
+			},
+			required: ['designator', 'pin', 'net'],
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const des = requireString(args, 'designator');
+			const pin = requireString(args, 'pin');
+			const net = requireString(args, 'net');
+			const len = typeof args.length === 'number' && args.length > 0 ? args.length : 20;
+			return schHint(
+				await ctx.exec<Record<string, unknown>>(
+					`
+				${ENSURE_SCH}
+				const des = ${JSON.stringify(des)}.toUpperCase();
+				const key = ${JSON.stringify(pin)}.toUpperCase();
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const c = all.find(x => String(x.designator || '').toUpperCase() === des);
+				if (!c) return { ok: false, error: '找不到位号 ' + des };
+				const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId);
+				const p = (pins || []).find(x => String(x.pinNumber || '').toUpperCase() === key)
+					|| (pins || []).find(x => String(x.pinName || '').toUpperCase() === key);
+				if (!p) return { ok: false, error: des + ' 上找不到引脚 ' + key,
+					pins: (pins||[]).map(x => x.pinNumber + ':' + x.pinName) };
+
+				// 顺着引脚朝向引出，避免线压在符号上
+				const L = ${len};
+				const r = ((Number(p.rotation) % 360) + 360) % 360;
+				const d = r === 0 ? [L, 0] : r === 90 ? [0, -L] : r === 180 ? [-L, 0] : r === 270 ? [0, L] : [L, 0];
+				const line = [p.x, p.y, p.x + d[0], p.y + d[1]];
+				const w = await eda.sch_PrimitiveWire.create(line, ${JSON.stringify(net)});
+				if (!w) return { ok: false, error: '引出线创建失败（该引脚可能已属于别的已命名网络）', attempted: line };
+				return { ok: true, pin: des + '.' + p.pinNumber, net: ${JSON.stringify(net)}, path: line, wire_id: w.primitiveId };
+			`,
+					EDIT_TIMEOUT_MS,
+				),
+			);
+		},
+	},
+	{
 		name: 'eda_place_component',
 		description:
 			'【写操作】在当前原理图页放置一个元器件。' +
@@ -110,8 +216,10 @@ export const schematicEditTools: ToolDef[] = [
 						assignError = '位号 ' + want + ' 已被占用，已保留自动分配的编号';
 					} else {
 						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: want });
-						if (m) { finalDes = want; assigned = true; }
-						else assignError = '设置指定位号失败';
+						const fresh = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+						const dup = fresh.filter(x => String(x.designator || '').toUpperCase() === want.toUpperCase()).length;
+						if (m && dup === 1) { finalDes = want; assigned = true; }
+						else assignError = dup > 1 ? '位号 ' + want + ' 出现重复，已放弃指定' : '设置指定位号失败';
 					}
 				}
 				if (!assigned && (raw === '' || raw.indexOf('?') >= 0)) {
@@ -119,12 +227,21 @@ export const schematicEditTools: ToolDef[] = [
 					// 注意这里刻意不写含反斜杠的正则 —— 这段代码是放在 TS 模板字符串里传给 EDA 执行的，
 					// 模板字符串会把 \? \d 这类无效转义的反斜杠吃掉，到了 EDA 那边就成了非法正则。
 					const prefix = (raw.replace(/[?0-9]+$/, '') || 'U').toUpperCase();
+					// 改完必须重新查全图确认唯一 —— getAll 相对写入有延迟，只凭放置前那一次快照算编号，
+					// 连续放置时会算出同一个号，两个器件同位号。位号重复会让整张图**导不出网表**
+					// （DRC 报致命错误），代价远大于多查几次。
 					let n = 1;
-					while (used.has(prefix + n)) n++;
-					const auto = prefix + n;
-					const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: auto });
-					if (m) { finalDes = auto; assigned = true; }
-					else assignError = (assignError ? assignError + '；' : '') + '自动编号失败，位号仍是占位符 ' + raw;
+					for (let attempt = 0; attempt < 40 && !assigned; attempt++) {
+						while (used.has(prefix + n)) n++;
+						const auto = prefix + n;
+						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: auto });
+						if (!m) { assignError = '自动编号失败，位号仍是占位符 ' + raw; break; }
+						const fresh = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+						const dup = fresh.filter(x => String(x.designator || '').toUpperCase() === auto).length;
+						if (dup === 1) { finalDes = auto; assigned = true; }
+						else { fresh.forEach(x => used.add(String(x.designator || '').toUpperCase())); n++; }
+					}
+					if (!assigned && !assignError) assignError = '连续 40 次都撞上重名，未能分配唯一位号';
 				}
 
 				return {
