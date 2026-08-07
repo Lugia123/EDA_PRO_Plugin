@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 3e4;
-var VERSION = "0.1.17";
+var VERSION = "0.1.18";
 var Bridge = class {
   http = null;
   wss = null;
@@ -20927,7 +20927,7 @@ var allTools = [
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.17";
+var VERSION2 = "0.1.18";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var ctx = {
