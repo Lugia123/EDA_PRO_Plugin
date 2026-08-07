@@ -549,16 +549,15 @@ export const schematicEditTools: ToolDef[] = [
 	{
 		name: 'eda_auto_route',
 		description:
-			'【写操作】让 EDA 自动整理当前原理图页的连线 —— **画完网络后必做的一步**。' +
-			'\n\n工作方式：把已经建立的网络关系整理成真正的走线（拐弯、节点、避让），' +
-			'而不是一堆散落的短引出线。实测 3.4 秒把 154 段短线整理成 46 条正规连线。' +
-			'\n\n**推荐工作流**：' +
-			'\n1. eda_place_component 放器件' +
-			'\n2. eda_label_pin_net 声明每个引脚属于哪个网络（只表达电气意图，不管几何）' +
-			'\n3. **eda_auto_route** 让 EDA 把线画好看' +
-			'\n\n这样分工的理由：自动生成的几何路径在密集图里会大量交叉，' +
-			'而交叉重合的导线会被判定为电气相连，从而把不相干的网络连成一片。' +
-			'把布线交给 EDA 自己的算法，既好看又不会误连。',
+			'【写操作】让 EDA 自动整理当前原理图页的连线，把散落的短引出线整理成正规走线。' +
+			'\n\n**必须传 nets**（和 eda_arrange_block / eda_label_nets 同一份声明）。' +
+			'实测 EDA 的布线算法在重组连线时会把导线从引脚上扯掉 —— ' +
+			'一次全图布线后 148 个引脚只剩 60 个还连着，而 DRC 照样报 0 错误、' +
+			'器件和网络名也都还在，光看 DRC 根本发现不了。' +
+			'\n\n传了 nets，工具会在布线后逐个引脚核对，把被扯掉的重新接回去，并报告修复数量。' +
+			'不传就只布线不校验，**断了也不会有人告诉你**。' +
+			'\n\n工作流：eda_place_component → eda_arrange_block(nets) → ' +
+			'eda_label_nets(nets) → **eda_auto_route(nets)**。',
 		inputSchema: {
 			type: 'object',
 			properties: {
@@ -567,11 +566,28 @@ export const schematicEditTools: ToolDef[] = [
 					items: { type: 'string' },
 					description: '可选，只处理这些器件（图元 id）；不给则处理全图所有未布线网络',
 				},
+				nets: {
+					type: 'object',
+					description:
+						'**强烈建议传**，格式与 eda_arrange_block / eda_label_nets 完全相同：' +
+						'{ "+24V": ["U1.3","C11.1"], … }。布线算法会扯断引脚连接，' +
+						'有了这份声明工具才能核对并自动接回。',
+					additionalProperties: { type: 'array', items: { type: 'string' } },
+				},
 			},
 		},
 		mutating: true,
 		handler: async (args, ctx) => {
 			const uuids = Array.isArray(args.component_uuids) ? (args.component_uuids as string[]) : null;
+			const nets = (args.nets && typeof args.nets === 'object' ? args.nets : {}) as Record<string, string[]>;
+			const jobs: Array<{ des: string; pin: string; net: string }> = [];
+			for (const [net, refs] of Object.entries(nets)) {
+				for (const ref of Array.isArray(refs) ? refs : []) {
+					const dot = String(ref).lastIndexOf('.');
+					if (dot <= 0) continue;
+					jobs.push({ des: String(ref).slice(0, dot).toUpperCase(), pin: String(ref).slice(dot + 1), net });
+				}
+			}
 			return schHint(
 				await ctx.exec<Record<string, unknown>>(
 					`
@@ -586,10 +602,81 @@ export const schematicEditTools: ToolDef[] = [
 				const props = ${uuids ? `{ uuids: ${JSON.stringify(uuids)} }` : 'undefined'};
 				await eda.sch_Document.autoRouting(props);
 				const after = await stat();
+
+				// ── 布线后自检：EDA 的算法会把导线从引脚上扯掉 ──
+				// getDocumentSource 有缓存，布线刚结束就读会拿到旧内容，看起来一切正常。
+				// 必须等一下再读，否则这段校验形同虚设。
+				const JOBS = ${JSON.stringify(jobs)};
+				let repaired = 0, stillOff = [];
+				if (JOBS.length) {
+					await new Promise((r) => setTimeout(r, 1500));
+					const endpoints = () => {
+						const out = [];
+						for (const ln of String(srcCache).split('\n')) {
+							if (ln.indexOf('"type":"LINE"') < 0) continue;
+							const q = ln.indexOf('||');
+							if (q < 0) continue;
+							let body = ln.slice(q + 2);
+							const last = body.lastIndexOf('|');
+							if (last >= 0) body = body.slice(0, last);
+							let o = null;
+							try { o = JSON.parse(body); } catch (e) { continue; }
+							if (o.startX == null) continue;
+							out.push([o.startX, -o.startY]);
+							out.push([o.endX, -o.endY]);
+						}
+						return out;
+					};
+					var srcCache = await eda.sys_FileManager.getDocumentSource();
+					let pts = endpoints();
+
+					const all = await eda.sch_PrimitiveComponent.getAll();
+					const byDes = {};
+					for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+					const pinCache = {};
+					const getPins = async (des) => {
+						if (!pinCache[des]) {
+							const c = byDes[des];
+							pinCache[des] = c ? (await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId) || []) : [];
+						}
+						return pinCache[des];
+					};
+
+					for (const j of JOBS) {
+						const pins = await getPins(j.des);
+						const key = String(j.pin).toUpperCase();
+						let p = null;
+						for (const x of pins) if (String(x.pinNumber || '').toUpperCase() === key) { p = x; break; }
+						if (!p) for (const x of pins) if (String(x.pinName || '').toUpperCase() === key) { p = x; break; }
+						if (!p) continue;
+						let ok = false;
+						for (const pt of pts) {
+							if (Math.abs(pt[0] - p.x) + Math.abs(pt[1] - p.y) < 2) { ok = true; break; }
+						}
+						if (ok) continue;
+						// 接回去。长度取 30 而不是 20 ——
+						// 实测 stub 端点落在别的线端点旁边 1-2 个单位时，create 会静默失败
+						// （返回对象但线不落在引脚上），拉长一点就能避开。
+						const rot = ((Number(p.rotation) % 360) + 360) % 360;
+						const L = 30;
+						const d = rot === 0 ? [L, 0] : rot === 90 ? [0, -L] : rot === 180 ? [-L, 0] : rot === 270 ? [0, L] : [L, 0];
+						const w = await eda.sch_PrimitiveWire.create([p.x, p.y, p.x + d[0], p.y + d[1]], j.net);
+						if (w) repaired += 1;
+						else stillOff.push(j.des + '.' + j.pin);
+					}
+				}
+
 				return {
 					ok: true, page: _page.name, elapsed_ms: Date.now() - t0,
 					before, after,
-					note: '连线已由 EDA 的布线算法重新整理。建议接着跑 eda_schematic_drc 确认没有新增 error。',
+					checked_pins: JOBS.length,
+					repaired_after_routing: repaired,
+					still_disconnected: stillOff.length ? stillOff : undefined,
+					note: JOBS.length
+						? (repaired
+							? '布线算法扯断了 ' + repaired + ' 个引脚连接，已按 nets 声明接回。'
+							: '布线完成，所有声明的引脚连接都还在。')
+						: '**没传 nets，没做连接校验** —— 布线算法可能已经扯断引脚连接，DRC 查不出来。建议传 nets 重跑。',
 				};
 			`,
 					180_000,

@@ -27,8 +27,8 @@ description: >-
   │ 写出本区网络表    哪个脚接哪个网络 —— 这份声明是后面两步共同的输入
   │ 排布              eda_arrange_block，把网络表当 nets 传进去
   │ 标注              eda_label_nets，同一份网络表原样再传一次
-  │ 布线              eda_auto_route
-  │ 验证              eda_schematic_drc，errors 必须为 0
+  │ 布线              eda_auto_route，**把同一份网络表再传一次**
+  │ 验证              eda_schematic_drc + 核对 repaired_after_routing
   └ 下一个区
 ⑤ 区间连接          跨区一律用同名网络标签，不拉长线
 ⑥ 整体验收          全图 DRC + 通读一遍
@@ -247,6 +247,33 @@ eda_label_pin_net(designator:"U8", pin:"12", net:"OPA_OUT")
 eda_schematic_drc
 eda_schematic_nets                      # 对一遍网络数与关键网络的连接
 ```
+
+## 布线会扯断连接，必须核对
+
+`eda_auto_route` 让图好看，代价是**它重组走线时会把导线从引脚上扯掉**。
+实测一次全图布线后，148 个引脚只剩 60 个还连着 —— 而 `eda_schematic_drc`
+照样报 errors: 0，器件、网络名、连线在图上一个不少，肉眼和 DRC 都发现不了。
+
+所以调用时**必须把 nets 声明传进去**：
+
+```
+eda_auto_route(nets: nets)      # 和 arrange_block / label_nets 同一份
+```
+
+工具会在布线后逐个引脚核对，把被扯断的接回来，并在 `repaired_after_routing`
+里告诉你修了几个。不传就只布线不校验，**断了不会有人告诉你**。
+
+一份网络表用在三个地方：排布定方位、标注建连接、布线后兜底核对。
+
+### 别拿 DRC 当连接的证据
+
+DRC 查的是「已有网络之间有没有冲突」，查不出「引脚压根没进任何网络」。
+一个引脚悬空、一整块电路孤立，DRC 都可能一声不吭。
+
+要确认连接，看 `eda_auto_route` 返回的 `repaired_after_routing` 和
+`still_disconnected`；收尾时再核一遍每个器件的引脚是不是都落在网络里。
+**未连的引脚应该只剩你有意悬空的那些**（NC 空脚、未用的逻辑门输出、
+单向使用的收发器接收端），其余都得有网络。
 
 ## 什么时候可以用 eda_auto_layout
 

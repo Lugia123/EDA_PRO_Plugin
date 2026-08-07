@@ -177,6 +177,38 @@ WIRE 99、LINE 224、TEXT 9。
 这样解析逻辑是可测试、可维护的 TypeScript，而不是塞在字符串里的一次性代码。
 **这正是"本地 MCP"相对纯扩展方案的价值所在。**
 
+## §4.6 「连上了」必须验证，DRC 说了不算
+
+**实测**：一次全图 `autoRouting()` 之后，148 个引脚只剩 60 个还落在导线上，
+而 `eda_schematic_drc` 依旧报 **errors: 0**，器件、网络名、连线在图上一样不少。
+布线算法重组走线时会把导线从引脚端点扯开，从此那些引脚不属于任何网络 ——
+DRC 查的是「已有网络之间有没有冲突」，查不出「引脚压根没进网络」。
+
+所以判定连接只有一个可信办法：**把引脚坐标和导线端点逐个比对**。
+
+```
+引脚坐标  eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId() → p.x, p.y
+导线端点  getDocumentSource() 里 type=LINE 的 startX/startY/endX/endY
+坐标关系  源码 y = -API y（EDA 内部 y 轴向上），x 相同；容差 2
+```
+
+不要用 `sch_Net.getAllNets()` / `getAllNetsName()` —— 和 §4.5 的区域查询一样，
+在扩展的 WebSocket 回调上下文里一律返回空，既证明不了连上、也证明不了没连上。
+
+### 两个会让验证失效的陷阱
+
+1. **`getDocumentSource()` 有缓存**。布线刚结束就读会拿到布线前的内容，
+   校验通过纯属假象。实测正是这样漏判了一整轮：读到 135 个引脚连着，
+   等缓存刷新后真实数字是 60。**读之前先等 1.5 秒。**
+   （`getCurrentSchematicPageInfo()` 同样有缓存，见 `eda_set_page_size`。）
+
+2. **`sch_PrimitiveWire.create()` 会静默失败**。当引出线端点落在另一条线的端点
+   附近 1–2 个单位时，它照样返回图元对象，但线不会真的落在引脚上。
+   实测 stub 长度 20 时端点在 x=300、邻线端点在 x=299，连接建立失败且无任何报错；
+   长度改成 30 避开就正常。**创建后必须回读比对，不能信返回值。**
+
+因此 `eda_auto_route` 要求传 `nets` 声明：布线后逐个引脚核对，被扯断的自动接回。
+
 ## §5 目录
 
 ```
