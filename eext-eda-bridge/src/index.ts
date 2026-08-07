@@ -17,8 +17,25 @@ import type { ClientInfo, ServerMessage } from '../../shared/protocol.js';
 import { PORT_END, PORT_START, PROTOCOL_VERSION, SERVICE_ID } from '../../shared/protocol.js';
 import extensionConfig from '../extension.json' with { type: 'json' };
 
-/** WebSocket 连接 ID；固定一个，换端口前必须先 close（同 ID 不同参数会让平台内部状态混乱） */
-const WS_ID = 'eda-mcp-bridge';
+/**
+ * WebSocket 连接 ID。
+ *
+ * **每次连接都必须换一个新 ID**，不能固定复用。官方文档明确写着：
+ * 「如果存在指定 ID 且处于活跃状态中的 WebSocket 连接，那么其余参数的变更将不会被应用」。
+ *
+ * 实测后果：bridge 重启后，扩展这边残留着一个指向死连接的活跃 ID，
+ * 之后所有 register() 都被静默忽略 —— 扫描永远收不到 hello，
+ * 表现为「服务明明在跑，扩展却怎么都连不上，只有刷新页面才恢复」。
+ * close() 对一个对端已消失的连接并不总能让平台把状态清干净，换 ID 才可靠。
+ */
+const WS_ID_PREFIX = 'eda-mcp-bridge';
+let wsIdSeq = 0;
+let wsId = `${WS_ID_PREFIX}-0`;
+
+function nextWsId(): string {
+	wsIdSeq += 1;
+	return `${WS_ID_PREFIX}-${wsIdSeq}`;
+}
 
 /** 单个端口等 hello 的时间 */
 const HELLO_TIMEOUT_MS = 1500;
@@ -173,9 +190,13 @@ function tryPort(port: number): Promise<boolean> {
 			resolve(ok);
 		};
 
+		// 每次尝试都用新 ID：同一个 ID 只要还被平台视为「活跃」，
+		// 后续 register 的参数（这里是端口）就不会生效，扫描会一直连在旧地址上。
+		wsId = nextWsId();
+
 		helloWaiter = finish;
 		try {
-			eda.sys_WebSocket.register(WS_ID, `ws://127.0.0.1:${port}`, onRawMessage, () => {
+			eda.sys_WebSocket.register(wsId, `ws://127.0.0.1:${port}`, onRawMessage, () => {
 				// 连接已建立，但还要等 hello 验明身份才算数
 			});
 		} catch (e) {
@@ -388,7 +409,7 @@ function logWarn(msg: string): void {
 
 function send(msg: Record<string, unknown>): void {
 	try {
-		eda.sys_WebSocket.send(WS_ID, JSON.stringify(msg));
+		eda.sys_WebSocket.send(wsId, JSON.stringify(msg));
 	} catch {
 		// 两件**不能**做的事：
 		// 1. 不能置 permissionDenied —— 连接断掉后 send 必然抛错，据此判定"无权限"
@@ -405,7 +426,7 @@ function send(msg: Record<string, unknown>): void {
 
 function safeClose(code?: number, reason?: string): void {
 	try {
-		eda.sys_WebSocket.close(WS_ID, code, reason);
+		eda.sys_WebSocket.close(wsId, code, reason);
 	} catch {
 		/* 未连接或无权限，忽略 */
 	}
