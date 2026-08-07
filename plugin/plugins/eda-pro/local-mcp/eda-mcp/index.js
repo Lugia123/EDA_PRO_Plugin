@@ -19301,8 +19301,8 @@ function constantTimeEqual(a, b) {
 var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
-var RECONNECT_WAIT_MS = 3e4;
-var VERSION = "0.1.22";
+var RECONNECT_WAIT_MS = 12e4;
+var VERSION = "0.1.25";
 var Bridge = class {
   http = null;
   wss = null;
@@ -20530,8 +20530,237 @@ function num(args, key) {
 }
 var schematicEditTools = [
   {
+    name: "eda_set_page_size",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u8BBE\u7F6E\u5F53\u524D\u539F\u7406\u56FE\u9875\u7684\u56FE\u7EB8\u5C3A\u5BF8\u3002\u9ED8\u8BA4\u65B0\u5EFA\u7684\u9875\u662F A4\uFF0811.7 \xD7 8.25 inch\uFF09\uFF0C\u5668\u4EF6\u5750\u6807\u8D85\u51FA\u8FD9\u4E2A\u8303\u56F4\u5C31\u4F1A\u6389\u5230\u56FE\u6846\u5916\u9762\u3002\n\n\u753B\u5927\u56FE\u524D\u5148\u8BBE\u597D\u5C3A\u5BF8\uFF1AA4 \u7EA6 1170\xD7825\u3001A3 \u7EA6 1650\xD71170\uFF08\u5355\u4F4D 0.01 inch\uFF09\u3002\u4E0D\u786E\u5B9A\u8981\u591A\u5927\u65F6\uFF0C\u5148\u770B\u84DD\u672C/\u76EE\u6807\u5668\u4EF6\u7684\u5750\u6807\u8303\u56F4\u518D\u9009\u3002\n\n\u4E5F\u53EF\u4EE5\u7528 width/height \u76F4\u63A5\u7ED9\u81EA\u5B9A\u4E49\u5C3A\u5BF8\uFF08\u5355\u4F4D inch\uFF09\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        size: { type: "string", description: "\u56FE\u7EB8\u89C4\u683C\uFF0C\u5982 A4 / A3 / A2 / A1 / A0" },
+        width: { type: "number", description: "\u81EA\u5B9A\u4E49\u5BBD\u5EA6\uFF08inch\uFF09\uFF0C\u4E0E size \u4E8C\u9009\u4E00" },
+        height: { type: "number", description: "\u81EA\u5B9A\u4E49\u9AD8\u5EA6\uFF08inch\uFF09\uFF0C\u4E0E size \u4E8C\u9009\u4E00" }
+      }
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const size = optionalString(args, "size");
+      const w = typeof args.width === "number" ? args.width : null;
+      const h = typeof args.height === "number" ? args.height : null;
+      if (!size && !(w && h)) throw new Error("\u8BF7\u7ED9\u51FA size\uFF08\u5982 A3\uFF09\uFF0C\u6216\u540C\u65F6\u7ED9\u51FA width \u4E0E height\uFF08inch\uFF09");
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				// modifySchematicPageTitleBlock \u53EA\u7ED9\u90E8\u5206\u5B57\u6BB5\u4F1A\u629B
+				// \u300CCannot set properties of undefined\u300D\u2014\u2014 \u5B83\u5185\u90E8\u6309\u5B8C\u6574\u7ED3\u6784\u904D\u5386\uFF0C
+				// \u6240\u4EE5\u5FC5\u987B\u628A\u73B0\u6709 titleBlockData \u6574\u4EFD\u8BFB\u56DE\u6765\u3001\u6539\u5B8C\u518D\u5199\u56DE\u53BB\u3002
+				const before = _page.titleBlockData || {};
+				const data = JSON.parse(JSON.stringify(before));
+				const put = (k, v) => { data[k] = Object.assign({}, data[k] || {}, { value: String(v) }); };
+				${size ? `put('Size', ${JSON.stringify(size)}); put('Page Size', ${JSON.stringify(size)});` : ""}
+				${w ? `put('Width', ${w});` : ""}
+				${h ? `put('Height', ${h});` : ""}
+				const ok = await eda.dmt_Schematic.modifySchematicPageTitleBlock(undefined, data);
+				const after = (await eda.dmt_Schematic.getCurrentSchematicPageInfo())?.titleBlockData || {};
+				const read = (k) => after[k] && after[k].value !== undefined ? String(after[k].value) : undefined;
+				return {
+					ok: ok === true,
+					page: _page.name,
+					size: read('Size'), page_size: read('Page Size'),
+					width: read('Width'), height: read('Height'),
+					before: { size: before.Size && before.Size.value, width: before.Width && before.Width.value, height: before.Height && before.Height.value },
+				};
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_label_pin_net",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u7ED9\u4E00\u4E2A\u5F15\u811A\u5F15\u51FA\u4E00\u5C0F\u6BB5\u5BFC\u7EBF\u5E76\u6807\u4E0A\u7F51\u7EDC\u540D \u2014\u2014 **\u6279\u91CF\u8FDE\u63A5\u7684\u9996\u9009\u65B9\u5F0F**\u3002\n\n\u4E3A\u4EC0\u4E48\u4E0D\u7528\u957F\u8DDD\u79BB\u8FDE\u7EBF\uFF1A\u539F\u7406\u56FE\u91CC\u4EA4\u53C9\u91CD\u5408\u7684\u5BFC\u7EBF\u4F1A\u88AB EDA \u5224\u5B9A\u4E3A\u7535\u6C14\u76F8\u8FDE\u3002\u81EA\u52A8\u751F\u6210\u7684 L \u578B\u957F\u8DEF\u5F84\u5728\u5BC6\u96C6\u56FE\u91CC\u5FC5\u7136\u5927\u91CF\u4EA4\u53C9\uFF0C\u4F1A\u628A\u672C\u4E0D\u76F8\u5E72\u7684\u7F51\u7EDC\u8FDE\u6210\u4E00\u7247\uFF08\u5B9E\u6D4B\u4E00\u6B21\u590D\u523B\u4E2D 81 \u4E2A\u5F15\u811A\u88AB\u8BEF\u5E76\u8FDB\u540C\u4E00\u4E2A\u7F51\u7EDC\uFF09\u3002\n\n\u540C\u540D\u7F51\u7EDC\u672C\u6765\u5C31\u7535\u6C14\u76F8\u8FDE\uFF0C\u6240\u4EE5\u53EA\u8981\u7ED9\u6BCF\u4E2A\u5F15\u811A\u5F15\u51FA\u4E00\u5C0F\u6BB5\u5E26\u7F51\u7EDC\u540D\u7684\u7EBF\uFF0C\u4E0D\u9700\u8981\u7269\u7406\u8FDE\u901A\uFF0C\u4E5F\u5C31\u4E0D\u4F1A\u8BEF\u8FDE\u3002\u5BC6\u96C6\u56FE\u3001\u603B\u7EBF\u3001\u7535\u6E90\u5730\u7F51\u7EDC\u90FD\u8BE5\u7528\u8FD9\u4E2A\u3002\n\n\u4E24\u4E2A\u5F15\u811A\u4E4B\u95F4\u786E\u5B9E\u8981\u753B\u770B\u5F97\u89C1\u7684\u8FDE\u7EBF\u65F6\uFF0C\u624D\u7528 eda_connect_pins\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        designator: { type: "string", description: "\u5668\u4EF6\u4F4D\u53F7\uFF0C\u5982 U1" },
+        pin: { type: "string", description: "\u5F15\u811A\u53F7\u6216\u5F15\u811A\u540D\uFF0C\u5982 3 \u6216 VIN" },
+        net: { type: "string", description: "\u7F51\u7EDC\u540D\uFF0C\u5982 VCC_3V3" },
+        length: { type: "number", description: "\u5F15\u51FA\u7EBF\u957F\u5EA6\uFF080.01 inch\uFF09\uFF0C\u9ED8\u8BA4 20" }
+      },
+      required: ["designator", "pin", "net"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const des = requireString(args, "designator");
+      const pin = requireString(args, "pin");
+      const net = requireString(args, "net");
+      const len = typeof args.length === "number" && args.length > 0 ? args.length : 20;
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const des = ${JSON.stringify(des)}.toUpperCase();
+				const key = ${JSON.stringify(pin)}.toUpperCase();
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const c = all.find(x => String(x.designator || '').toUpperCase() === des);
+				if (!c) return { ok: false, error: '\u627E\u4E0D\u5230\u4F4D\u53F7 ' + des };
+				const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId);
+				const p = (pins || []).find(x => String(x.pinNumber || '').toUpperCase() === key)
+					|| (pins || []).find(x => String(x.pinName || '').toUpperCase() === key);
+				if (!p) return { ok: false, error: des + ' \u4E0A\u627E\u4E0D\u5230\u5F15\u811A ' + key,
+					pins: (pins||[]).map(x => x.pinNumber + ':' + x.pinName) };
+
+				// \u987A\u7740\u5F15\u811A\u671D\u5411\u5F15\u51FA\uFF0C\u907F\u514D\u7EBF\u538B\u5728\u7B26\u53F7\u4E0A
+				const L = ${len};
+				const r = ((Number(p.rotation) % 360) + 360) % 360;
+				const d = r === 0 ? [L, 0] : r === 90 ? [0, -L] : r === 180 ? [-L, 0] : r === 270 ? [0, L] : [L, 0];
+				const line = [p.x, p.y, p.x + d[0], p.y + d[1]];
+				const w = await eda.sch_PrimitiveWire.create(line, ${JSON.stringify(net)});
+				if (!w) return { ok: false, error: '\u5F15\u51FA\u7EBF\u521B\u5EFA\u5931\u8D25\uFF08\u8BE5\u5F15\u811A\u53EF\u80FD\u5DF2\u5C5E\u4E8E\u522B\u7684\u5DF2\u547D\u540D\u7F51\u7EDC\uFF09', attempted: line };
+				return { ok: true, pin: des + '.' + p.pinNumber, net: ${JSON.stringify(net)}, path: line, wire_id: w.primitiveId };
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_arrange_components",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u6279\u91CF\u79FB\u52A8 / \u65CB\u8F6C\u5668\u4EF6 \u2014\u2014 \u529F\u80FD\u5206\u533A\u5E03\u5C40\u7684\u6267\u884C\u624B\u6BB5\u3002\n\n\u4E00\u6B21\u4F20\u591A\u4E2A {designator, x, y, rotation?, mirror?}\uFF0C\u6BD4\u9010\u4E2A\u8C03\u7528\u5FEB\u5F97\u591A\u3002\u5750\u6807\u5355\u4F4D 0.01 inch\uFF0Crotation \u9006\u65F6\u9488\u4E3A\u6B63\u3002\n\n**\u5178\u578B\u7528\u6CD5\u662F\u6309\u529F\u80FD\u5206\u533A**\uFF1A\u5148\u60F3\u6E05\u695A\u8FD9\u5F20\u56FE\u5206\u51E0\u4E2A\u529F\u80FD\u5757\uFF08\u7535\u6E90\u3001\u65F6\u949F\u3001MCU\u3001\u6A21\u62DF\u524D\u7AEF\u3001ADC/DAC\u3001\u63A5\u53E3\u2026\uFF09\uFF0C\u7ED9\u6BCF\u5757\u5212\u4E00\u7247\u56FE\u7EB8\u533A\u57DF\uFF0C\u518D\u628A\u5404\u5757\u7684\u5668\u4EF6\u6446\u8FDB\u53BB\u3002\u6446\u5B8C\u8DD1 eda_auto_route\uFF0C\u8FDE\u7EBF\u81EA\u7136\u5C31\u77ED\u800C\u6E05\u6670\u3002\n\n\u53EA\u60F3\u8BA9\u7B97\u6CD5\u6392\u3001\u4E0D\u5728\u610F\u5206\u533A\u65F6\uFF0C\u7528 eda_auto_layout \u66F4\u7701\u4E8B\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        placements: {
+          type: "array",
+          description: "\u6BCF\u9879 {designator, x, y, rotation?, mirror?}",
+          items: {
+            type: "object",
+            properties: {
+              designator: { type: "string" },
+              x: { type: "number" },
+              y: { type: "number" },
+              rotation: { type: "number" },
+              mirror: { type: "boolean" }
+            },
+            required: ["designator", "x", "y"]
+          }
+        }
+      },
+      required: ["placements"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const list = args.placements;
+      if (!Array.isArray(list) || !list.length) throw new Error("placements \u5FC5\u987B\u662F\u975E\u7A7A\u6570\u7EC4");
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const want = ${JSON.stringify(list)};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+				const okList = [], failList = [];
+				for (const w of want) {
+					const c = byDes[String(w.designator).toUpperCase()];
+					if (!c) { failList.push({ designator: w.designator, error: '\u627E\u4E0D\u5230\u8BE5\u4F4D\u53F7' }); continue; }
+					const prop = { x: w.x, y: w.y };
+					if (w.rotation !== undefined) prop.rotation = w.rotation;
+					if (w.mirror !== undefined) prop.mirror = w.mirror;
+					const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, prop);
+					if (m) okList.push(w.designator); else failList.push({ designator: w.designator, error: 'modify \u8FD4\u56DE\u5931\u8D25' });
+				}
+				return { ok: failList.length === 0, moved: okList.length, failed: failList.length,
+					failures: failList.slice(0, 10), page: _page.name,
+					note: '\u4F4D\u7F6E\u53D8\u4E86\uFF0C\u8BB0\u5F97\u8DD1 eda_auto_route \u91CD\u65B0\u6574\u7406\u8FDE\u7EBF\u3002' };
+			`,
+          18e4
+        )
+      );
+    }
+  },
+  {
+    name: "eda_auto_route",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u8BA9 EDA \u81EA\u52A8\u6574\u7406\u5F53\u524D\u539F\u7406\u56FE\u9875\u7684\u8FDE\u7EBF \u2014\u2014 **\u753B\u5B8C\u7F51\u7EDC\u540E\u5FC5\u505A\u7684\u4E00\u6B65**\u3002\n\n\u5DE5\u4F5C\u65B9\u5F0F\uFF1A\u628A\u5DF2\u7ECF\u5EFA\u7ACB\u7684\u7F51\u7EDC\u5173\u7CFB\u6574\u7406\u6210\u771F\u6B63\u7684\u8D70\u7EBF\uFF08\u62D0\u5F2F\u3001\u8282\u70B9\u3001\u907F\u8BA9\uFF09\uFF0C\u800C\u4E0D\u662F\u4E00\u5806\u6563\u843D\u7684\u77ED\u5F15\u51FA\u7EBF\u3002\u5B9E\u6D4B 3.4 \u79D2\u628A 154 \u6BB5\u77ED\u7EBF\u6574\u7406\u6210 46 \u6761\u6B63\u89C4\u8FDE\u7EBF\u3002\n\n**\u63A8\u8350\u5DE5\u4F5C\u6D41**\uFF1A\n1. eda_place_component \u653E\u5668\u4EF6\n2. eda_label_pin_net \u58F0\u660E\u6BCF\u4E2A\u5F15\u811A\u5C5E\u4E8E\u54EA\u4E2A\u7F51\u7EDC\uFF08\u53EA\u8868\u8FBE\u7535\u6C14\u610F\u56FE\uFF0C\u4E0D\u7BA1\u51E0\u4F55\uFF09\n3. **eda_auto_route** \u8BA9 EDA \u628A\u7EBF\u753B\u597D\u770B\n\n\u8FD9\u6837\u5206\u5DE5\u7684\u7406\u7531\uFF1A\u81EA\u52A8\u751F\u6210\u7684\u51E0\u4F55\u8DEF\u5F84\u5728\u5BC6\u96C6\u56FE\u91CC\u4F1A\u5927\u91CF\u4EA4\u53C9\uFF0C\u800C\u4EA4\u53C9\u91CD\u5408\u7684\u5BFC\u7EBF\u4F1A\u88AB\u5224\u5B9A\u4E3A\u7535\u6C14\u76F8\u8FDE\uFF0C\u4ECE\u800C\u628A\u4E0D\u76F8\u5E72\u7684\u7F51\u7EDC\u8FDE\u6210\u4E00\u7247\u3002\u628A\u5E03\u7EBF\u4EA4\u7ED9 EDA \u81EA\u5DF1\u7684\u7B97\u6CD5\uFF0C\u65E2\u597D\u770B\u53C8\u4E0D\u4F1A\u8BEF\u8FDE\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        component_uuids: {
+          type: "array",
+          items: { type: "string" },
+          description: "\u53EF\u9009\uFF0C\u53EA\u5904\u7406\u8FD9\u4E9B\u5668\u4EF6\uFF08\u56FE\u5143 id\uFF09\uFF1B\u4E0D\u7ED9\u5219\u5904\u7406\u5168\u56FE\u6240\u6709\u672A\u5E03\u7EBF\u7F51\u7EDC"
+        }
+      }
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const uuids = Array.isArray(args.component_uuids) ? args.component_uuids : null;
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const stat = async () => {
+					const src = await eda.sys_FileManager.getDocumentSource();
+					const n = (t) => (src.match(new RegExp('"type":"' + t + '"', 'g')) || []).length;
+					return { wires: n('WIRE'), lines: n('LINE') };
+				};
+				const before = await stat();
+				const t0 = Date.now();
+				const props = ${uuids ? `{ uuids: ${JSON.stringify(uuids)} }` : "undefined"};
+				await eda.sch_Document.autoRouting(props);
+				const after = await stat();
+				return {
+					ok: true, page: _page.name, elapsed_ms: Date.now() - t0,
+					before, after,
+					note: '\u8FDE\u7EBF\u5DF2\u7531 EDA \u7684\u5E03\u7EBF\u7B97\u6CD5\u91CD\u65B0\u6574\u7406\u3002\u5EFA\u8BAE\u63A5\u7740\u8DD1 eda_schematic_drc \u786E\u8BA4\u6CA1\u6709\u65B0\u589E error\u3002',
+				};
+			`,
+          18e4
+        )
+      );
+    }
+  },
+  {
+    name: "eda_auto_layout",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u8BA9 EDA \u81EA\u52A8\u5E03\u5C40\u5F53\u524D\u539F\u7406\u56FE\u9875\u7684\u5668\u4EF6\u4F4D\u7F6E\u3002\n\n\u9002\u7528\u4E8E\u4ECE\u96F6\u753B\u56FE\u3001\u8FD8\u6CA1\u60F3\u597D\u5668\u4EF6\u600E\u4E48\u6446\u7684\u65F6\u5019\uFF1A\u5148\u968F\u4FBF\u653E\u4E0B\u53BB\uFF0C\u518D\u8BA9\u7B97\u6CD5\u6392\u3002\u5982\u679C\u5668\u4EF6\u4F4D\u7F6E\u662F\u7167\u7740\u53C2\u8003\u56FE\u6446\u7684\uFF08\u6BD4\u5982\u590D\u523B\uFF09\uFF0C**\u4E0D\u8981\u7528**\uFF0C\u4F1A\u6253\u4E71\u539F\u6709\u5E03\u5C40\u3002\n\ndevice_types \u628A\u4F4D\u53F7\u6620\u5C04\u5230\u5668\u4EF6\u7C7B\u522B\uFF08resistor / capacitor / inductive / diode / triode / oscillator / chip / otherDevice\uFF09\uFF0C\u7B97\u6CD5\u4F1A\u636E\u6B64\u4F18\u5316\u6446\u653E \u2014\u2014 \u7ED9\u4E86\u4F1A\u660E\u663E\u66F4\u6574\u9F50\u3002\n\n\u5E03\u5C40\u6539\u53D8\u540E\u5E94\u91CD\u65B0\u8DD1 eda_auto_route\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        component_uuids: { type: "array", items: { type: "string" }, description: "\u53EF\u9009\uFF0C\u53EA\u5E03\u5C40\u8FD9\u4E9B\u5668\u4EF6" },
+        device_types: {
+          type: "object",
+          description: '\u53EF\u9009\uFF0C\u4F4D\u53F7 \u2192 \u7C7B\u522B\uFF0C\u5982 {"R1":"resistor","C1":"capacitor","U1":"chip"}',
+          additionalProperties: { type: "string" }
+        }
+      }
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const uuids = Array.isArray(args.component_uuids) ? args.component_uuids : null;
+      const types = args.device_types && typeof args.device_types === "object" ? args.device_types : null;
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const props = {};
+				${uuids ? `props.uuids = ${JSON.stringify(uuids)};` : ""}
+				${types ? `props.designatorDeviceTypeMap = ${JSON.stringify(types)};` : ""}
+				const t0 = Date.now();
+				await eda.sch_Document.autoLayout(Object.keys(props).length ? props : undefined);
+				const comps = await eda.sch_PrimitiveComponent.getAll();
+				return {
+					ok: true, page: _page.name, elapsed_ms: Date.now() - t0,
+					component_count: comps.length,
+					note: '\u5E03\u5C40\u5DF2\u91CD\u6392\u3002\u4F4D\u7F6E\u53D8\u4E86\uFF0C\u63A5\u7740\u8DD1 eda_auto_route \u91CD\u65B0\u6574\u7406\u8FDE\u7EBF\u3002',
+				};
+			`,
+          18e4
+        )
+      );
+    }
+  },
+  {
     name: "eda_place_component",
-    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u4E00\u4E2A\u5143\u5668\u4EF6\u3002\n\n\u7528\u7ACB\u521B\u5546\u57CE\u7F16\u53F7\uFF08lcsc_id\uFF09\u6700\u65B9\u4FBF\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7ED9 device_uuid + library_uuid\uFF08\u4ECE eda_library_search \u62FF\uFF09\u3002\n\n**\u5750\u6807\u5355\u4F4D\u662F 0.01 inch**\uFF08A4 \u56FE\u7EB8\u7EA6 1170 \xD7 830\uFF09\uFF0Crotation \u9006\u65F6\u9488\u4E3A\u6B63\u3002\n\n**\u4F4D\u53F7\u4F1A\u81EA\u52A8\u5206\u914D**\uFF08U1\u3001U2\u3001R1\u2026\uFF09\uFF1AEDA \u7684 create \u63A5\u53E3\u653E\u51FA\u6765\u7684\u5668\u4EF6\u4F4D\u53F7\u662F\u5E93\u91CC\u7684\u5360\u4F4D\u7B26\uFF08\u5982 `U?`\uFF09\uFF0C\u591A\u4E2A\u5668\u4EF6\u4F1A\u91CD\u540D\u3001\u6CA1\u6CD5\u5F15\u7528\uFF0C\u6240\u4EE5\u672C\u5DE5\u5177\u653E\u7F6E\u540E\u4F1A\u626B\u63CF\u5168\u56FE\u5DF2\u7528\u4F4D\u53F7\u5E76\u8865\u4E0A\u4E0B\u4E00\u4E2A\u53EF\u7528\u7F16\u53F7\u3002\u4E5F\u53EF\u4EE5\u7528 designator \u53C2\u6570\u6307\u5B9A\uFF0C\u91CD\u590D\u65F6\u4F1A\u62A5\u9519\u3002\n\n\u653E\u5B8C\u5EFA\u8BAE\u8C03 eda_schematic_components \u786E\u8BA4\uFF0C\u518D\u8DD1 eda_schematic_drc \u770B\u6709\u6CA1\u6709\u65B0\u589E error\u3002",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u4E00\u4E2A\u5143\u5668\u4EF6\u3002\n\n\u7528\u7ACB\u521B\u5546\u57CE\u7F16\u53F7\uFF08lcsc_id\uFF09\u6700\u65B9\u4FBF\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7ED9 device_uuid + library_uuid\uFF08\u4ECE eda_library_search \u62FF\uFF09\u3002\n\n**\u653E\u5668\u4EF6\u524D\u5148\u89C4\u5212\u529F\u80FD\u5206\u533A** \u2014\u2014 \u89C1 eda-schematic-layout skill\u3002\u6309\u6E05\u5355\u987A\u5E8F\u968F\u624B\u6446\u4F1A\u8BA9\u8FDE\u7EBF\u6A2A\u7A7F\u6574\u5F20\u56FE\u3001\u65E0\u6CD5\u9605\u8BFB\uFF1B\u5206\u533A\u662F\u8BBE\u8BA1\u5224\u65AD\uFF0C\u5DE5\u5177\u53EA\u8D1F\u8D23\u6267\u884C\u3002\n\n**\u5750\u6807\u5355\u4F4D\u662F 0.01 inch**\uFF08A4 \u56FE\u7EB8\u7EA6 1170 \xD7 830\uFF09\uFF0Crotation \u9006\u65F6\u9488\u4E3A\u6B63\u3002\n\n**\u4F4D\u53F7\u4F1A\u81EA\u52A8\u5206\u914D**\uFF08U1\u3001U2\u3001R1\u2026\uFF09\uFF1AEDA \u7684 create \u63A5\u53E3\u653E\u51FA\u6765\u7684\u5668\u4EF6\u4F4D\u53F7\u662F\u5E93\u91CC\u7684\u5360\u4F4D\u7B26\uFF08\u5982 `U?`\uFF09\uFF0C\u591A\u4E2A\u5668\u4EF6\u4F1A\u91CD\u540D\u3001\u6CA1\u6CD5\u5F15\u7528\uFF0C\u6240\u4EE5\u672C\u5DE5\u5177\u653E\u7F6E\u540E\u4F1A\u626B\u63CF\u5168\u56FE\u5DF2\u7528\u4F4D\u53F7\u5E76\u8865\u4E0A\u4E0B\u4E00\u4E2A\u53EF\u7528\u7F16\u53F7\u3002\u4E5F\u53EF\u4EE5\u7528 designator \u53C2\u6570\u6307\u5B9A\uFF0C\u91CD\u590D\u65F6\u4F1A\u62A5\u9519\u3002\n\n\u653E\u5B8C\u5EFA\u8BAE\u8C03 eda_schematic_components \u786E\u8BA4\uFF0C\u518D\u8DD1 eda_schematic_drc \u770B\u6709\u6CA1\u6709\u65B0\u589E error\u3002",
     inputSchema: {
       type: "object",
       properties: {
@@ -20591,8 +20820,10 @@ var schematicEditTools = [
 						assignError = '\u4F4D\u53F7 ' + want + ' \u5DF2\u88AB\u5360\u7528\uFF0C\u5DF2\u4FDD\u7559\u81EA\u52A8\u5206\u914D\u7684\u7F16\u53F7';
 					} else {
 						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: want });
-						if (m) { finalDes = want; assigned = true; }
-						else assignError = '\u8BBE\u7F6E\u6307\u5B9A\u4F4D\u53F7\u5931\u8D25';
+						const fresh = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+						const dup = fresh.filter(x => String(x.designator || '').toUpperCase() === want.toUpperCase()).length;
+						if (m && dup === 1) { finalDes = want; assigned = true; }
+						else assignError = dup > 1 ? '\u4F4D\u53F7 ' + want + ' \u51FA\u73B0\u91CD\u590D\uFF0C\u5DF2\u653E\u5F03\u6307\u5B9A' : '\u8BBE\u7F6E\u6307\u5B9A\u4F4D\u53F7\u5931\u8D25';
 					}
 				}
 				if (!assigned && (raw === '' || raw.indexOf('?') >= 0)) {
@@ -20600,12 +20831,21 @@ var schematicEditTools = [
 					// \u6CE8\u610F\u8FD9\u91CC\u523B\u610F\u4E0D\u5199\u542B\u53CD\u659C\u6760\u7684\u6B63\u5219 \u2014\u2014 \u8FD9\u6BB5\u4EE3\u7801\u662F\u653E\u5728 TS \u6A21\u677F\u5B57\u7B26\u4E32\u91CC\u4F20\u7ED9 EDA \u6267\u884C\u7684\uFF0C
 					// \u6A21\u677F\u5B57\u7B26\u4E32\u4F1A\u628A ? d \u8FD9\u7C7B\u65E0\u6548\u8F6C\u4E49\u7684\u53CD\u659C\u6760\u5403\u6389\uFF0C\u5230\u4E86 EDA \u90A3\u8FB9\u5C31\u6210\u4E86\u975E\u6CD5\u6B63\u5219\u3002
 					const prefix = (raw.replace(/[?0-9]+$/, '') || 'U').toUpperCase();
+					// \u6539\u5B8C\u5FC5\u987B\u91CD\u65B0\u67E5\u5168\u56FE\u786E\u8BA4\u552F\u4E00 \u2014\u2014 getAll \u76F8\u5BF9\u5199\u5165\u6709\u5EF6\u8FDF\uFF0C\u53EA\u51ED\u653E\u7F6E\u524D\u90A3\u4E00\u6B21\u5FEB\u7167\u7B97\u7F16\u53F7\uFF0C
+					// \u8FDE\u7EED\u653E\u7F6E\u65F6\u4F1A\u7B97\u51FA\u540C\u4E00\u4E2A\u53F7\uFF0C\u4E24\u4E2A\u5668\u4EF6\u540C\u4F4D\u53F7\u3002\u4F4D\u53F7\u91CD\u590D\u4F1A\u8BA9\u6574\u5F20\u56FE**\u5BFC\u4E0D\u51FA\u7F51\u8868**
+					// \uFF08DRC \u62A5\u81F4\u547D\u9519\u8BEF\uFF09\uFF0C\u4EE3\u4EF7\u8FDC\u5927\u4E8E\u591A\u67E5\u51E0\u6B21\u3002
 					let n = 1;
-					while (used.has(prefix + n)) n++;
-					const auto = prefix + n;
-					const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: auto });
-					if (m) { finalDes = auto; assigned = true; }
-					else assignError = (assignError ? assignError + '\uFF1B' : '') + '\u81EA\u52A8\u7F16\u53F7\u5931\u8D25\uFF0C\u4F4D\u53F7\u4ECD\u662F\u5360\u4F4D\u7B26 ' + raw;
+					for (let attempt = 0; attempt < 40 && !assigned; attempt++) {
+						while (used.has(prefix + n)) n++;
+						const auto = prefix + n;
+						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: auto });
+						if (!m) { assignError = '\u81EA\u52A8\u7F16\u53F7\u5931\u8D25\uFF0C\u4F4D\u53F7\u4ECD\u662F\u5360\u4F4D\u7B26 ' + raw; break; }
+						const fresh = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+						const dup = fresh.filter(x => String(x.designator || '').toUpperCase() === auto).length;
+						if (dup === 1) { finalDes = auto; assigned = true; }
+						else { fresh.forEach(x => used.add(String(x.designator || '').toUpperCase())); n++; }
+					}
+					if (!assigned && !assignError) assignError = '\u8FDE\u7EED 40 \u6B21\u90FD\u649E\u4E0A\u91CD\u540D\uFF0C\u672A\u80FD\u5206\u914D\u552F\u4E00\u4F4D\u53F7';
 				}
 
 				return {
@@ -21125,7 +21365,7 @@ var allTools = [
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.22";
+var VERSION2 = "0.1.25";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var ctx = {

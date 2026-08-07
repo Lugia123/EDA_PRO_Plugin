@@ -1,19 +1,30 @@
 {
   "name": "eda-pro",
-  "description": "用 AI 操作立创EDA专业版（EasyEDA Pro）：读工程结构与原理图、查器件与网络、跑 DRC、库检索选型、下载数据手册。本地 MCP + EDA 扩展，全程 loopback 不出本机，首次使用需一次配对。",
-  "version": "0.1.24",
+  "description": "用 AI 操作立创EDA专业版（EasyEDA Pro）：读工程与原理图、查器件与网络、跑 DRC、库检索选型、下载数据手册，以及按功能分区画原理图（放器件 → 声明网络 → EDA 自动布线）。本地 MCP + EDA 扩展，全程 loopback 不出本机，首次使用需一次配对。",
+  "version": "0.1.25",
   "author": {
     "name": "EDA_PRO_Plugin contributors"
   },
   "homepage": "https://github.com/",
   "repository": "https://github.com/",
   "license": "MIT",
-  "keywords": ["eda", "easyeda", "lceda", "jlceda", "pcb", "schematic", "hardware", "mcp"],
+  "keywords": [
+    "eda",
+    "easyeda",
+    "lceda",
+    "jlceda",
+    "pcb",
+    "schematic",
+    "hardware",
+    "mcp"
+  ],
   "mcpServers": {
     "eda": {
       "type": "stdio",
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/local-mcp/eda-mcp/index.js"]
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/local-mcp/eda-mcp/index.js"
+      ]
     }
   }
 }

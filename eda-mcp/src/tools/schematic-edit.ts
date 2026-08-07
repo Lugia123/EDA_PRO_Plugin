@@ -147,6 +147,68 @@ export const schematicEditTools: ToolDef[] = [
 		},
 	},
 	{
+		name: 'eda_arrange_components',
+		description:
+			'【写操作】批量移动 / 旋转器件 —— 功能分区布局的执行手段。' +
+			'\n\n一次传多个 {designator, x, y, rotation?, mirror?}，比逐个调用快得多。' +
+			'坐标单位 0.01 inch，rotation 逆时针为正。' +
+			'\n\n**典型用法是按功能分区**：先想清楚这张图分几个功能块（电源、时钟、MCU、' +
+			'模拟前端、ADC/DAC、接口…），给每块划一片图纸区域，再把各块的器件摆进去。' +
+			'摆完跑 eda_auto_route，连线自然就短而清晰。' +
+			'\n\n只想让算法排、不在意分区时，用 eda_auto_layout 更省事。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				placements: {
+					type: 'array',
+					description: '每项 {designator, x, y, rotation?, mirror?}',
+					items: {
+						type: 'object',
+						properties: {
+							designator: { type: 'string' },
+							x: { type: 'number' },
+							y: { type: 'number' },
+							rotation: { type: 'number' },
+							mirror: { type: 'boolean' },
+						},
+						required: ['designator', 'x', 'y'],
+					},
+				},
+			},
+			required: ['placements'],
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const list = args.placements;
+			if (!Array.isArray(list) || !list.length) throw new Error('placements 必须是非空数组');
+			return schHint(
+				await ctx.exec<Record<string, unknown>>(
+					`
+				${ENSURE_SCH}
+				const want = ${JSON.stringify(list)};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+				const okList = [], failList = [];
+				for (const w of want) {
+					const c = byDes[String(w.designator).toUpperCase()];
+					if (!c) { failList.push({ designator: w.designator, error: '找不到该位号' }); continue; }
+					const prop = { x: w.x, y: w.y };
+					if (w.rotation !== undefined) prop.rotation = w.rotation;
+					if (w.mirror !== undefined) prop.mirror = w.mirror;
+					const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, prop);
+					if (m) okList.push(w.designator); else failList.push({ designator: w.designator, error: 'modify 返回失败' });
+				}
+				return { ok: failList.length === 0, moved: okList.length, failed: failList.length,
+					failures: failList.slice(0, 10), page: _page.name,
+					note: '位置变了，记得跑 eda_auto_route 重新整理连线。' };
+			`,
+					180_000,
+				),
+			);
+		},
+	},
+	{
 		name: 'eda_auto_route',
 		description:
 			'【写操作】让 EDA 自动整理当前原理图页的连线 —— **画完网络后必做的一步**。' +
@@ -247,6 +309,8 @@ export const schematicEditTools: ToolDef[] = [
 		description:
 			'【写操作】在当前原理图页放置一个元器件。' +
 			'\n\n用立创商城编号（lcsc_id）最方便，也可以直接给 device_uuid + library_uuid（从 eda_library_search 拿）。' +
+			'\n\n**放器件前先规划功能分区** —— 见 eda-schematic-layout skill。' +
+			'按清单顺序随手摆会让连线横穿整张图、无法阅读；分区是设计判断，工具只负责执行。' +
 			'\n\n**坐标单位是 0.01 inch**（A4 图纸约 1170 × 830），rotation 逆时针为正。' +
 			'\n\n**位号会自动分配**（U1、U2、R1…）：EDA 的 create 接口放出来的器件位号是库里的占位符（如 `U?`），' +
 			'多个器件会重名、没法引用，所以本工具放置后会扫描全图已用位号并补上下一个可用编号。' +
