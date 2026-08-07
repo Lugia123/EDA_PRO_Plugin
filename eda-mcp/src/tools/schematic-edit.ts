@@ -700,25 +700,30 @@ export const schematicEditTools: ToolDef[] = [
 					for (const x of pins) if (String(x.pinName || '').toUpperCase() === k) return x;
 					return null;
 				};
-				// 引脚必须从朝向那一侧接入，从符号内侧画进去 EDA 不认这个连接
-				const STUB = 20;
-				const outward = (p) => {
+				// 引脚必须从朝向那一侧接入，从符号内侧画进去 EDA 不认这个连接。
+				// 引出长度**按网络逐个错开**：两个网络若都从同一颗芯片的相邻引脚引出、
+				// 又都要折返到同一侧，用同一个长度就会让两条竖直段落在同一个 x 上。
+				// 原理图里重叠的导线会被判定为电气相连 —— 实测 FB 与 AOUT 因此短路，
+				// 等于把反馈电阻整个旁路掉，而 DRC 一声不吭。
+				const outward = (p, stub) => {
 					const r = ((Number(p.rotation) % 360) + 360) % 360;
-					if (r === 0) return [STUB, 0];
-					if (r === 90) return [0, -STUB];
-					if (r === 180) return [-STUB, 0];
-					return [0, STUB];
+					if (r === 0) return [stub, 0];
+					if (r === 90) return [0, -stub];
+					if (r === 180) return [-stub, 0];
+					return [0, stub];
 				};
 
 				const done = [], failed = [];
-				for (const g of GROUPS) {
+				for (let gi = 0; gi < GROUPS.length; gi++) {
+					const g = GROUPS[gi];
+					const stub = 20 + (gi % 5) * 12; // 每个网络错开 12，五个一循环
 					const pts = [];
 					let bad = false;
 					for (const ref of g.refs) {
 						if (!byDes[ref.des]) { failed.push({ net: g.net, why: '图上没有 ' + ref.des }); bad = true; break; }
 						const p = await findPin(ref.des, ref.pin);
 						if (!p) { failed.push({ net: g.net, why: ref.des + ' 上找不到引脚 ' + ref.pin }); bad = true; break; }
-						const d = outward(p);
+						const d = outward(p, stub);
 						pts.push({ ref: ref.des + '.' + ref.pin, x: p.x, y: p.y, ex: p.x + d[0], ey: p.y + d[1] });
 					}
 					if (bad) continue;
