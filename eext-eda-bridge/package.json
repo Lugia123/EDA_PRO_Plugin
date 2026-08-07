@@ -1,7 +1,7 @@
 {
 	"name": "eda-bridge",
 	"type": "module",
-	"version": "0.1.22",
+	"version": "0.1.24",
 	"description": "立创EDA专业版扩展：连接本机 eda-mcp，在 EDA 内执行 AI 下发的代码。派生自 easyeda/pro-api-sdk 脚手架。",
 	"author": "EDA_PRO_Plugin contributors",
 	"license": "Apache-2.0",

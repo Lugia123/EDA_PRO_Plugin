@@ -147,6 +147,102 @@ export const schematicEditTools: ToolDef[] = [
 		},
 	},
 	{
+		name: 'eda_auto_route',
+		description:
+			'【写操作】让 EDA 自动整理当前原理图页的连线 —— **画完网络后必做的一步**。' +
+			'\n\n工作方式：把已经建立的网络关系整理成真正的走线（拐弯、节点、避让），' +
+			'而不是一堆散落的短引出线。实测 3.4 秒把 154 段短线整理成 46 条正规连线。' +
+			'\n\n**推荐工作流**：' +
+			'\n1. eda_place_component 放器件' +
+			'\n2. eda_label_pin_net 声明每个引脚属于哪个网络（只表达电气意图，不管几何）' +
+			'\n3. **eda_auto_route** 让 EDA 把线画好看' +
+			'\n\n这样分工的理由：自动生成的几何路径在密集图里会大量交叉，' +
+			'而交叉重合的导线会被判定为电气相连，从而把不相干的网络连成一片。' +
+			'把布线交给 EDA 自己的算法，既好看又不会误连。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				component_uuids: {
+					type: 'array',
+					items: { type: 'string' },
+					description: '可选，只处理这些器件（图元 id）；不给则处理全图所有未布线网络',
+				},
+			},
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const uuids = Array.isArray(args.component_uuids) ? (args.component_uuids as string[]) : null;
+			return schHint(
+				await ctx.exec<Record<string, unknown>>(
+					`
+				${ENSURE_SCH}
+				const stat = async () => {
+					const src = await eda.sys_FileManager.getDocumentSource();
+					const n = (t) => (src.match(new RegExp('"type":"' + t + '"', 'g')) || []).length;
+					return { wires: n('WIRE'), lines: n('LINE') };
+				};
+				const before = await stat();
+				const t0 = Date.now();
+				const props = ${uuids ? `{ uuids: ${JSON.stringify(uuids)} }` : 'undefined'};
+				await eda.sch_Document.autoRouting(props);
+				const after = await stat();
+				return {
+					ok: true, page: _page.name, elapsed_ms: Date.now() - t0,
+					before, after,
+					note: '连线已由 EDA 的布线算法重新整理。建议接着跑 eda_schematic_drc 确认没有新增 error。',
+				};
+			`,
+					180_000,
+				),
+			);
+		},
+	},
+	{
+		name: 'eda_auto_layout',
+		description:
+			'【写操作】让 EDA 自动布局当前原理图页的器件位置。' +
+			'\n\n适用于从零画图、还没想好器件怎么摆的时候：先随便放下去，再让算法排。' +
+			'如果器件位置是照着参考图摆的（比如复刻），**不要用**，会打乱原有布局。' +
+			'\n\ndevice_types 把位号映射到器件类别（resistor / capacitor / inductive / diode /' +
+			' triode / oscillator / chip / otherDevice），算法会据此优化摆放 —— 给了会明显更整齐。' +
+			'\n\n布局改变后应重新跑 eda_auto_route。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				component_uuids: { type: 'array', items: { type: 'string' }, description: '可选，只布局这些器件' },
+				device_types: {
+					type: 'object',
+					description: '可选，位号 → 类别，如 {"R1":"resistor","C1":"capacitor","U1":"chip"}',
+					additionalProperties: { type: 'string' },
+				},
+			},
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const uuids = Array.isArray(args.component_uuids) ? (args.component_uuids as string[]) : null;
+			const types = args.device_types && typeof args.device_types === 'object' ? args.device_types : null;
+			return schHint(
+				await ctx.exec<Record<string, unknown>>(
+					`
+				${ENSURE_SCH}
+				const props = {};
+				${uuids ? `props.uuids = ${JSON.stringify(uuids)};` : ''}
+				${types ? `props.designatorDeviceTypeMap = ${JSON.stringify(types)};` : ''}
+				const t0 = Date.now();
+				await eda.sch_Document.autoLayout(Object.keys(props).length ? props : undefined);
+				const comps = await eda.sch_PrimitiveComponent.getAll();
+				return {
+					ok: true, page: _page.name, elapsed_ms: Date.now() - t0,
+					component_count: comps.length,
+					note: '布局已重排。位置变了，接着跑 eda_auto_route 重新整理连线。',
+				};
+			`,
+					180_000,
+				),
+			);
+		},
+	},
+	{
 		name: 'eda_place_component',
 		description:
 			'【写操作】在当前原理图页放置一个元器件。' +
