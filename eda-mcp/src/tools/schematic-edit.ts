@@ -283,10 +283,16 @@ export const schematicEditTools: ToolDef[] = [
 					// 文字标签按同器件内的序号错开引出长度，避免相邻引脚的标签叠在一起 ——
 					// 引脚间距只有 10，而网络名文字宽度动辄 50 以上。
 					const rot = ((Number(p.rotation) % 360) + 360) % 360;
-					const L2 = j.kind === 'label' ? L + (j.seq % 3) * 25 : L;
+					// 电源地的引出线要长一点（40），否则符号名会压在器件位号上 ——
+					// 实测引出 30 时，C2 的位号和它上方 +3V3 的网络名只差 5 个单位。
+					const L2 = j.kind === 'label' ? L + (j.seq % 3) * 25 : L + 10;
 					const d = rot === 0 ? [L2, 0] : rot === 90 ? [0, -L2] : rot === 180 ? [-L2, 0] : rot === 270 ? [0, L2] : [L2, 0];
 					const ex = p.x + d[0], ey = p.y + d[1];
-					const w = await eda.sch_PrimitiveWire.create([p.x, p.y, ex, ey], j.net);
+					// 要放符号时，导线本身**不带网络名** —— 否则导线的 NET 标签和符号名会把
+					// 同一个网络名画两遍，挤在一小段线的两端。让符号独自命名这个网络。
+					const w = j.flag
+						? await eda.sch_PrimitiveWire.create([p.x, p.y, ex, ey])
+						: await eda.sch_PrimitiveWire.create([p.x, p.y, ex, ey], j.net);
 					if (!w) { failed.push({ ref: j.des + '.' + j.pin, why: '引出线创建失败（该引脚可能已属于别的网络）' }); continue; }
 
 					if (j.flag) {
