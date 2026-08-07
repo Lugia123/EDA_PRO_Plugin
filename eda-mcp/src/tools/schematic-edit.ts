@@ -168,13 +168,17 @@ export const schematicEditTools: ToolDef[] = [
 	{
 		name: 'eda_label_nets',
 		description:
-			'【写操作】按一份网络声明批量标注引脚 —— eda_label_pin_net 的批量版，' +
-			'吃的是和 eda_arrange_block 完全相同的 nets 参数：' +
-			'{ "+24V": ["U1.3","C11.1"], "GND": ["U1.1","C11.2"] }。' +
-			'\n\n**同一份声明先排布、再标注**，写一次用两处，也保证了摆位依据和电气连接是同一套东西。' +
-			'一个功能块动辄十几二十个引脚，逐个调用要几分钟，这里一次搞定。' +
-			'\n\n顺序很重要：**先把块排布定稿再标注**。标注会在引脚旁画出短导线，' +
-			'之后再移动器件，导线会留在原地，连接就断了。',
+			'【写操作】按一份网络声明批量建立引脚连接。吃的是和 eda_arrange_block ' +
+			'完全相同的 nets 参数：{ "+24V": ["U1.3","C11.1"], "GND": ["U1.1","C11.2"] }。' +
+			'\n\n**会按网络语义自动选择图形表达**，而不是一律贴文字标签：' +
+			'\n- 电源与地（GND / AGND / VCC / +3V3 / +24V 这类）→ 放**电源符号、地符号**' +
+			'\n- 其余信号 → 引出短线 + 网络标签，且按引脚序错开长度，避免文字糊在一起' +
+			'\n\n为什么必须这样：芯片相邻引脚间距只有 10（0.1 inch），而一个网络名的文字宽度' +
+			'动辄 50 以上。密集芯片上逐个引脚贴文字标签，必然重叠成一团（实测 LM331 周围' +
+			'七八个标签叠在一起，连引脚名都被盖住）。电源地又恰恰是引脚最多的网络，' +
+			'换成符号能一次消掉大半重叠。' +
+			'\n\n顺序很重要：**先把块排布定稿再调这个**。连接建立后再移动器件，' +
+			'导线和符号会留在原地，连接就断了。',
 		inputSchema: {
 			type: 'object',
 			properties: {
@@ -183,20 +187,62 @@ export const schematicEditTools: ToolDef[] = [
 					description: '{ 网络名: ["位号.引脚号", …] }，与 eda_arrange_block 的 nets 同格式',
 					additionalProperties: { type: 'array', items: { type: 'string' } },
 				},
-				length: { type: 'number', description: '每个引脚引出线的长度（0.01 inch），默认 20' },
+				length: { type: 'number', description: '每个引脚引出线的长度（0.01 inch），默认 30' },
+				power_nets: {
+					type: 'object',
+					description:
+						'可选，手工指定某个网络用哪种符号：{ "VBUS": "power", "EARTH": "protect_ground" }。' +
+						'取值 power / ground / analog_ground / protect_ground / label。' +
+						'不指定时按网络名自动判断（GND/VSS→地，AGND→模拟地，VCC/VDD/+xxV→电源）。' +
+						'填 label 可以强制某个电源网络仍用文字标签。',
+					additionalProperties: { type: 'string' },
+				},
 			},
 			required: ['nets'],
 		},
 		mutating: true,
 		handler: async (args, ctx) => {
 			const nets = (args.nets && typeof args.nets === 'object' ? args.nets : {}) as Record<string, string[]>;
-			const len = typeof args.length === 'number' && args.length > 0 ? args.length : 20;
-			const jobs: Array<{ des: string; pin: string; net: string }> = [];
+			const len = typeof args.length === 'number' && args.length > 0 ? args.length : 30;
+			const override = (args.power_nets && typeof args.power_nets === 'object' ? args.power_nets : {}) as Record<string, string>;
+
+			// 网络名 → 用什么图形表达。电源地用符号，其余走文字标签。
+			const FLAG: Record<string, string> = {
+				power: 'Power',
+				ground: 'Ground',
+				analog_ground: 'AnalogGround',
+				protect_ground: 'ProtectGround',
+			};
+			const classify = (net: string): string => {
+				const manual = override[net];
+				if (manual) return manual === 'label' ? 'label' : (FLAG[manual] ? manual : 'label');
+				const u = net.toUpperCase();
+				if (u === 'AGND' || u === 'GNDA') return 'analog_ground';
+				if (u === 'PGND' || u === 'EARTH' || u === 'FGND') return 'protect_ground';
+				if (u === 'GND' || u === 'DGND' || u === 'SGND' || u === 'VSS' || u === 'VEE' || u === 'GNDD') return 'ground';
+				if (u.indexOf('VCC') === 0 || u.indexOf('VDD') === 0 || u.indexOf('VBAT') === 0 || u === 'V+') return 'power';
+				// +24V / +3V3 / 5V0 这类：以 + 或数字开头且含 V
+				const c0 = u.charCodeAt(0);
+				if (((c0 >= 48 && c0 <= 57) || u.charAt(0) === '+') && u.indexOf('V') >= 0) return 'power';
+				return 'label';
+			};
+			const jobs: Array<{ des: string; pin: string; net: string; kind: string; flag: string; seq: number }> = [];
+			const seqOf: Record<string, number> = {}; // 同一器件内第几个标签，用来错开引出长度
 			for (const [net, refs] of Object.entries(nets)) {
+				const kind = classify(net);
 				for (const ref of Array.isArray(refs) ? refs : []) {
 					const dot = String(ref).lastIndexOf('.');
 					if (dot <= 0) continue;
-					jobs.push({ des: String(ref).slice(0, dot).toUpperCase(), pin: String(ref).slice(dot + 1), net });
+					const des = String(ref).slice(0, dot).toUpperCase();
+					seqOf[des] = (seqOf[des] ?? -1) + 1;
+					jobs.push({
+						des,
+						pin: String(ref).slice(dot + 1),
+						net,
+						kind,
+						flag: FLAG[kind] ?? '',
+						seq: kind === 'label' ? seqOf[des] : 0,
+					});
 				}
 			}
 			if (!jobs.length) throw new Error('nets 里没有可解析的 "位号.引脚号" 条目');
@@ -220,6 +266,7 @@ export const schematicEditTools: ToolDef[] = [
 				};
 
 				const done = [], failed = [];
+				let flags = 0, labels = 0;
 				for (const j of JOBS) {
 					if (!byDes[j.des]) { failed.push({ ref: j.des + '.' + j.pin, why: '图上没有这个位号' }); continue; }
 					const pins = await getPins(j.des);
@@ -232,14 +279,34 @@ export const schematicEditTools: ToolDef[] = [
 						failed.push({ ref: j.des + '.' + j.pin, why: '找不到该引脚', pins: avail });
 						continue;
 					}
-					// 顺着引脚朝向往外引，从符号内侧接入的话 EDA 不认这个连接
+					// 顺着引脚朝向往外引，从符号内侧接入的话 EDA 不认这个连接。
+					// 文字标签按同器件内的序号错开引出长度，避免相邻引脚的标签叠在一起 ——
+					// 引脚间距只有 10，而网络名文字宽度动辄 50 以上。
 					const rot = ((Number(p.rotation) % 360) + 360) % 360;
-					const d = rot === 0 ? [L, 0] : rot === 90 ? [0, -L] : rot === 180 ? [-L, 0] : rot === 270 ? [0, L] : [L, 0];
-					const w = await eda.sch_PrimitiveWire.create([p.x, p.y, p.x + d[0], p.y + d[1]], j.net);
-					if (w) done.push(j.des + '.' + p.pinNumber + '=' + j.net);
-					else failed.push({ ref: j.des + '.' + j.pin, why: '引出线创建失败（该引脚可能已属于别的网络）' });
+					const L2 = j.kind === 'label' ? L + (j.seq % 3) * 25 : L;
+					const d = rot === 0 ? [L2, 0] : rot === 90 ? [0, -L2] : rot === 180 ? [-L2, 0] : rot === 270 ? [0, L2] : [L2, 0];
+					const ex = p.x + d[0], ey = p.y + d[1];
+					const w = await eda.sch_PrimitiveWire.create([p.x, p.y, ex, ey], j.net);
+					if (!w) { failed.push({ ref: j.des + '.' + j.pin, why: '引出线创建失败（该引脚可能已属于别的网络）' }); continue; }
+
+					if (j.flag) {
+						// 电源 / 地：在引出线末端放符号。符号自带一个引脚，坐标即放置点，
+						// 与导线端点重合就连上了。旋转让符号朝外（背对器件）。
+						const fr = rot === 0 ? 270 : rot === 90 ? 180 : rot === 180 ? 90 : 0;
+						const fl = await eda.sch_PrimitiveComponent.createNetFlag(j.flag, j.net, ex, ey, fr);
+						if (fl) { flags += 1; done.push(j.des + '.' + p.pinNumber + '=' + j.net + '(符号)'); }
+						else failed.push({ ref: j.des + '.' + j.pin, why: '电源/地符号创建失败' });
+					} else {
+						labels += 1;
+						done.push(j.des + '.' + p.pinNumber + '=' + j.net);
+					}
 				}
-				return { ok: failed.length === 0, labeled: done.length, total: JOBS.length, done, failed };
+				return {
+					ok: failed.length === 0,
+					labeled: done.length, total: JOBS.length,
+					power_symbols: flags, text_labels: labels,
+					done, failed,
+				};
 			`,
 				180_000,
 			);
@@ -547,6 +614,442 @@ export const schematicEditTools: ToolDef[] = [
 		},
 	},
 	{
+		name: 'eda_wire_block',
+		description:
+			'【写操作】把一个功能块内部的引脚用**真实导线**连起来 —— 块内连接的正确做法。' +
+			'\n\n为什么不用逐引脚贴网络标签：两端各贴一个同名标签，电气上成立，但人得满图找同名文字' +
+			'才能看出谁连谁；密集芯片上标签还会互相压住。**块内器件之间就该有看得见的线。**' +
+			'\n\n给它一份 nets 声明，它会：' +
+			'\n- 电源、地网络 → 跳过（交给 eda_label_nets 放符号）' +
+			'\n- 两个引脚 → 直线或 L 形连起来' +
+			'\n- 三个以上 → 拉一条主干，各引脚引短线接上去（总线式，最清晰）' +
+			'\n\n跨区的网络不要放进来 —— 长线穿越图纸是可读性的头号杀手，跨区用 eda_add_net_identifier ' +
+			'放 IN/OUT 端口。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				nets: {
+					type: 'object',
+					description: '{ 网络名: ["位号.引脚号", …] }，与 eda_arrange_block 同格式',
+					additionalProperties: { type: 'array', items: { type: 'string' } },
+				},
+				include_power: {
+					type: 'boolean',
+					description: '是否也给电源地网络画线，默认 false（电源地应该用符号，不该拉线）',
+				},
+			},
+			required: ['nets'],
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const nets = (args.nets && typeof args.nets === 'object' ? args.nets : {}) as Record<string, string[]>;
+			const includePower = args.include_power === true;
+			const GND = ['GND', 'AGND', 'DGND', 'PGND', 'SGND', 'VSS', 'VEE', 'GNDA', 'GNDD', 'EARTH'];
+			const isPowerish = (n: string): boolean => {
+				const u = n.toUpperCase();
+				if (GND.includes(u)) return true;
+				if (u.startsWith('VCC') || u.startsWith('VDD') || u.startsWith('VBAT') || u === 'V+') return true;
+				const c0 = u.charCodeAt(0);
+				return ((c0 >= 48 && c0 <= 57) || u.charAt(0) === '+') && u.includes('V');
+			};
+			const groups: Array<{ net: string; refs: Array<{ des: string; pin: string }> }> = [];
+			const skipped: string[] = [];
+			for (const [net, refs] of Object.entries(nets)) {
+				if (!includePower && isPowerish(net)) {
+					skipped.push(net);
+					continue;
+				}
+				const parsed: Array<{ des: string; pin: string }> = [];
+				for (const ref of Array.isArray(refs) ? refs : []) {
+					const dot = String(ref).lastIndexOf('.');
+					if (dot <= 0) continue;
+					parsed.push({ des: String(ref).slice(0, dot).toUpperCase(), pin: String(ref).slice(dot + 1) });
+				}
+				if (parsed.length >= 2) groups.push({ net, refs: parsed });
+				else if (parsed.length === 1) skipped.push(`${net}(只有一个引脚)`);
+			}
+			if (!groups.length) {
+				return { ok: true, wired: 0, skipped, note: '没有需要画线的网络（电源地默认跳过，单引脚网络无法成线）。' };
+			}
+
+			const r = await ctx.exec<Record<string, unknown>>(
+				`
+				${ENSURE_SCH}
+				const GROUPS = ${JSON.stringify(groups)};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+				const pinCache = {};
+				const getPins = async (des) => {
+					if (!pinCache[des]) {
+						const c = byDes[des];
+						pinCache[des] = c ? (await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId) || []) : [];
+					}
+					return pinCache[des];
+				};
+				const findPin = async (des, key) => {
+					const pins = await getPins(des);
+					const k = String(key).toUpperCase();
+					for (const x of pins) if (String(x.pinNumber || '').toUpperCase() === k) return x;
+					for (const x of pins) if (String(x.pinName || '').toUpperCase() === k) return x;
+					return null;
+				};
+				// 引脚必须从朝向那一侧接入，从符号内侧画进去 EDA 不认这个连接
+				const STUB = 20;
+				const outward = (p) => {
+					const r = ((Number(p.rotation) % 360) + 360) % 360;
+					if (r === 0) return [STUB, 0];
+					if (r === 90) return [0, -STUB];
+					if (r === 180) return [-STUB, 0];
+					return [0, STUB];
+				};
+
+				const done = [], failed = [];
+				for (const g of GROUPS) {
+					const pts = [];
+					let bad = false;
+					for (const ref of g.refs) {
+						if (!byDes[ref.des]) { failed.push({ net: g.net, why: '图上没有 ' + ref.des }); bad = true; break; }
+						const p = await findPin(ref.des, ref.pin);
+						if (!p) { failed.push({ net: g.net, why: ref.des + ' 上找不到引脚 ' + ref.pin }); bad = true; break; }
+						const d = outward(p);
+						pts.push({ ref: ref.des + '.' + ref.pin, x: p.x, y: p.y, ex: p.x + d[0], ey: p.y + d[1] });
+					}
+					if (bad) continue;
+
+					let segs = 0;
+					if (pts.length === 2) {
+						const a = pts[0], b = pts[1];
+						if (a.y === b.y || a.x === b.x) {
+							// 正好共线：一条直线到底
+							if (await eda.sch_PrimitiveWire.create([a.x, a.y, b.x, b.y], g.net)) segs += 1;
+						} else {
+							// L 形：先各自朝外引出，再折一个直角接上
+							const w = await eda.sch_PrimitiveWire.create([a.x, a.y, a.ex, a.ey, a.ex, b.y, b.x, b.y], g.net);
+							if (w) segs += 1;
+							else if (await eda.sch_PrimitiveWire.create([a.x, a.y, a.ex, a.ey, b.ex, a.ey, b.ex, b.ey, b.x, b.y], g.net)) segs += 1;
+						}
+					} else {
+						// 三个以上：拉一条主干，各引脚引短线接上去。
+						// 主干走向取决于引脚是横向散开还是纵向散开。
+						let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+						for (const p of pts) {
+							if (p.ex < minX) minX = p.ex;
+							if (p.ex > maxX) maxX = p.ex;
+							if (p.ey < minY) minY = p.ey;
+							if (p.ey > maxY) maxY = p.ey;
+						}
+						const horizontal = (maxX - minX) >= (maxY - minY);
+						if (horizontal) {
+							const ys = pts.map((p) => p.ey).sort((a, b) => a - b);
+							const trunk = ys[Math.floor(ys.length / 2)];
+							if (await eda.sch_PrimitiveWire.create([minX, trunk, maxX, trunk], g.net)) segs += 1;
+							for (const p of pts) {
+								const path = p.ey === trunk ? [p.x, p.y, p.ex, p.ey] : [p.x, p.y, p.ex, p.ey, p.ex, trunk];
+								if (await eda.sch_PrimitiveWire.create(path, g.net)) segs += 1;
+							}
+						} else {
+							const xs = pts.map((p) => p.ex).sort((a, b) => a - b);
+							const trunk = xs[Math.floor(xs.length / 2)];
+							if (await eda.sch_PrimitiveWire.create([trunk, minY, trunk, maxY], g.net)) segs += 1;
+							for (const p of pts) {
+								const path = p.ex === trunk ? [p.x, p.y, p.ex, p.ey] : [p.x, p.y, p.ex, p.ey, trunk, p.ey];
+								if (await eda.sch_PrimitiveWire.create(path, g.net)) segs += 1;
+							}
+						}
+					}
+					if (segs) done.push(g.net + '(' + pts.length + '脚/' + segs + '段)');
+					else failed.push({ net: g.net, why: '导线创建失败' });
+				}
+				return { ok: failed.length === 0, wired: done.length, done, failed };
+			`,
+				180_000,
+			);
+			return schHint({ ...r, skipped_power_nets: skipped.length ? skipped : undefined });
+		},
+	},
+	{
+		name: 'eda_draw_zone',
+		description:
+			'【写操作】给一个功能区画边框、标题和说明 —— 让人一眼看出这块电路是干什么的。' +
+			'\n\n分区不是摆位置就完事了：框起来、写上「电源 +5V→+3V3」这样的标题，' +
+			'再补一句功能说明，读图的人不用逐个器件推敲就知道每块在做什么。' +
+			'\n\n框要留出余量（比器件包围盒每边多 40 以上），标题放在框的左上角外侧。' +
+			'先把这一区的器件都摆好、量出实际范围，再画框。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				x1: { type: 'number', description: '框左下角 X（0.01 inch）' },
+				y1: { type: 'number', description: '框左下角 Y' },
+				x2: { type: 'number', description: '框右上角 X' },
+				y2: { type: 'number', description: '框右上角 Y' },
+				title: { type: 'string', description: '区标题，如「电源 +5V→+3V3」' },
+				note: { type: 'string', description: '可选，一句功能说明' },
+			},
+			required: ['x1', 'y1', 'x2', 'y2', 'title'],
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const x1 = num(args, 'x1');
+			const y1 = num(args, 'y1');
+			const x2 = num(args, 'x2');
+			const y2 = num(args, 'y2');
+			const title = requireString(args, 'title');
+			const note = optionalString(args, 'note');
+			return schHint(
+				await ctx.exec<Record<string, unknown>>(
+					`
+				${ENSURE_SCH}
+				const rc = await eda.sch_PrimitiveRectangle.create(${Math.min(x1, x2)}, ${Math.min(y1, y2)}, ${Math.max(x1, x2)}, ${Math.max(y1, y2)});
+				// 标题放框顶外侧，不压住里面的器件
+				const t = await eda.sch_PrimitiveText.create(${JSON.stringify(title)}, ${Math.min(x1, x2)} + 10, ${Math.max(y1, y2)} + 25);
+				let n = null;
+				${note ? `n = await eda.sch_PrimitiveText.create(${JSON.stringify(note)}, ${Math.min(x1, x2)} + 10, ${Math.max(y1, y2)} + 8);` : ''}
+				return {
+					ok: !!rc, rect_id: rc && rc.primitiveId, title_id: t && t.primitiveId, note_id: n && n.primitiveId,
+					box: [${Math.min(x1, x2)}, ${Math.min(y1, y2)}, ${Math.max(x1, x2)}, ${Math.max(y1, y2)}],
+				};
+			`,
+					EDIT_TIMEOUT_MS,
+				),
+			);
+		},
+	},
+	{
+		name: 'eda_mark_nc',
+		description:
+			'【写操作】给不使用的引脚打 NC 标记。' +
+			'\n\n裸露悬空的引脚，读图的人分不清是**有意不接**还是**画漏了**。' +
+			'芯片的 NC 空脚、未用的逻辑门输出、单向使用的收发器接收端，都该明确标出来。' +
+			'\n\n注意：立创的扩展 API 没有开放原生「非连接标志」，这里用引脚端点处的 ✕ 符号等效表达 —— ' +
+			'视觉上一致，但不参与电气检查，所以 eda_check_schematic 仍会把它们算作悬空，' +
+			'把这些引脚填进该工具的 allow_floating 即可。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				pins: {
+					type: 'array',
+					items: { type: 'string' },
+					description: '要标记的引脚，如 ["U2.2","U2.3","U12.6"]',
+				},
+			},
+			required: ['pins'],
+		},
+		mutating: true,
+		handler: async (args, ctx) => {
+			const refs = (Array.isArray(args.pins) ? (args.pins as string[]) : []).map((x) => String(x));
+			if (!refs.length) throw new Error('pins 不能为空');
+			const jobs = refs
+				.map((ref) => {
+					const dot = ref.lastIndexOf('.');
+					return dot <= 0 ? null : { des: ref.slice(0, dot).toUpperCase(), pin: ref.slice(dot + 1) };
+				})
+				.filter(Boolean);
+			return schHint(
+				await ctx.exec<Record<string, unknown>>(
+					`
+				${ENSURE_SCH}
+				const JOBS = ${JSON.stringify(jobs)};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+				const done = [], failed = [];
+				for (const j of JOBS) {
+					const c = byDes[j.des];
+					if (!c) { failed.push(j.des + '.' + j.pin + ' 图上没有这个位号'); continue; }
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					const k = String(j.pin).toUpperCase();
+					let p = null;
+					for (const x of (pins || [])) if (String(x.pinNumber || '').toUpperCase() === k) { p = x; break; }
+					if (!p) for (const x of (pins || [])) if (String(x.pinName || '').toUpperCase() === k) { p = x; break; }
+					if (!p) { failed.push(j.des + '.' + j.pin + ' 找不到该引脚'); continue; }
+					const t = await eda.sch_PrimitiveText.create(String.fromCharCode(10005), p.x - 4, p.y - 4);
+					if (t) done.push(j.des + '.' + String(p.pinNumber));
+					else failed.push(j.des + '.' + j.pin + ' 标记创建失败');
+				}
+				return { ok: failed.length === 0, marked: done.length, done, failed };
+			`,
+					EDIT_TIMEOUT_MS,
+				),
+			);
+		},
+	},
+	{
+		name: 'eda_check_schematic',
+		description:
+			'【只读】原理图体检 —— 逐个引脚核对是否真的连上了，并检查重叠与出框。' +
+			'\n\n**画完必跑**。DRC 查的是已有网络之间有没有冲突，查不出「引脚压根没进网络」：' +
+			'实测一次布线后 148 个引脚只剩 60 个还连着，DRC 依旧报 errors 0。' +
+			'\n\n判据是几何：把每个引脚的坐标和图里所有导线段做点到线段的距离比对。' +
+			'注意引脚落在导线**中间**也算连上（T 型分支），只比端点会大量误判。' +
+			'\n\n返回未连引脚清单、器件重叠对、文字/图元出框情况。' +
+			'把有意悬空的引脚填进 allow_floating，剩下的就该是 0。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				allow_floating: {
+					type: 'array',
+					items: { type: 'string' },
+					description: '允许悬空的引脚，如 ["U2.2","U2.3"]（未用 IO、NC 空脚、只发不收的 RO 等）',
+				},
+			},
+		},
+		handler: async (args, ctx) => {
+			const allow = new Set((Array.isArray(args.allow_floating) ? (args.allow_floating as string[]) : []).map((x) => String(x).toUpperCase()));
+			const r = await ctx.exec<Record<string, unknown>>(
+				`
+				${ENSURE_SCH}
+				// 读源码前先等一下 —— getDocumentSource 有缓存，
+				// 紧跟写操作去读会拿到旧内容，体检结果全是假的。
+				await new Promise((r) => setTimeout(r, 1200));
+				const src = await eda.sys_FileManager.getDocumentSource();
+				const segs = [];
+				for (const ln of String(src).split(String.fromCharCode(10))) {
+					if (ln.indexOf('"type":"LINE"') < 0) continue;
+					const q = ln.indexOf('||');
+					if (q < 0) continue;
+					let body = ln.slice(q + 2);
+					const last = body.lastIndexOf('|');
+					if (last >= 0) body = body.slice(0, last);
+					let o = null;
+					try { o = JSON.parse(body); } catch (e) { continue; }
+					if (o.startX == null) continue;
+					// 源码 y 轴向下为负，翻回 API 坐标系
+					segs.push([o.startX, -o.startY, o.endX, -o.endY]);
+				}
+				// 点到线段的距离：引脚接在导线中间是合法的 T 型分支，只比端点会误判
+				const distToSeg = (px, py, s) => {
+					const x1 = s[0], y1 = s[1], x2 = s[2], y2 = s[3];
+					const dx = x2 - x1, dy = y2 - y1;
+					const len2 = dx * dx + dy * dy;
+					let t = len2 === 0 ? 0 : ((px - x1) * dx + (py - y1) * dy) / len2;
+					t = t < 0 ? 0 : t > 1 ? 1 : t;
+					const qx = x1 + t * dx, qy = y1 + t * dy;
+					return Math.sqrt((px - qx) * (px - qx) + (py - qy) * (py - qy));
+				};
+
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const parts = all.filter((c) => c.componentType === 'part');
+				const boxes = [];
+				const floating = [];
+				let checked = 0;
+				for (const c of all) {
+					if (c.componentType === 'sheet') continue;
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					const label = c.designator || (c.componentType + ':' + String(c.name || ''));
+					for (const p of (pins || [])) {
+						checked += 1;
+						let best = 1e9;
+						for (const s of segs) {
+							const d = distToSeg(p.x, p.y, s);
+							if (d < best) best = d;
+							if (best < 2) break;
+						}
+						if (best >= 2) floating.push({ ref: label + '.' + String(p.pinNumber), name: String(p.pinName || ''), xy: [p.x, p.y] });
+					}
+					if (c.componentType === 'part') {
+						const b = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => null);
+						if (b) boxes.push({ des: label, b });
+					}
+				}
+
+				// ── 文字重叠 ──
+				// 用户最直观的抱怨就是这个：芯片相邻引脚间距只有 10，
+				// 而一个网络名的文字宽度动辄 30 以上，逐引脚贴标签必然糊成一团。
+				// 源码里每条可见 ATTR 都有 x / y / value，按字号估外接框两两比。
+				const texts = [];
+				for (const ln of String(src).split(String.fromCharCode(10))) {
+					if (ln.indexOf('"type":"ATTR"') < 0 && ln.indexOf('"type":"TEXT"') < 0) continue;
+					const q = ln.indexOf('||');
+					if (q < 0) continue;
+					let body = ln.slice(q + 2);
+					const last = body.lastIndexOf('|');
+					if (last >= 0) body = body.slice(0, last);
+					let o = null;
+					try { o = JSON.parse(body); } catch (e) { continue; }
+					if (o.x == null || o.y == null) continue;
+					// 只统计真正画在图上的文字。图框标题栏那一堆属性（Symbol / Company /
+					// Page Size…）valueVisible 是 null，本来就不显示，算进来全是假重叠 ——
+					// 其中 Symbol 的值还是符号 UUID 这种一看就不该出现在图上的东西。
+					if (o.valueVisible !== true) continue;
+					const v = String(o.value == null ? (o.text == null ? '' : o.text) : o.value);
+					if (!v) continue;
+					// 字号缺省按 EDA 原理图默认的 7 算；西文字宽约 0.6 字高，中文按 1.0
+					const fs = o.fontSize ? Number(String(o.fontSize).replace('pt', '')) : 7;
+					let w = 0;
+					for (let i = 0; i < v.length; i++) w += v.charCodeAt(i) > 127 ? fs : fs * 0.6;
+					texts.push({ v: v, x: o.x, y: -o.y, w: w, h: fs });
+				}
+				const textOverlaps = [];
+				for (let i = 0; i < texts.length && textOverlaps.length < 40; i++) {
+					for (let j = i + 1; j < texts.length; j++) {
+						const a = texts[i], b = texts[j];
+						// 文字以坐标为左基线，向右延伸
+						if (a.x < b.x + b.w && b.x < a.x + a.w && Math.abs(a.y - b.y) < (a.h + b.h) / 2) {
+							textOverlaps.push(a.v + ' × ' + b.v + ' @(' + Math.round(a.x) + ',' + Math.round(a.y) + ')');
+							break;
+						}
+					}
+				}
+
+				// 器件重叠：bbox 相交即算
+				const overlaps = [];
+				for (let i = 0; i < boxes.length; i++) {
+					for (let j = i + 1; j < boxes.length; j++) {
+						const a = boxes[i].b, b = boxes[j].b;
+						if (a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY) {
+							overlaps.push(boxes[i].des + ' × ' + boxes[j].des);
+						}
+					}
+				}
+
+				// 出框：拿图纸尺寸比
+				const tb = _page.titleBlockData || {};
+				const W = tb.Width && tb.Width.value ? Number(tb.Width.value) : 1170;
+				const H = tb.Height && tb.Height.value ? Number(tb.Height.value) : 825;
+				const outside = boxes
+					.filter((x) => x.b.minX < 0 || x.b.minY < 0 || x.b.maxX > W || x.b.maxY > H)
+					.map((x) => x.des + '(' + Math.round(x.b.minX) + ',' + Math.round(x.b.minY) + '..' + Math.round(x.b.maxX) + ',' + Math.round(x.b.maxY) + ')');
+
+				return {
+					page: _page.name,
+					sheet: { width: W, height: H },
+					parts: parts.length,
+					wire_segments: segs.length,
+					pins_checked: checked,
+					floating: floating,
+					overlaps: overlaps,
+					outside_sheet: outside,
+					texts_checked: texts.length,
+					text_overlaps: textOverlaps,
+				};
+			`,
+				180_000,
+			);
+			const floatingAll = (r.floating as Array<{ ref: string; name: string; xy: number[] }>) ?? [];
+			const unexpected = floatingAll.filter((f) => !allow.has(f.ref.toUpperCase()));
+			const problems =
+				unexpected.length +
+				((r.overlaps as string[]) ?? []).length +
+				((r.outside_sheet as string[]) ?? []).length +
+				((r.text_overlaps as string[]) ?? []).length;
+			return schHint({
+				...r,
+				floating: undefined,
+				floating_total: floatingAll.length,
+				floating_allowed: floatingAll.length - unexpected.length,
+				floating_unexpected: unexpected,
+				verdict: problems === 0 ? '通过' : `发现 ${problems} 处问题`,
+				note:
+					problems === 0
+						? '所有引脚都连上了，文字与器件都不重叠，也没出框。'
+						: '逐项处理 floating_unexpected / overlaps / text_overlaps / outside_sheet。' +
+							'有意悬空的引脚请填进 allow_floating。文字重叠多半是逐引脚贴网络标签造成的 —— ' +
+							'电源地改用符号、块内改画导线，能消掉大部分。',
+			});
+		},
+	},
+	{
 		name: 'eda_auto_route',
 		description:
 			'【写操作】让 EDA 自动整理当前原理图页的连线，把散落的短引出线整理成正规走线。' +
@@ -612,7 +1115,7 @@ export const schematicEditTools: ToolDef[] = [
 					await new Promise((r) => setTimeout(r, 1500));
 					const endpoints = () => {
 						const out = [];
-						for (const ln of String(srcCache).split('\n')) {
+						for (const ln of String(srcCache).split(String.fromCharCode(10))) {
 							if (ln.indexOf('"type":"LINE"') < 0) continue;
 							const q = ln.indexOf('||');
 							if (q < 0) continue;
