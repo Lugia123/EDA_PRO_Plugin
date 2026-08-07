@@ -25,9 +25,13 @@ const bridge = new Bridge();
 
 const server = new Server({ name: 'eda-mcp', version: VERSION }, { capabilities: { tools: {} } });
 
+/** 每次分发工具前置位，供 exec 判断这次调用能不能在断连后重试 */
+let currentToolIsMutating = false;
+
 const ctx: ToolContext = {
 	bridge,
-	exec: async <T>(code: string, timeoutMs?: number): Promise<T> => (await bridge.execute(code, timeoutMs)) as T,
+	exec: async <T>(code: string, timeoutMs?: number): Promise<T> =>
+		(await bridge.execute(code, timeoutMs, currentToolIsMutating)) as T,
 };
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -40,6 +44,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 	if (!tool) throw new McpError(ErrorCode.MethodNotFound, `未知工具: ${name}`);
 
 	try {
+		currentToolIsMutating = tool.mutating === true;
 		const result = await tool.handler((args ?? {}) as Record<string, unknown>, ctx);
 		return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
 	} catch (err) {

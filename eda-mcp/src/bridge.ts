@@ -294,15 +294,28 @@ export class Bridge {
 	/**
 	 * 在 EDA 里执行一段 JS（AsyncFunction，可 await，`eda` 已注入）。
 	 *
-	 * 断连会自动重试一次：部分 EDA 操作（实测 createNetFlag）会让扩展重连，
+	 * 断连后**只读操作**自动重试一次：部分 EDA 操作（实测 createNetFlag）会让扩展重连，
 	 * 此时请求已经发出但回包永远不会来。扩展几秒内就会自己连回来，重试即可成功 ——
 	 * 比把一个本可恢复的抖动报成失败要好。
+	 *
+	 * **写操作（noRetry）不重试**：重试一个已经生效的写操作会做第二遍。
 	 */
-	async execute(code: string, timeoutMs = DEFAULT_EXEC_TIMEOUT_MS): Promise<unknown> {
+	async execute(code: string, timeoutMs = DEFAULT_EXEC_TIMEOUT_MS, noRetry = false): Promise<unknown> {
 		try {
 			return await this.executeOnce(code, timeoutMs);
 		} catch (e) {
 			if (!(e instanceof Error) || e.message !== 'DISCONNECTED') throw e;
+			// 写操作绝不自动重试 —— 断的是回包不是执行，重试等于再做一遍。
+			// 实测代价：一次 eda_place_component 断连重试，图上多出一个器件，
+			// 位号还是 EDA 自动分配的（U2 / U7），外加一个属性残缺的幽灵器件，
+			// EDA 日志刷了一千多条「器件属性有误，请删除该元件」。
+			if (noRetry) {
+				throw new Error(
+					'执行期间连接断开，拿不到返回值。**这是写操作，动作很可能已经生效** —— ' +
+						'断开的是回包，不是执行本身。请先用只读工具核实当前状态' +
+						'（如 eda_schematic_components 看器件是否已存在），确认后再决定是否重做，不要直接重试。',
+				);
+			}
 			log('执行期间连接断开，等待扩展重连后重试一次');
 			const back = await this.waitForClient(RECONNECT_WAIT_MS);
 			if (!back) {

@@ -9,6 +9,7 @@ import type { Bridge } from '../bridge.js';
 export interface ToolContext {
 	bridge: Bridge;
 	/** 在 EDA 里执行代码；失败时抛错，NO_CLIENT 由上层统一转成连接指引 */
+	/** 在 EDA 里执行 JS。断连后是否重试由当前工具的 mutating 决定 —— 写操作不重试。 */
 	exec: <T = unknown>(code: string, timeoutMs?: number) => Promise<T>;
 }
 
