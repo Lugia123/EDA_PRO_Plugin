@@ -44,6 +44,9 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 /** 当前端口的 hello 等待器；收到 hello 或超时后置空 */
 let helloWaiter: ((ok: boolean) => void) | null = null;
 
+/** 下一次 auth_ok 是否要提示用户 —— 只有手动「重新连接」才置真，自动重连保持安静 */
+let announceNextReady = false;
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // ─── 入口 ─────────────────────────────────────────────────────────────
@@ -69,7 +72,7 @@ export function pair(): void {
 export function reconnect(): void {
 	autoConnect = true;
 	permissionDenied = false;
-	toast('正在重新连接 bridge…', 'info');
+	announceNextReady = true;
 	void connect();
 }
 
@@ -207,15 +210,21 @@ function onRawMessage(event: MessageEvent<unknown>): void {
 				phase = 'authing';
 				send({ type: 'auth', protocol: PROTOCOL_VERSION, token, client: clientInfo() });
 			} else {
+				// 端口扫描可能反复触发，同一次「待配对」状态只提醒一次，别刷屏
+				const firstTime = phase !== 'awaiting-pair';
 				phase = 'awaiting-pair';
-				toast('已找到 AI 桥接服务，请点菜单「EDA Bridge → 配对」输入配对码', 'question', 8000);
+				if (firstTime) toast('已找到 AI 桥接服务，请点菜单「EDA Bridge → 配对」输入配对码', 'question', 8);
 			}
 			break;
 		}
 
 		case 'auth_ok':
 			phase = 'ready';
-			toast('已连接到 AI（EDA Bridge 就绪）', 'success');
+			// 自动重连是后台行为，不打扰用户；只有用户手动点了「重新连接」才回一句
+			if (announceNextReady) {
+				announceNextReady = false;
+				toast('已连接到 AI（EDA Bridge 就绪）', 'success', 3);
+			}
 			break;
 
 		case 'auth_error':
@@ -223,9 +232,9 @@ function onRawMessage(event: MessageEvent<unknown>): void {
 				// token 失效（对面 unpair 过 / 换了机器）→ 清掉，回到待配对
 				void setToken('');
 				phase = 'awaiting-pair';
-				toast('保存的配对凭证已失效，请重新配对', 'warn', 8000);
+				toast('保存的配对凭证已失效，请重新配对', 'warn', 8);
 			} else {
-				toast('协议版本不一致，请更新扩展或 eda-mcp', 'error', 8000);
+				toast('协议版本不一致，请更新扩展或 eda-mcp', 'error', 8);
 				phase = 'idle';
 			}
 			break;
@@ -233,12 +242,13 @@ function onRawMessage(event: MessageEvent<unknown>): void {
 		case 'paired':
 			void setToken(msg.token).then(() => {
 				phase = 'ready';
-				toast('配对成功，EDA Bridge 就绪', 'success');
+				announceNextReady = false;
+				toast('配对成功，EDA Bridge 就绪', 'success', 3);
 			});
 			break;
 
 		case 'pair_error':
-			toast(pairErrorText(msg.error, msg.attemptsLeft), 'error', 8000);
+			toast(pairErrorText(msg.error, msg.attemptsLeft), 'error', 8);
 			break;
 
 		case 'execute':
@@ -452,9 +462,20 @@ function phaseText(p: Phase): string {
 	}[p];
 }
 
-function toast(message: string, type: 'info' | 'warn' | 'error' | 'success' | 'question' = 'info', timer = 4000): void {
+/**
+ * 弹一条吐司消息。
+ *
+ * ⚠️ `timer` 的单位是**秒**，不是毫秒（官方注释：「自动关闭倒计时秒数，0 为不自动关闭」）。
+ * 早期版本这里按毫秒传了 4000/8000，等于让提示挂 66 分钟到 2 小时不消失，
+ * 反复重连时还会堆叠成一片，把画布挡住。
+ *
+ * 另一条原则：**只在需要用户知道或采取行动时才弹**。
+ * 自动重连成功属于后台行为，用户不需要每次都被打断 —— 状态可以从
+ * 「EDA Bridge → 连接状态」随时查看。
+ */
+function toast(message: string, type: 'info' | 'warn' | 'error' | 'success' | 'question' = 'info', seconds = 4): void {
 	try {
-		eda.sys_Message.showToastMessage(message, type as never, timer);
+		eda.sys_Message.showToastMessage(message, type as never, seconds);
 	} catch {
 		/* ignore */
 	}

@@ -53,16 +53,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 	}
 });
 
+async function shutdown(reason: string): Promise<never> {
+	log(`退出（${reason}）`);
+	await bridge.stop().catch(() => {});
+	process.exit(0);
+}
+
 async function main(): Promise<void> {
 	const paired = (await loadPairing()) !== null;
 	await bridge.start();
 	const transport = new StdioServerTransport();
+
+	// MCP 客户端断开后必须自己退出，否则进程会连同 bridge 一起赖在端口上。
+	// 那样下一个 MCP 实例只能退到 49631，而 EDA 扩展扫端口时先扫到 49630 上的
+	// 僵尸进程就连上去了 —— 表现为「明明起了新服务，扩展却连不上/配对不成功」。
+	transport.onclose = () => void shutdown('stdio 已关闭');
+	process.stdin.on('end', () => void shutdown('stdin 结束'));
+
 	await server.connect(transport);
 	log(`EDA MCP v${VERSION} 已启动（stdio），${allTools.length} 个工具，配对状态：${paired ? '已配对' : '未配对'}`);
 }
 
-process.on('SIGINT', () => void bridge.stop().then(() => process.exit(0)));
-process.on('SIGTERM', () => void bridge.stop().then(() => process.exit(0)));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
 main().catch((err) => {
 	logError('启动失败', err);
