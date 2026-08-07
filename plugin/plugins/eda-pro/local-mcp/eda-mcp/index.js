@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 3e4;
-var VERSION = "0.1.20";
+var VERSION = "0.1.22";
 var Bridge = class {
   http = null;
   wss = null;
@@ -19533,8 +19533,19 @@ ${msg.stack}` : msg.error));
       if (!(e instanceof Error) || e.message !== "DISCONNECTED") throw e;
       log("\u6267\u884C\u671F\u95F4\u8FDE\u63A5\u65AD\u5F00\uFF0C\u7B49\u5F85\u6269\u5C55\u91CD\u8FDE\u540E\u91CD\u8BD5\u4E00\u6B21");
       const back = await this.waitForClient(RECONNECT_WAIT_MS);
-      if (!back) throw new Error("\u6267\u884C\u671F\u95F4\u8FDE\u63A5\u65AD\u5F00\uFF0C\u4E14\u6269\u5C55\u672A\u5728 30 \u79D2\u5185\u91CD\u8FDE\u3002\u53EF\u8BA9\u7528\u6237\u5728 EDA \u91CC\u70B9\u300CEDA Bridge \u2192 \u91CD\u65B0\u8FDE\u63A5\u300D\u3002");
-      return await this.executeOnce(code, timeoutMs);
+      if (!back) {
+        throw new Error(
+          "\u6267\u884C\u671F\u95F4\u8FDE\u63A5\u65AD\u5F00\uFF0C\u4E14\u6269\u5C55\u672A\u5728 30 \u79D2\u5185\u91CD\u8FDE\u3002**\u8FD9\u6BB5\u4EE3\u7801\u53EF\u80FD\u5DF2\u7ECF\u5728 EDA \u91CC\u6267\u884C\u8FC7\u4E86** \u2014\u2014 \u65AD\u7684\u662F\u56DE\u5305\uFF0C\u4E0D\u662F\u6267\u884C\u672C\u8EAB\uFF0C\u91CD\u8BD5\u5199\u64CD\u4F5C\u524D\u8BF7\u5148\u6838\u5B9E\u5F53\u524D\u72B6\u6001\u3002\u53EF\u8BA9\u7528\u6237\u5728 EDA \u91CC\u70B9\u300CEDA Bridge \u2192 \u91CD\u65B0\u8FDE\u63A5\u300D\u3002"
+        );
+      }
+      try {
+        return await this.executeOnce(code, timeoutMs);
+      } catch (e2) {
+        if (!(e2 instanceof Error) || e2.message !== "DISCONNECTED") throw e2;
+        throw new Error(
+          "\u8BE5\u64CD\u4F5C\u6BCF\u6B21\u6267\u884C\u90FD\u4F1A\u8BA9 EDA \u6269\u5C55\u91CD\u8FDE\uFF0C\u62FF\u4E0D\u5230\u8FD4\u56DE\u503C\u3002**\u52A8\u4F5C\u5F88\u53EF\u80FD\u5DF2\u7ECF\u751F\u6548**\uFF08\u65AD\u5F00\u7684\u662F\u56DE\u5305\uFF0C\u4E0D\u662F\u6267\u884C\uFF09\u2014\u2014 \u8BF7\u5148\u7528\u53EA\u8BFB\u5DE5\u5177\u6838\u5B9E\u7ED3\u679C\uFF08\u5982 eda_schematic_nets / eda_schematic_primitives\uFF09\uFF0C\u786E\u8BA4\u540E\u518D\u51B3\u5B9A\u662F\u5426\u91CD\u505A\uFF0C\u4E0D\u8981\u76F4\u63A5\u91CD\u8BD5\u3002"
+        );
+      }
     }
   }
   executeOnce(code, timeoutMs) {
@@ -20520,7 +20531,7 @@ function num(args, key) {
 var schematicEditTools = [
   {
     name: "eda_place_component",
-    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u4E00\u4E2A\u5143\u5668\u4EF6\u3002\n\n\u7528\u7ACB\u521B\u5546\u57CE\u7F16\u53F7\uFF08lcsc_id\uFF09\u6700\u65B9\u4FBF\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7ED9 device_uuid + library_uuid\uFF08\u4ECE eda_library_search \u62FF\uFF09\u3002\n\n**\u5750\u6807\u5355\u4F4D\u662F 0.01 inch**\uFF08A4 \u56FE\u7EB8\u7EA6 1170 \xD7 830\uFF09\uFF0Crotation \u9006\u65F6\u9488\u4E3A\u6B63\u3002\u653E\u7F6E\u540E\u4F4D\u53F7\u7531 EDA \u6309\u5668\u4EF6\u7684\u9ED8\u8BA4\u524D\u7F00\u81EA\u52A8\u7F16\u53F7\u3002\n\n\u653E\u5B8C\u5EFA\u8BAE\u8C03 eda_schematic_components \u786E\u8BA4\uFF0C\u518D\u8DD1 eda_schematic_drc \u770B\u6709\u6CA1\u6709\u65B0\u589E error\u3002",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u4E00\u4E2A\u5143\u5668\u4EF6\u3002\n\n\u7528\u7ACB\u521B\u5546\u57CE\u7F16\u53F7\uFF08lcsc_id\uFF09\u6700\u65B9\u4FBF\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7ED9 device_uuid + library_uuid\uFF08\u4ECE eda_library_search \u62FF\uFF09\u3002\n\n**\u5750\u6807\u5355\u4F4D\u662F 0.01 inch**\uFF08A4 \u56FE\u7EB8\u7EA6 1170 \xD7 830\uFF09\uFF0Crotation \u9006\u65F6\u9488\u4E3A\u6B63\u3002\n\n**\u4F4D\u53F7\u4F1A\u81EA\u52A8\u5206\u914D**\uFF08U1\u3001U2\u3001R1\u2026\uFF09\uFF1AEDA \u7684 create \u63A5\u53E3\u653E\u51FA\u6765\u7684\u5668\u4EF6\u4F4D\u53F7\u662F\u5E93\u91CC\u7684\u5360\u4F4D\u7B26\uFF08\u5982 `U?`\uFF09\uFF0C\u591A\u4E2A\u5668\u4EF6\u4F1A\u91CD\u540D\u3001\u6CA1\u6CD5\u5F15\u7528\uFF0C\u6240\u4EE5\u672C\u5DE5\u5177\u653E\u7F6E\u540E\u4F1A\u626B\u63CF\u5168\u56FE\u5DF2\u7528\u4F4D\u53F7\u5E76\u8865\u4E0A\u4E0B\u4E00\u4E2A\u53EF\u7528\u7F16\u53F7\u3002\u4E5F\u53EF\u4EE5\u7528 designator \u53C2\u6570\u6307\u5B9A\uFF0C\u91CD\u590D\u65F6\u4F1A\u62A5\u9519\u3002\n\n\u653E\u5B8C\u5EFA\u8BAE\u8C03 eda_schematic_components \u786E\u8BA4\uFF0C\u518D\u8DD1 eda_schematic_drc \u770B\u6709\u6CA1\u6709\u65B0\u589E error\u3002",
     inputSchema: {
       type: "object",
       properties: {
@@ -20530,7 +20541,8 @@ var schematicEditTools = [
         x: { type: "number", description: "X \u5750\u6807\uFF0C\u5355\u4F4D 0.01 inch" },
         y: { type: "number", description: "Y \u5750\u6807\uFF0C\u5355\u4F4D 0.01 inch" },
         rotation: { type: "number", description: "\u65CB\u8F6C\u89D2\u5EA6\uFF08\u9006\u65F6\u9488\u4E3A\u6B63\uFF09\uFF0C\u9ED8\u8BA4 0" },
-        mirror: { type: "boolean", description: "\u662F\u5426\u955C\u50CF\uFF0C\u9ED8\u8BA4 false" }
+        mirror: { type: "boolean", description: "\u662F\u5426\u955C\u50CF\uFF0C\u9ED8\u8BA4 false" },
+        designator: { type: "string", description: "\u53EF\u9009\uFF0C\u6307\u5B9A\u4F4D\u53F7\u5982 U5\uFF1B\u4E0D\u7ED9\u5219\u81EA\u52A8\u5206\u914D\u4E0B\u4E00\u4E2A\u53EF\u7528\u7F16\u53F7" }
       },
       required: ["x", "y"]
     },
@@ -20544,6 +20556,7 @@ var schematicEditTools = [
       const y = num(args, "y");
       const rotation = typeof args.rotation === "number" ? args.rotation : 0;
       const mirror = args.mirror === true;
+      const wantDes = optionalString(args, "designator");
       return schHint(
         await ctx2.exec(
           `
@@ -20555,15 +20568,51 @@ var schematicEditTools = [
 					if (!hit || !hit.length) return { ok: false, error: '\u5E93\u91CC\u627E\u4E0D\u5230\u7ACB\u521B\u7F16\u53F7 ' + lcsc };
 					uuid = hit[0].uuid; libUuid = hit[0].libraryUuid;
 				}
+				// \u4F4D\u53F7\u5728\u6574\u4EFD\u539F\u7406\u56FE\uFF08\u6240\u6709\u9875\uFF09\u5185\u552F\u4E00\uFF0C\u7B97\u4E0B\u4E00\u4E2A\u7F16\u53F7\u8981\u770B\u5168\u90E8\u9875
+				const usedAll = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+				const used = new Set(usedAll.map(x => String(x.designator || '').toUpperCase()));
 				const before = (await eda.sch_PrimitiveComponent.getAll()).length;
+
 				const c = await eda.sch_PrimitiveComponent.create(
 					{ libraryUuid: libUuid, uuid }, ${x}, ${y}, undefined, ${rotation}, ${mirror}
 				);
 				const after = await eda.sch_PrimitiveComponent.getAll();
 				if (!c && after.length === before) return { ok: false, error: '\u653E\u7F6E\u5931\u8D25\uFF0CEDA \u672A\u8FD4\u56DE\u56FE\u5143\u4E14\u5668\u4EF6\u6570\u6CA1\u6709\u589E\u52A0' };
+
+				// EDA \u653E\u51FA\u6765\u7684\u4F4D\u53F7\u662F\u5E93\u91CC\u7684\u5360\u4F4D\u7B26\uFF08U?\uFF09\uFF0C\u4E0D\u7F16\u53F7\u7684\u8BDD\u591A\u4E2A\u5668\u4EF6\u4F1A\u91CD\u540D\u3001\u65E0\u6CD5\u5F15\u7528
+				const raw = String(c.designator || '');
+				const want = ${JSON.stringify(wantDes ?? null)};
+				let finalDes = raw;
+				let assigned = false;
+				let assignError;
+
+				if (want) {
+					if (used.has(want.toUpperCase())) {
+						assignError = '\u4F4D\u53F7 ' + want + ' \u5DF2\u88AB\u5360\u7528\uFF0C\u5DF2\u4FDD\u7559\u81EA\u52A8\u5206\u914D\u7684\u7F16\u53F7';
+					} else {
+						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: want });
+						if (m) { finalDes = want; assigned = true; }
+						else assignError = '\u8BBE\u7F6E\u6307\u5B9A\u4F4D\u53F7\u5931\u8D25';
+					}
+				}
+				if (!assigned && (raw === '' || raw.indexOf('?') >= 0)) {
+					// \u524D\u7F00\u53D6\u81EA\u5E93\u91CC\u7684\u5360\u4F4D\u7B26\uFF1AU? \u2192 U\uFF1B\u6CA1\u6709\u5C31\u9000\u56DE U
+					// \u6CE8\u610F\u8FD9\u91CC\u523B\u610F\u4E0D\u5199\u542B\u53CD\u659C\u6760\u7684\u6B63\u5219 \u2014\u2014 \u8FD9\u6BB5\u4EE3\u7801\u662F\u653E\u5728 TS \u6A21\u677F\u5B57\u7B26\u4E32\u91CC\u4F20\u7ED9 EDA \u6267\u884C\u7684\uFF0C
+					// \u6A21\u677F\u5B57\u7B26\u4E32\u4F1A\u628A ? d \u8FD9\u7C7B\u65E0\u6548\u8F6C\u4E49\u7684\u53CD\u659C\u6760\u5403\u6389\uFF0C\u5230\u4E86 EDA \u90A3\u8FB9\u5C31\u6210\u4E86\u975E\u6CD5\u6B63\u5219\u3002
+					const prefix = (raw.replace(/[?0-9]+$/, '') || 'U').toUpperCase();
+					let n = 1;
+					while (used.has(prefix + n)) n++;
+					const auto = prefix + n;
+					const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: auto });
+					if (m) { finalDes = auto; assigned = true; }
+					else assignError = (assignError ? assignError + '\uFF1B' : '') + '\u81EA\u52A8\u7F16\u53F7\u5931\u8D25\uFF0C\u4F4D\u53F7\u4ECD\u662F\u5360\u4F4D\u7B26 ' + raw;
+				}
+
 				return {
 					ok: true,
-					placed: c ? { primitive_id: c.primitiveId, designator: c.designator, x: c.x, y: c.y } : null,
+					placed: { primitive_id: c.primitiveId, designator: finalDes, x: c.x, y: c.y },
+					designator_assigned: assigned,
+					designator_note: assignError,
 					component_count: { before, after: after.length },
 					page: _page.name,
 				};
@@ -20609,8 +20658,157 @@ var schematicEditTools = [
     }
   },
   {
+    name: "eda_component_pins",
+    description: "\u5217\u51FA\u67D0\u4E2A\u5668\u4EF6\u5728\u753B\u5E03\u4E0A\u7684\u6240\u6709\u5F15\u811A\uFF1A\u5F15\u811A\u53F7\u3001\u5F15\u811A\u540D\u3001**\u7EDD\u5BF9\u5750\u6807**\u3001\u671D\u5411\u3001\u7535\u6C14\u7C7B\u578B\u3002\n\n\u8FD9\u662F\u81EA\u52A8\u8FDE\u7EBF\u7684\u524D\u63D0 \u2014\u2014 \u5750\u6807\u5DF2\u7ECF\u7B97\u597D\u4E86\u5668\u4EF6\u7684\u4F4D\u7F6E\u4E0E\u65CB\u8F6C\uFF0C\u76F4\u63A5\u5C31\u662F\u53EF\u4EE5\u843D\u7EBF\u7684\u70B9\u3002\n\nrotation \u8868\u793A\u5F15\u811A\u671D\u5916\u7684\u65B9\u5411\uFF1A0 \u671D\u53F3\u300190 \u671D\u4E0A\u3001180 \u671D\u5DE6\u3001270 \u671D\u4E0B\u3002\u8FDE\u7EBF\u65F6\u7B2C\u4E00\u6BB5\u5E94\u987A\u7740\u8FD9\u4E2A\u65B9\u5411\u5F15\u51FA\uFF0C\u5426\u5219\u7EBF\u4F1A\u538B\u5728\u5668\u4EF6\u7B26\u53F7\u4E0A\u3002",
+    inputSchema: {
+      type: "object",
+      properties: { designator: { type: "string", description: "\u5668\u4EF6\u4F4D\u53F7\uFF0C\u5982 U1" } },
+      required: ["designator"]
+    },
+    handler: async (args, ctx2) => {
+      const des = requireString(args, "designator");
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const want = ${JSON.stringify(des)}.toUpperCase();
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const c = all.find(x => String(x.designator || '').toUpperCase() === want);
+				if (!c) return { error: '\u5F53\u524D\u539F\u7406\u56FE\u9875\u91CC\u6CA1\u6709\u4F4D\u53F7 ' + want, available: all.map(x => x.designator).filter(Boolean).slice(0, 40) };
+				const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId);
+				return {
+					designator: c.designator,
+					component: { primitive_id: c.primitiveId, x: c.x, y: c.y, rotation: c.rotation },
+					pin_count: (pins || []).length,
+					pins: (pins || []).map(p => ({
+						number: p.pinNumber, name: p.pinName,
+						x: p.x, y: p.y, rotation: p.rotation,
+						type: p.pinType, no_connect: p.noConnected,
+					})),
+				};
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_connect_pins",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u628A\u4E24\u4E2A\u5668\u4EF6\u5F15\u811A\u7528\u5BFC\u7EBF\u8FDE\u8D77\u6765 \u2014\u2014 \u81EA\u52A8\u67E5\u5F15\u811A\u5750\u6807\u5E76\u751F\u6210\u6298\u7EBF\u8DEF\u5F84\u3002\n\n\u5F15\u811A\u7528\u300C\u4F4D\u53F7.\u5F15\u811A\u53F7\u300D\u6216\u300C\u4F4D\u53F7.\u5F15\u811A\u540D\u300D\u6307\u5B9A\uFF0C\u5982 `U1.3`\u3001`U1.VIN`\u3001`R1.2`\u3002\n\n\u8FD9\u662F\u81EA\u52A8\u753B\u539F\u7406\u56FE\u7684\u4E3B\u529B\u5DE5\u5177\uFF0C\u6BD4\u624B\u5DE5\u7B97\u5750\u6807\u8C03 eda_draw_wire \u53EF\u9760\u5F97\u591A\u3002\n\n\u8DEF\u5F84\u9ED8\u8BA4\u6309\u8D77\u70B9\u5F15\u811A\u7684\u671D\u5411\u9009\u62E9\u5148\u6A2A\u540E\u7AD6\u8FD8\u662F\u5148\u7AD6\u540E\u6A2A\uFF08\u987A\u7740\u5F15\u811A\u5F15\u51FA\uFF0C\u907F\u514D\u538B\u5728\u7B26\u53F7\u4E0A\uFF09\uFF1B\u4E24\u811A\u540C\u4E00\u6C34\u5E73\u7EBF\u6216\u5782\u76F4\u7EBF\u4E0A\u5219\u76F4\u8FDE\u3002\n\n**\u7F51\u7EDC\u51B2\u7A81\u4F1A\u5931\u8D25**\uFF1A\u5982\u679C\u4E24\u7AEF\u5F15\u811A\u5DF2\u5206\u522B\u5C5E\u4E8E\u4E0D\u540C\u7684\u5DF2\u547D\u540D\u7F51\u7EDC\uFF0CEDA \u4F1A\u62D2\u7EDD\u521B\u5EFA\uFF0C\u8FD9\u65F6\u8981\u5148\u7528\u7F51\u7EDC\u6807\u7B7E\u7EDF\u4E00\u547D\u540D\uFF0C\u800C\u4E0D\u662F\u53CD\u590D\u91CD\u8BD5\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "\u8D77\u70B9\u5F15\u811A\uFF0C\u5982 U1.3 \u6216 U1.VIN" },
+        to: { type: "string", description: "\u7EC8\u70B9\u5F15\u811A\uFF0C\u5982 C1.1" },
+        net: { type: "string", description: "\u53EF\u9009\uFF0C\u6307\u5B9A\u7F51\u7EDC\u540D" },
+        route: {
+          type: "string",
+          enum: ["auto", "hv", "vh", "direct"],
+          description: "auto=\u6309\u8D77\u70B9\u5F15\u811A\u671D\u5411\u51B3\u5B9A\uFF08\u9ED8\u8BA4\uFF09\uFF1Bhv=\u5148\u6C34\u5E73\u540E\u5782\u76F4\uFF1Bvh=\u5148\u5782\u76F4\u540E\u6C34\u5E73\uFF1Bdirect=\u4E24\u70B9\u76F4\u8FDE"
+        }
+      },
+      required: ["from", "to"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const from = requireString(args, "from");
+      const to = requireString(args, "to");
+      const net = optionalString(args, "net");
+      const route = optionalString(args, "route") ?? "auto";
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH}
+				const all = await eda.sch_PrimitiveComponent.getAll();
+
+				// "U1.3" / "U1.VIN" \u2192 \u627E\u5230\u90A3\u6839\u5F15\u811A
+				const locate = async (spec) => {
+					const dot = spec.lastIndexOf('.');
+					if (dot <= 0) return { err: spec + ' \u683C\u5F0F\u5E94\u4E3A\u300C\u4F4D\u53F7.\u5F15\u811A\u53F7\u300D\uFF0C\u5982 U1.3' };
+					const des = spec.slice(0, dot).toUpperCase();
+					const key = spec.slice(dot + 1).toUpperCase();
+					const c = all.find(x => String(x.designator || '').toUpperCase() === des);
+					if (!c) return { err: '\u627E\u4E0D\u5230\u4F4D\u53F7 ' + des };
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId);
+					const p = (pins || []).find(x => String(x.pinNumber || '').toUpperCase() === key)
+						|| (pins || []).find(x => String(x.pinName || '').toUpperCase() === key);
+					if (!p) return { err: des + ' \u4E0A\u627E\u4E0D\u5230\u5F15\u811A ' + key, pins: (pins||[]).map(x => x.pinNumber + ':' + x.pinName) };
+					return { pin: p, designator: c.designator };
+				};
+
+				const a = await locate(${JSON.stringify(from)});
+				if (a.err) return { ok: false, error: a.err, pins: a.pins };
+				const b = await locate(${JSON.stringify(to)});
+				if (b.err) return { ok: false, error: b.err, pins: b.pins };
+
+				const p1 = a.pin, p2 = b.pin;
+
+				// \u5173\u952E\uFF1A\u5BFC\u7EBF\u5FC5\u987B\u4ECE\u5F15\u811A\u7AEF\u70B9**\u671D\u5916**\u63A5\u5165\u3002\u5B9E\u6D4B\u82E5\u4ECE\u7AEF\u70B9\u5F80\u7B26\u53F7\u672C\u4F53\u65B9\u5411\u753B\uFF0C
+				// \u7EBF\u4F1A\u538B\u5728\u5F15\u811A\u4E0A\uFF0CEDA \u4E0D\u8BA4\u8FD9\u4E2A\u8FDE\u63A5 \u2014\u2014 \u8868\u73B0\u4E3A\u7F51\u7EDC\u53EA\u6302\u4E0A\u4E86\u53E6\u4E00\u7AEF\u90A3\u4E2A\u5F15\u811A\u3002
+				// \u6240\u4EE5\u4E24\u7AEF\u5404\u5148\u6CBF\u81EA\u8EAB\u671D\u5411\u5F15\u51FA\u4E00\u5C0F\u6BB5\uFF08stub\uFF09\uFF0C\u518D\u5728\u4E24\u4E2A stub \u7AEF\u70B9\u4E4B\u95F4\u8D70\u6298\u7EBF\u3002
+				// \u5750\u6807\u7CFB y \u5411\u4E0B\u4E3A\u6B63\uFF1Brotation \u9006\u65F6\u9488\u4E3A\u6B63\uFF0C0=\u671D\u53F3 90=\u671D\u4E0A 180=\u671D\u5DE6 270=\u671D\u4E0B\u3002
+				const STUB = 10; // 0.1 inch\uFF0C\u4E00\u4E2A\u6805\u683C
+				const outward = (rot) => {
+					const r = ((Number(rot) % 360) + 360) % 360;
+					if (r === 0) return [STUB, 0];
+					if (r === 90) return [0, -STUB];
+					if (r === 180) return [-STUB, 0];
+					if (r === 270) return [0, STUB];
+					return [0, 0]; // \u975E\u6B63\u4EA4\u671D\u5411\uFF1A\u4E0D\u52A0 stub\uFF0C\u76F4\u63A5\u8FDE
+				};
+				const [dx1, dy1] = outward(p1.rotation);
+				const [dx2, dy2] = outward(p2.rotation);
+				const a1 = [p1.x + dx1, p1.y + dy1];
+				const b1 = [p2.x + dx2, p2.y + dy2];
+
+				let mode = ${JSON.stringify(route)};
+				if (mode === 'auto') {
+					if (a1[0] === b1[0] || a1[1] === b1[1]) mode = 'direct';
+					// \u8D77\u70B9 stub \u662F\u6C34\u5E73\u5F15\u51FA\u7684\u8BDD\uFF0C\u63A5\u7740\u8D70\u6C34\u5E73\u6BB5\u66F4\u987A\uFF1B\u53CD\u4E4B\u5148\u8D70\u5782\u76F4
+					else mode = dx1 !== 0 ? 'hv' : 'vh';
+				}
+
+				let mid;
+				if (mode === 'direct' || a1[0] === b1[0] || a1[1] === b1[1]) mid = [];
+				else if (mode === 'vh') mid = [a1[0], b1[1]];
+				else mid = [b1[0], a1[1]];
+
+				const line = [p1.x, p1.y, a1[0], a1[1], ...mid, b1[0], b1[1], p2.x, p2.y]
+					// \u53BB\u6389\u8FDE\u7EED\u91CD\u590D\u70B9\uFF0C\u907F\u514D\u96F6\u957F\u5EA6\u7EBF\u6BB5
+					.reduce((acc, v, i, arr) => {
+						if (i % 2 === 1) {
+							const px = arr[i - 1], py = v;
+							const n = acc.length;
+							if (n >= 2 && acc[n - 2] === px && acc[n - 1] === py) return acc;
+							acc.push(px, py);
+						}
+						return acc;
+					}, []);
+
+				const w = await eda.sch_PrimitiveWire.create(line, ${JSON.stringify(net ?? void 0)});
+				if (!w) {
+					return { ok: false, error: '\u5BFC\u7EBF\u521B\u5EFA\u5931\u8D25\u3002\u6700\u5E38\u89C1\u539F\u56E0\u662F\u4E24\u7AEF\u5F15\u811A\u5DF2\u5206\u5C5E\u4E0D\u540C\u7684\u5DF2\u547D\u540D\u7F51\u7EDC \u2014\u2014 '
+						+ 'EDA \u4E0D\u5141\u8BB8\u8FD9\u6837\u5408\u5E76\uFF0C\u8BF7\u5148\u7528\u7F51\u7EDC\u6807\u7B7E\u628A\u5B83\u4EEC\u7EDF\u4E00\u547D\u540D\u3002',
+						attempted_path: line };
+				}
+				return {
+					ok: true,
+					from: a.designator + '.' + p1.pinNumber + '(' + p1.pinName + ')',
+					to: b.designator + '.' + p2.pinNumber + '(' + p2.pinName + ')',
+					route: mode,
+					path: line,
+					net: w.net ?? ${JSON.stringify(net ?? null)},
+					wire_id: w.primitiveId,
+				};
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
     name: "eda_add_net_identifier",
-    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u7F51\u7EDC\u6807\u8BC6\uFF1A\u7F51\u7EDC\u6807\u7B7E\uFF08NetLabel\uFF09\u3001\u7535\u6E90/\u5730\u7B26\u53F7\uFF08NetFlag\uFF09\u6216\u7F51\u7EDC\u7AEF\u53E3\uFF08NetPort\uFF09\u3002\n\n- kind=label\uFF1A\u666E\u901A\u7F51\u7EDC\u6807\u7B7E\uFF0C\u8D34\u5728\u5BFC\u7EBF\u4E0A\u7ED9\u7F51\u7EDC\u547D\u540D\n- kind=power / ground / analog_ground / protect_ground\uFF1A\u7535\u6E90\u4E0E\u5404\u7C7B\u5730\u7B26\u53F7\n- kind=port_in / port_out / port_bi\uFF1A\u5C42\u6B21\u56FE\u7F51\u7EDC\u7AEF\u53E3\n\n\u5750\u6807\u5355\u4F4D 0.01 inch\u3002",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u7F51\u7EDC\u6807\u8BC6\uFF1A\u7F51\u7EDC\u6807\u7B7E\uFF08NetLabel\uFF09\u3001\u7535\u6E90/\u5730\u7B26\u53F7\uFF08NetFlag\uFF09\u6216\u7F51\u7EDC\u7AEF\u53E3\uFF08NetPort\uFF09\u3002\n\n- kind=label\uFF1A\u666E\u901A\u7F51\u7EDC\u6807\u7B7E\uFF0C**\u5750\u6807\u5FC5\u987B\u843D\u5728\u4E00\u6761\u5DF2\u6709\u5BFC\u7EBF\u4E0A**\u3002\u653E\u5728\u7A7A\u767D\u5904\u65F6 EDA \u4F1A\u8FDB\u5165\u7B49\u5F85\u9F20\u6807\u70B9\u51FB\u7684\u4EA4\u4E92\u6A21\u5F0F\uFF0C\u63A5\u53E3\u4E00\u76F4\u4E0D\u8FD4\u56DE\uFF08\u8868\u73B0\u4E3A\u6267\u884C\u8D85\u65F6\uFF09\u2014\u2014\u6240\u4EE5\u8981\u5148\u753B\u7EBF\u518D\u8D34\u6807\u7B7E\uFF0C\u5750\u6807\u53D6\u7EBF\u4E0A\u7684\u70B9\u3002\n- kind=power / ground / analog_ground / protect_ground\uFF1A\u7535\u6E90\u4E0E\u5404\u7C7B\u5730\u7B26\u53F7\n- kind=port_in / port_out / port_bi\uFF1A\u5C42\u6B21\u56FE\u7F51\u7EDC\u7AEF\u53E3\n\n\u5750\u6807\u5355\u4F4D 0.01 inch\u3002",
     inputSchema: {
       type: "object",
       properties: {
@@ -20927,7 +21125,7 @@ var allTools = [
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.20";
+var VERSION2 = "0.1.22";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var ctx = {
