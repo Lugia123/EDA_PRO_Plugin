@@ -118,3 +118,32 @@ export function dirVec(dir: Rotation): [number, number] {
 }
 
 export const snap = (v: number): number => Math.round(v / GRID) * GRID;
+
+/**
+ * pinWorld 的逆运算：已知引脚此刻在世界坐标里的位置和朝向，加上器件当前的摆放，
+ * 反推它在器件本地坐标系里的定义。
+ *
+ * 从 EDA 读回来的永远是世界坐标，而优化器要的是本地定义（跟摆放无关的那部分），
+ * 所以每次接入现有图纸都要先过这一步。器件当初就不是 rot=0 摆的，不能直接相减。
+ */
+export function pinLocal(
+	pl: Placement,
+	world: { x: number; y: number; dir: Rotation },
+	id: string,
+): PinDef {
+	const rx = world.x - pl.x;
+	const ry = world.y - pl.y;
+	// 先转回去
+	const rad = (-pl.rot * Math.PI) / 180;
+	const cos = Math.round(Math.cos(rad));
+	const sin = Math.round(Math.sin(rad));
+	let dx = rx * cos - ry * sin;
+	const dy = rx * sin + ry * cos;
+	let dir = (((world.dir - pl.rot) % 360 + 360) % 360) as Rotation;
+	// 再翻回来
+	if (pl.mirror) {
+		dx = -dx;
+		dir = ((180 - dir + 360) % 360) as Rotation;
+	}
+	return { id, dx, dy, dir };
+}

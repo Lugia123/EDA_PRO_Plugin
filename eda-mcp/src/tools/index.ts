@@ -2,6 +2,7 @@
 import { connectionTools } from './connection.js';
 import { createTools } from './create.js';
 import { datasheetTools } from './datasheet.js';
+import { layoutTools } from './layout-tool.js';
 import { libraryTools } from './library.js';
 import { pcbTools } from './pcb.js';
 import { projectTools } from './project.js';
@@ -14,6 +15,7 @@ export const allTools: ToolDef[] = [
 	...projectTools,
 	...schematicTools,
 	...schematicEditTools,
+	...layoutTools,
 	...libraryTools,
 	...datasheetTools,
 	...createTools,
