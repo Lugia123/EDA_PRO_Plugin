@@ -266,18 +266,15 @@ export const layoutTools: ToolDef[] = [
 				${ENSURE_SCH}
 				const MOVES = ${JSON.stringify(moves)};
 				const WIRES = ${JSON.stringify(wires)};
-				const olds = await eda.sch_PrimitiveWire.getAll();
-				let removed = 0;
-				for (const w of olds) { await eda.sch_PrimitiveWire.delete(w.primitiveId).catch(() => {}); removed += 1; }
+				const olds = (await eda.sch_PrimitiveWire.getAll()).map(function (w) { return w.primitiveId; });
+				if (olds.length) await eda.sch_PrimitiveWire.delete(olds);
+				const removed = olds.length;
 				// 旧的电源地符号一并清掉，稍后按新位置重放；留着就是一堆孤儿
-				const comps = await eda.sch_PrimitiveComponent.getAll();
-				let flagsRemoved = 0;
-				for (const c of comps) {
-					if (c.componentType === 'netflag') {
-						await eda.sch_PrimitiveComponent.delete(c.primitiveId).catch(() => {});
-						flagsRemoved += 1;
-					}
-				}
+				const staleFlags = (await eda.sch_PrimitiveComponent.getAll())
+					.filter(function (c) { return c.componentType === 'netflag'; })
+					.map(function (c) { return c.primitiveId; });
+				if (staleFlags.length) await eda.sch_PrimitiveComponent.delete(staleFlags);
+				const flagsRemoved = staleFlags.length;
 				let moved = 0;
 				for (const m of MOVES) {
 					const r = await eda.sch_PrimitiveComponent.modify(m.id, {

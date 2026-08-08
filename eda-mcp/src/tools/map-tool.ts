@@ -52,14 +52,11 @@ export const mapTools: ToolDef[] = [
 				const PAYLOAD = ${JSON.stringify(payload)};
 				const MARK = ${JSON.stringify(MARK)};
 				// 先清掉旧地图，避免读的时候撞见两份
-				const olds = await eda.sch_PrimitiveText.getAll();
-				let removed = 0;
-				for (const t of olds) {
-					if (String(t.content || '').indexOf(MARK) === 0) {
-						await eda.sch_PrimitiveText.delete(t.primitiveId).catch(() => {});
-						removed += 1;
-					}
-				}
+				const olds = (await eda.sch_PrimitiveText.getAll())
+					.filter(function (t) { return String(t.content || '').indexOf(MARK) === 0; })
+					.map(function (t) { return t.primitiveId; });
+				if (olds.length) await eda.sch_PrimitiveText.delete(olds);
+				const removed = olds.length;
 				// 签名是 create(x, y, text)，坐标在前
 				const t = await eda.sch_PrimitiveText.create(${MAP_X}, ${MAP_Y}, PAYLOAD);
 				if (!t) return { ok: false, error: '地图写入失败' };

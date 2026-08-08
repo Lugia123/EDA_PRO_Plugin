@@ -216,44 +216,33 @@ export const mapApplyTools: ToolDef[] = [
 			await runStep(
 				'清导线',
 				`
-				let n = 0;
-				for (const w of await eda.sch_PrimitiveWire.getAll()) {
-					await eda.sch_PrimitiveWire.delete(w.primitiveId).catch(() => {});
-					n += 1;
-				}
-				return { removed: n };
+				const ids = (await eda.sch_PrimitiveWire.getAll()).map(function (w) { return w.primitiveId; });
+				if (ids.length) await eda.sch_PrimitiveWire.delete(ids);
+				return { removed: ids.length };
 			`,
 			);
 			await runStep(
 				'清符号与端口',
 				`
-				let n = 0;
-				for (const c of await eda.sch_PrimitiveComponent.getAll()) {
-					if (c.componentType === 'netflag' || c.componentType === 'netport') {
-						await eda.sch_PrimitiveComponent.delete(c.primitiveId).catch(() => {});
-						n += 1;
-					}
-				}
-				return { removed: n };
+				const ids = (await eda.sch_PrimitiveComponent.getAll())
+					.filter(function (c) { return c.componentType === 'netflag' || c.componentType === 'netport'; })
+					.map(function (c) { return c.primitiveId; });
+				if (ids.length) await eda.sch_PrimitiveComponent.delete(ids);
+				return { removed: ids.length };
 			`,
 			);
 			await runStep(
 				'清旧区框与文字',
 				`
 				const MARKTXT = ${JSON.stringify(MARK)};
-				let r = 0, t = 0;
-				for (const x of await eda.sch_PrimitiveRectangle.getAll()) {
-					await eda.sch_PrimitiveRectangle.delete(x.primitiveId).catch(() => {});
-					r += 1;
-				}
+				const rects = (await eda.sch_PrimitiveRectangle.getAll()).map(function (x) { return x.primitiveId; });
+				if (rects.length) await eda.sch_PrimitiveRectangle.delete(rects);
 				// 地图那条文字要留着，靠标记认出来
-				for (const x of await eda.sch_PrimitiveText.getAll()) {
-					if (String(x.content || '').indexOf(MARKTXT) !== 0) {
-						await eda.sch_PrimitiveText.delete(x.primitiveId).catch(() => {});
-						t += 1;
-					}
-				}
-				return { rects: r, texts: t };
+				const texts = (await eda.sch_PrimitiveText.getAll())
+					.filter(function (x) { return String(x.content || '').indexOf(MARKTXT) !== 0; })
+					.map(function (x) { return x.primitiveId; });
+				if (texts.length) await eda.sch_PrimitiveText.delete(texts);
+				return { rects: rects.length, texts: texts.length };
 			`,
 			);
 			await runStep(
@@ -372,9 +361,10 @@ export const mapApplyTools: ToolDef[] = [
 					${ENSURE_SCH}
 					const PAYLOAD = ${JSON.stringify(payload)};
 					const MARK = ${JSON.stringify(MARK)};
-					for (const t of await eda.sch_PrimitiveText.getAll()) {
-						if (String(t.content || '').indexOf(MARK) === 0) await eda.sch_PrimitiveText.delete(t.primitiveId).catch(() => {});
-					}
+					const stale = (await eda.sch_PrimitiveText.getAll())
+						.filter(function (t) { return String(t.content || '').indexOf(MARK) === 0; })
+						.map(function (t) { return t.primitiveId; });
+					if (stale.length) await eda.sch_PrimitiveText.delete(stale);
 					const t = await eda.sch_PrimitiveText.create(-400, -400, PAYLOAD);
 					return { ok: !!t, bytes: PAYLOAD.length };
 				`,
