@@ -1,33 +1,35 @@
 {
-  "name": "eda-mcp",
-  "version": "0.1.25",
-  "private": true,
-  "description": "立创EDA专业版 本地 MCP Server —— 内置 bridge（WebSocket）与 EDA 扩展通信，esbuild bundle 后随 Claude Code plugin 分发（不走 npm registry）",
-  "type": "module",
-  "scripts": {
-    "build": "node build.mjs",
-    "dev": "tsx src/index.ts",
-    "dev:bridge": "tsx scripts/dev-bridge.ts",
-    "typecheck": "tsc --noEmit",
-    "test:mcp": "npm run build && tsx scripts/test-mcp.ts",
-    "deploy": "npm run build && bash scripts/deploy-to-plugin.sh",
-    "gen:api": "tsx scripts/gen-api-index.ts",
-    "predeploy": "node ../scripts/stamp-version.mjs",
-    "mcp:daemon": "tsx scripts/mcp-daemon.ts"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
-    "elkjs": "^0.12.0",
-    "ws": "^8.18.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/ws": "^8.5.13",
-    "esbuild": "^0.24.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.5.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+	"name": "eda-mcp",
+	"version": "0.1.25",
+	"private": true,
+	"description": "立创EDA专业版 本地 MCP Server —— 内置 bridge（WebSocket）与 EDA 扩展通信，esbuild bundle 后随 Claude Code plugin 分发（不走 npm registry）",
+	"type": "module",
+	"scripts": {
+		"build": "node scripts/check-eda-code.mjs && node build.mjs",
+		"dev": "tsx src/index.ts",
+		"dev:bridge": "tsx scripts/dev-bridge.ts",
+		"typecheck": "tsc --noEmit",
+		"check:edacode": "node scripts/check-eda-code.mjs",
+		"check": "npm run typecheck && npm run check:edacode",
+		"test:mcp": "npm run build && tsx scripts/test-mcp.ts",
+		"deploy": "npm run build && bash scripts/deploy-to-plugin.sh",
+		"gen:api": "tsx scripts/gen-api-index.ts",
+		"predeploy": "node ../scripts/stamp-version.mjs",
+		"mcp:daemon": "tsx scripts/mcp-daemon.ts"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.0.4",
+		"elkjs": "^0.12.0",
+		"ws": "^8.18.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"@types/ws": "^8.5.13",
+		"esbuild": "^0.24.0",
+		"tsx": "^4.19.0",
+		"typescript": "^5.5.0"
+	},
+	"engines": {
+		"node": ">=18.0.0"
+	}
 }

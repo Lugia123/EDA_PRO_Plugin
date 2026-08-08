@@ -1285,7 +1285,10 @@ export const schematicEditTools: ToolDef[] = [
 			'\n\n**位号会自动分配**（U1、U2、R1…）：EDA 的 create 接口放出来的器件位号是库里的占位符（如 `U?`），' +
 			'多个器件会重名、没法引用，所以本工具放置后会扫描全图已用位号并补上下一个可用编号。' +
 			'也可以用 designator 参数指定，重复时会报错。' +
-			'\n\n放完建议调 eda_schematic_components 确认，再跑 eda_schematic_drc 看有没有新增 error。',
+			'\n\n**返回值里 `placed.actual` 是回读出来的实际状态，`placed.requested` 才是你要求的**。' +
+			'两者不符时 `position_verified` 为 false 并给出 warnings —— 请以 actual 为准，' +
+			'不要假定请求的坐标就是结果。若 `stacked_with` 非空，说明器件叠在了别的器件上（数量、DRC 都查不出这种错）。' +
+			'\n\n放完可以再跑 eda_schematic_drc 看有没有新增 error。',
 		inputSchema: {
 			type: 'object',
 			properties: {
@@ -1378,13 +1381,52 @@ export const schematicEditTools: ToolDef[] = [
 					if (!assigned && !assignError) assignError = '连续 40 次都撞上重名，未能分配唯一位号';
 				}
 
+				// ── 回读确认 ──
+				// c.x / c.y 是 create 那一刻的对象快照，不是 EDA 里的实际状态：
+				// 中间经过了若干次 modify（改位号），这个 JS 对象不会跟着更新。
+				// 以前这里直接返回 c.x/c.y，等于把请求值回显成结果 —— 器件明明
+				// 叠在上一个身上，工具却报告坐标正确。一律按 primitiveId 重新查。
+				await new Promise(function (r) { setTimeout(r, 600); });
+				const REQ = { x: ${x}, y: ${y}, rotation: ${rotation} };
+				const TOL = 10; // 半个网格：EDA 会把坐标吸附到网格，差这点不算失败
+				const fresh2 = await eda.sch_PrimitiveComponent.getAll();
+				const back = fresh2.filter(function (p) { return p.primitiveId === c.primitiveId; })[0];
+				const actual = back
+					? { x: back.x, y: back.y, rotation: back.rotation || 0, designator: String(back.designator || '') }
+					: null;
+				const posOk = !!actual && Math.abs(actual.x - REQ.x) <= TOL && Math.abs(actual.y - REQ.y) <= TOL;
+
+				// 叠在别人身上是最容易被漏掉的失败：数量对、返回值对、DRC 也不报
+				const stacked = !actual ? [] : fresh2
+					.filter(function (p) {
+						return p.componentType === 'part' && p.primitiveId !== c.primitiveId &&
+							Math.abs(p.x - actual.x) <= TOL && Math.abs(p.y - actual.y) <= TOL;
+					})
+					.map(function (p) { return String(p.designator || '?'); });
+
+				const warns = [];
+				if (!back) warns.push('回读时按 primitiveId 找不到刚放的器件 —— 放置可能没真正生效');
+				if (actual && !posOk) {
+					warns.push('实际落点 (' + actual.x + ', ' + actual.y + ') 与请求 (' +
+						REQ.x + ', ' + REQ.y + ') 不符');
+				}
+				if (stacked.length) warns.push('和已有器件重叠：' + stacked.join('、'));
+
 				return {
 					ok: true,
-					placed: { primitive_id: c.primitiveId, designator: finalDes, x: c.x, y: c.y },
+					placed: {
+						primitive_id: c.primitiveId,
+						designator: actual ? actual.designator : finalDes,
+						requested: REQ,
+						actual: actual,
+						position_verified: posOk,
+						stacked_with: stacked.length ? stacked : undefined,
+					},
 					designator_assigned: assigned,
 					designator_note: assignError,
 					component_count: { before, after: after.length },
 					page: _page.name,
+					warnings: warns.length ? warns : undefined,
 				};
 			`,
 					EDIT_TIMEOUT_MS,

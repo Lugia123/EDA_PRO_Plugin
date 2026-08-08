@@ -81,13 +81,61 @@ export const createTools: ToolDef[] = [
 				const createdName = await eda.dmt_Board.createBoard(schUuid, pcbUuid);
 				if (!createdName) return { ok: false, error: '绑定板子失败' };
 
-				// 先按创建时的名字取回完整信息 —— 改名放在后面，因为改名可能失败，
-				// 失败时我们仍要有 sch/pcb 的 uuid 可返回。
-				// 刚建好的板偶尔查到时 pcb 字段还没挂上，重查一次即可。
-				let info = (await eda.dmt_Board.getAllBoardsInfo()).find(b => b.name === createdName);
-				if (!info?.pcb) {
-					await new Promise(r => setTimeout(r, 400));
-					info = (await eda.dmt_Board.getAllBoardsInfo()).find(b => b.name === createdName) || info;
+				// ── 定位刚建的板 ──
+				// 关键：不能按名字查。板子没有 uuid，名字就是它的唯一标识，而
+				// createBoard 给的是 EDA 默认命名（Board1、Board2…），工程里
+				// 完全可能已经有个同名的旧板 —— 按名字 find 会撞上那个旧板，
+				// 于是返回别人的 page uuid。这个坑真踩过：连着建两块板，两块都
+				// 报告了第三块板的图页 uuid。
+				//
+				// 唯一可靠的判据是 schUuid：那是我们自己刚创建的原理图 uuid，
+				// 全局唯一，谁也冒充不了。列表有缓存，所以要轮询等它出现，
+				// 宁可多等 —— 拿到确定信息比快返回重要。
+				let info;
+				let attempts = 0;
+				const tried = [];
+				for (let i = 0; i < 8; i += 1) {
+					attempts = i + 1;
+					const all = (await eda.dmt_Board.getAllBoardsInfo()) || [];
+					info = all.find(function (b) { return b.schematic && b.schematic.uuid === schUuid; });
+					// pcb 字段偶尔比 schematic 晚挂上，等齐再收
+					if (info && info.pcb) break;
+					tried.push(all.length);
+					info = undefined;
+					await new Promise(function (r) { setTimeout(r, 500 + i * 500); });
+				}
+				if (!info) {
+					return {
+						ok: false,
+						error: '板子建出来了，但查询不到它的完整信息 —— 轮询 ' + attempts +
+							' 次都没在板子列表里找到 schematic.uuid=' + schUuid + ' 的板子。' +
+							'板子本身应该是好的（默认名 ' + createdName + '），请在 EDA 界面里确认。' +
+							'这里拒绝返回可能是别的板子的数据。',
+						created_name: createdName,
+						schematic_uuid: schUuid,
+						pcb_uuid: pcbUuid,
+						boards_seen_per_attempt: tried,
+					};
+				}
+
+				// ── 交叉校验：拿到的这份数据必须处处自洽 ──
+				const checks = {
+					schematic_uuid_matches: info.schematic.uuid === schUuid,
+					pcb_uuid_matches: !!info.pcb && info.pcb.uuid === pcbUuid,
+					name_matches_create: info.name === createdName,
+					in_current_project: info.parentProjectUuid === proj.uuid,
+					has_page: !!(info.schematic.page && info.schematic.page.length),
+				};
+				const failed = Object.keys(checks).filter(function (k) { return !checks[k]; });
+				if (failed.length) {
+					return {
+						ok: false,
+						error: '查到的板子数据没通过交叉校验，不敢用：' + failed.join('、') +
+							'。多半是查到了别的板子或半旧的缓存。板子本身应该已建好（' + createdName + '），请在 EDA 界面确认。',
+						checks: checks,
+						schematic_uuid: schUuid,
+						pcb_uuid: pcbUuid,
+					};
 				}
 
 				const want = ${JSON.stringify(name ?? null)};
@@ -95,11 +143,17 @@ export const createTools: ToolDef[] = [
 				let renameNote;
 				if (want && want !== createdName) {
 					// modifyBoardName 的返回值不可信（实测有时返回 true 却没生效），
-					// 一律以「重新查询列表里有没有新名字」为准。
+					// 一律以「重新查询同一块板（认 schUuid，不认名字）叫什么」为准。
 					await eda.dmt_Board.modifyBoardName(createdName, want);
-					const names = (await eda.dmt_Board.getAllBoardsInfo()).map(b => b.name);
-					if (names.includes(want)) {
-						finalName = want;
+					let renamedTo;
+					for (let i = 0; i < 6; i += 1) {
+						await new Promise(function (r) { setTimeout(r, 400 + i * 400); });
+						const again = ((await eda.dmt_Board.getAllBoardsInfo()) || [])
+							.find(function (b) { return b.schematic && b.schematic.uuid === schUuid; });
+						if (again && again.name === want) { renamedTo = again.name; break; }
+					}
+					if (renamedTo) {
+						finalName = renamedTo;
 					} else {
 						renameNote = '改名未生效，板子以默认名 ' + createdName + ' 创建（板子本身是好的）。'
 							+ 'EDA 的 modifyBoardName 实测不稳定，原因未查明；请让用户在 EDA 界面里手动改名。';
@@ -110,14 +164,17 @@ export const createTools: ToolDef[] = [
 					ok: true,
 					board: {
 						name: finalName,
-						uuid: info?.uuid,
-						schematic: info?.schematic ? { uuid: info.schematic.uuid, name: info.schematic.name,
-							pages: (info.schematic.page || []).map(p => ({ uuid: p.uuid, name: p.name })) } : null,
-						pcb: info?.pcb ? { uuid: info.pcb.uuid, name: info.pcb.name } : null,
+						schematic: { uuid: info.schematic.uuid, name: info.schematic.name,
+							pages: (info.schematic.page || []).map(function (p) { return { uuid: p.uuid, name: p.name }; }) },
+						pcb: { uuid: info.pcb.uuid, name: info.pcb.name },
 					},
-					renamed: finalName === want,
+					renamed: want ? finalName === want : undefined,
 					rename_failed: renameNote,
 					project: proj.friendlyName || proj.name,
+					// 这块板是靠什么认出来的、校验过哪些项 —— 便于调用方判断可信度
+					identified_by: 'schematic.uuid === createSchematic() 的返回值',
+					lookup_attempts: attempts,
+					cross_checks: checks,
 				};
 			`,
 				CREATE_TIMEOUT_MS,

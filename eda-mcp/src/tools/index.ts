@@ -11,9 +11,11 @@ import { projectTools } from './project.js';
 import { schematicEditTools } from './schematic-edit.js';
 import { schematicTools } from './schematic.js';
 import type { ToolDef } from './types.js';
+import { verifyTools } from './verify.js';
 
 export const allTools: ToolDef[] = [
 	...connectionTools,
+	...verifyTools,
 	...projectTools,
 	...schematicTools,
 	...schematicEditTools,
