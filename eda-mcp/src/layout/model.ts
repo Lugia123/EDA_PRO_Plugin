@@ -67,6 +67,55 @@ export interface Placement {
 	y: number;
 	rot: Rotation;
 	mirror: boolean;
+	/**
+	 * 每个 label 选中了第几号候选位（对应 LABEL_SLOTS）。
+	 *
+	 * 文字往哪摆不影响电气，只影响能不能看清，所以它是**状态的一部分**、
+	 * 跟着退火一起优化，而不是钉死在器件上的装饰。缺了这一维，
+	 * 密集处的位号和型号只能眼睁睁互相压着。
+	 */
+	labelSlots?: number[];
+}
+
+/**
+ * 文字的候选位：器件包围盒外围八个方位。
+ * dx/dy 是相对包围盒中心的倍率，实际偏移 = 倍率 × (半宽或半高 + 间隙)。
+ */
+export const LABEL_SLOTS: Array<{ name: string; fx: number; fy: number }> = [
+	{ name: '上', fx: 0, fy: 1 },
+	{ name: '下', fx: 0, fy: -1 },
+	{ name: '右', fx: 1, fy: 0 },
+	{ name: '左', fx: -1, fy: 0 },
+	{ name: '右上', fx: 1, fy: 1 },
+	{ name: '左上', fx: -1, fy: 1 },
+	{ name: '右下', fx: 1, fy: -1 },
+	{ name: '左下', fx: -1, fy: -1 },
+];
+
+/** 文字与器件边缘之间留的间隙 */
+export const LABEL_GAP = 12;
+
+/** 某个 label 在当前摆放下的落点（世界坐标）*/
+export function labelWorld(
+	part: Part,
+	pl: Placement,
+	index: number,
+): { x: number; y: number } {
+	const label = part.labels?.[index];
+	if (!label) return { x: pl.x, y: pl.y };
+	const slotIdx = pl.labelSlots?.[index];
+	if (slotIdx == null) {
+		// 没参与优化的，沿用器件自带的偏移
+		return { x: pl.x + label.dx, y: pl.y + label.dy };
+	}
+	const slot = LABEL_SLOTS[slotIdx % LABEL_SLOTS.length] as (typeof LABEL_SLOTS)[number];
+	const swap = pl.rot === 90 || pl.rot === 270;
+	const halfW = (swap ? part.h : part.w) / 2;
+	const halfH = (swap ? part.w : part.h) / 2;
+	return {
+		x: pl.x + slot.fx * (halfW + LABEL_GAP),
+		y: pl.y + slot.fy * (halfH + LABEL_GAP),
+	};
 }
 
 export type Layout = Map<string, Placement>;

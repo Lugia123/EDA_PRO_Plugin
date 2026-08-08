@@ -15,6 +15,7 @@ import {
 	type Part,
 	SYMBOL_RESERVE,
 	dirVec,
+	labelWorld,
 	overlapArea,
 	partBox,
 	pinWorld,
@@ -165,7 +166,13 @@ export function evaluate(
 		const p = parts.get(id);
 		const pl = layout.get(id);
 		if (!p || !pl) continue;
-		for (const l of p.labels ?? []) texts.push(labelBox(l.text, pl.x + l.dx, pl.y + l.dy));
+		(p.labels ?? []).forEach((l, i) => {
+			const w = labelWorld(p, pl, i);
+			// 文字以落点为中心排布，左右各半
+			const b = labelBox(l.text, w.x, w.y);
+			const halfW = (b.maxX - b.minX) / 2;
+			texts.push({ minX: b.minX - halfW, maxX: b.maxX - halfW, minY: b.minY, maxY: b.maxY });
+		});
 	}
 	let textOverlap = 0;
 	for (let i = 0; i < texts.length; i++) {

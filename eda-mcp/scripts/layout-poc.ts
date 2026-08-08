@@ -71,3 +71,10 @@ for (const [id, pl] of [...r.layout].sort()) {
 }
 const vert = [...r.layout.values()].filter((p) => p.rot === 90 || p.rot === 270).length;
 console.log(`\n竖放 ${vert} / ${r.layout.size}（起点全部横排）`);
+console.log(`文字重叠 ${Math.round(before.textOverlap)} → ${Math.round(r.cost.textOverlap)}`);
+const slotNames = ['上','下','右','左','右上','左上','右下','左下'];
+console.log('文字落位:');
+for (const [id, pl] of [...r.layout].sort()) {
+  const ls = (pl.labelSlots ?? []).map((i) => slotNames[i] ?? '?').join(' ');
+  if (ls) console.log(`  ${id.padEnd(5)} ${ls}`);
+}

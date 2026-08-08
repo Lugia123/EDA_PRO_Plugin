@@ -9,7 +9,7 @@
  * 与电路无关：这里只有矩形、连接点和折线，不认识电阻电容，也不关心信号方向。
  */
 import { type CostBreakdown, type Weights, DEFAULT_WEIGHTS, evaluate } from './cost.js';
-import { GRID, type Layout, type Net, type Part, type Placement, type Rotation, snap } from './model.js';
+import { GRID, LABEL_SLOTS, type Layout, type Net, type Part, type Placement, type Rotation, snap } from './model.js';
 
 export interface AnnealOptions {
 	/** 迭代轮数，越多越好但越慢 */
@@ -76,7 +76,12 @@ export function anneal(
 	}
 
 	const cur: Layout = new Map();
-	for (const [k, v] of initial) cur.set(k, { ...v });
+	for (const [k, v] of initial) {
+		const p = parts.get(k);
+		const n = p?.labels?.length ?? 0;
+		// 文字一开始都放器件上方（EDA 的常见默认），之后由退火自己挑位置
+		cur.set(k, { ...v, labelSlots: v.labelSlots ? [...v.labelSlots] : new Array(n).fill(0) });
+	}
 	let curCost = evaluate(parts, nets, cur, weights);
 	const initialCost = curCost;
 
@@ -103,13 +108,21 @@ export function anneal(
 		const before = { ...old };
 
 		const move = rng();
-		if (move < 0.55) {
+		const labelCount = parts.get(id)?.labels?.length ?? 0;
+		if (labelCount && move < 0.15) {
+			// 换个位置摆文字。位号和型号往哪放不影响电气，只影响看不看得清，
+			// 所以它跟位置、角度一样是可优化的变量。
+			const slots = [...(before.labelSlots ?? new Array(labelCount).fill(0))];
+			const which = Math.floor(rng() * labelCount);
+			slots[which] = Math.floor(rng() * LABEL_SLOTS.length);
+			cur.set(id, { ...before, labelSlots: slots });
+		} else if (move < 0.6) {
 			// 平移：温度高时步子大，低时精调
 			const scale = Math.max(1, Math.round((maxShiftGrids * temp) / startTemp));
 			const dx = (Math.floor(rng() * (2 * scale + 1)) - scale) * GRID;
 			const dy = (Math.floor(rng() * (2 * scale + 1)) - scale) * GRID;
 			cur.set(id, clamp({ ...before, x: snap(before.x + dx), y: snap(before.y + dy) }));
-		} else if (move < 0.8) {
+		} else if (move < 0.82) {
 			// 转角 —— 这一步是「器件永远横排」的解药
 			cur.set(id, { ...before, rot: ROTS[Math.floor(rng() * 4)] as Rotation });
 		} else if (move < 0.9) {
