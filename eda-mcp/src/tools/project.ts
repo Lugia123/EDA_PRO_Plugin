@@ -45,29 +45,8 @@ export const projectTools: ToolDef[] = [
 				};
 			`),
 	},
-	{
-		name: 'eda_current_context',
-		description:
-			'当前正在编辑的对象：哪块板、哪一页原理图、哪个 PCB。' +
-			'\n\n用户说「这个原理图」「当前这块板」时，用本工具把指代解析成具体 uuid。' +
-			'\n注意：打开原理图时 current_pcb 为 null，反之亦然 —— 由此可判断用户此刻在哪个编辑器里。',
-		inputSchema: { type: 'object', properties: {} },
-		handler: async (_args, ctx) =>
-			ctx.exec(`
-				const pick = (o, keys) => o ? Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]])) : null;
-				const board = await eda.dmt_Board.getCurrentBoardInfo().catch(() => null);
-				const page  = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
-				const sch   = await eda.dmt_Schematic.getCurrentSchematicInfo().catch(() => null);
-				const pcb   = await eda.dmt_Pcb.getCurrentPcbInfo().catch(() => null);
-				return {
-					board: pick(board, ['uuid', 'name']),
-					schematic: pick(sch, ['uuid', 'name']),
-					schematic_page: pick(page, ['uuid', 'name', 'parentSchematicUuid']),
-					pcb: pick(pcb, ['uuid', 'name']),
-					editor: page ? 'schematic' : pcb ? 'pcb' : 'other',
-				};
-			`),
-	},
+	// eda_current_context 搬到了 tools/verify.ts —— 那边带三道数据校验和
+	// 板/原理图/图页的互相印证。这里留个记号，免得又有人在这加一份同名的。
 	{
 		name: 'eda_list_projects',
 		description:

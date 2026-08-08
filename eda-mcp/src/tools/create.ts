@@ -58,10 +58,11 @@ export const createTools: ToolDef[] = [
 		description:
 			'【写操作】在**当前工程**里新建一块板子，自动配好一张原理图（含 1 页）和一个 PCB。' +
 			'\n\n这是"新建板子"的正确做法：底层要先建原理图和 PCB 再绑定，本工具已封装。' +
-			'\n\n给了 name 会尝试创建后改名；不给则用 EDA 的默认命名（Board1、Board2…）。' +
-			'\n**改名不保证成功**：EDA 的 modifyBoardName 实测不稳定（有时返回 true 却没生效，' +
-			'有时直接返回 false，原因未查明）。改名失败时板子仍会以默认名正常建好，' +
-			'返回里 renamed=false 且 rename_failed 会说明——这时请让用户在 EDA 界面里手动改名。' +
+			'\n\n给了 name 会创建后改名；不给则用 EDA 的默认命名（Board1、Board2…）。' +
+			'\n**给了 name 时会顺带打开这块板的原理图页**：刚建的板文档没落盘，' +
+			'不先保存一次的话 modifyBoardName 会静默失败（返回 true 但名字没变、重试多久都没用）。' +
+			'工具会自动 openDocument → save → 改名 → 按 schematic uuid 重查确认，因此建板要花十几秒，' +
+			'且结束后当前编辑器停在新板的图页上。仍未成功时 renamed=false 且 rename_failed 会说明。' +
 			'\n\n注意作用在当前打开的工程上 —— 先用 eda_project_overview 确认是不是目标工程。',
 		inputSchema: {
 			type: 'object',
@@ -70,7 +71,7 @@ export const createTools: ToolDef[] = [
 		mutating: true,
 		handler: async (args, ctx) => {
 			const name = optionalString(args, 'name');
-			return ctx.exec(
+			const res = await ctx.exec<Record<string, unknown>>(
 				`
 				const proj = await eda.dmt_Project.getCurrentProjectInfo();
 				if (!proj) return { ok: false, error: '当前没有打开的工程' };
@@ -138,38 +139,15 @@ export const createTools: ToolDef[] = [
 					};
 				}
 
-				const want = ${JSON.stringify(name ?? null)};
-				let finalName = createdName;
-				let renameNote;
-				if (want && want !== createdName) {
-					// modifyBoardName 的返回值不可信（实测有时返回 true 却没生效），
-					// 一律以「重新查询同一块板（认 schUuid，不认名字）叫什么」为准。
-					await eda.dmt_Board.modifyBoardName(createdName, want);
-					let renamedTo;
-					for (let i = 0; i < 6; i += 1) {
-						await new Promise(function (r) { setTimeout(r, 400 + i * 400); });
-						const again = ((await eda.dmt_Board.getAllBoardsInfo()) || [])
-							.find(function (b) { return b.schematic && b.schematic.uuid === schUuid; });
-						if (again && again.name === want) { renamedTo = again.name; break; }
-					}
-					if (renamedTo) {
-						finalName = renamedTo;
-					} else {
-						renameNote = '改名未生效，板子以默认名 ' + createdName + ' 创建（板子本身是好的）。'
-							+ 'EDA 的 modifyBoardName 实测不稳定，原因未查明；请让用户在 EDA 界面里手动改名。';
-					}
-				}
-
 				return {
 					ok: true,
 					board: {
-						name: finalName,
+						name: createdName,
 						schematic: { uuid: info.schematic.uuid, name: info.schematic.name,
 							pages: (info.schematic.page || []).map(function (p) { return { uuid: p.uuid, name: p.name }; }) },
 						pcb: { uuid: info.pcb.uuid, name: info.pcb.name },
 					},
-					renamed: want ? finalName === want : undefined,
-					rename_failed: renameNote,
+					schematic_uuid: schUuid,
 					project: proj.friendlyName || proj.name,
 					// 这块板是靠什么认出来的、校验过哪些项 —— 便于调用方判断可信度
 					identified_by: 'schematic.uuid === createSchematic() 的返回值',
@@ -179,6 +157,81 @@ export const createTools: ToolDef[] = [
 			`,
 				CREATE_TIMEOUT_MS,
 			);
+
+			// ── 改名：必须先把新板的原理图打开并保存 ──
+			// 根因实测出来了：**刚创建的板子，它的原理图文档还没落盘，这时候
+			// modifyBoardName 会静默失败** —— 返回 true，名字纹丝不动，等多久、
+			// 重试几次都没用（等过 3 分钟仍然不行）。而对一块「存在有一会儿」的
+			// 板改名一次就成。差别就是文档有没有保存过：
+			//   openDocument(页) → activateDocument → sch_Document.save() → 改名 ✓
+			// 顺带一提，modifySchematicName 在未落盘时是老老实实返回 false 的，
+			// 只有 modifyBoardName 谎报成功 —— 又一条「返回值只作参考」的例证。
+			const created = res as {
+				ok?: boolean;
+				board?: { name?: string; schematic?: { pages?: Array<{ uuid?: string }> } };
+				schematic_uuid?: string;
+			};
+			if (!created?.ok || !name || !created.board?.name || created.board.name === name) {
+				return res;
+			}
+			const firstPage = created.board.schematic?.pages?.[0]?.uuid ?? '';
+
+			const renamed = await ctx.exec<Record<string, unknown>>(
+				`
+				const WANT = ${JSON.stringify(name)};
+				const SCH = ${JSON.stringify(created.schematic_uuid ?? '')};
+				const PAGE = ${JSON.stringify(firstPage)};
+				const findMine = async function () {
+					return ((await eda.dmt_Board.getAllBoardsInfo()) || [])
+						.find(function (b) { return b.schematic && b.schematic.uuid === SCH; });
+				};
+				const taken = ((await eda.dmt_Board.getAllBoardsInfo()) || [])
+					.some(function (b) { return b.name === WANT && !(b.schematic && b.schematic.uuid === SCH); });
+				if (taken) {
+					return { ok: false, reason: '工程里已经有一块板叫 ' + WANT + '，板名必须唯一' };
+				}
+
+				// 先让文档落盘，否则下面的改名会谎报成功
+				let saved = false;
+				if (PAGE) {
+					const tab = await eda.dmt_EditorControl.openDocument(PAGE);
+					if (tab) {
+						await eda.dmt_EditorControl.activateDocument(tab);
+						await new Promise(function (r) { setTimeout(r, 1200); });
+						saved = (await eda.sch_Document.save().catch(function () { return false; })) === true;
+						await new Promise(function (r) { setTimeout(r, 1200); });
+					}
+				}
+
+				// 返回值不可信，判据一律是「按 schUuid 重查这块板叫什么」
+				let tries = 0;
+				for (let i = 0; i < 4; i += 1) {
+					tries = i + 1;
+					const mine = await findMine();
+					if (!mine) break;
+					if (mine.name === WANT) return { ok: true, tries: tries, saved: saved };
+					await eda.dmt_Board.modifyBoardName(mine.name, WANT);
+					await new Promise(function (r) { setTimeout(r, 800 + i * 800); });
+					const back = await findMine();
+					if (back && back.name === WANT) return { ok: true, tries: tries, saved: saved };
+				}
+				const last = await findMine();
+				return { ok: false, tries: tries, saved: saved, current_name: last ? last.name : undefined };
+			`,
+				CREATE_TIMEOUT_MS,
+			);
+
+			const okRenamed = renamed?.ok === true;
+			return {
+				...created,
+				board: { ...created.board, name: okRenamed ? name : created.board.name },
+				renamed: okRenamed,
+				rename_tries: renamed?.tries,
+				rename_failed: okRenamed
+					? undefined
+					: `改名没成功${renamed?.reason ? `：${String(renamed.reason)}` : ''}。` +
+						`板子以 ${String(renamed?.current_name ?? created.board.name)} 存在，板子本身是好的，请在 EDA 界面里手动改名。`,
+			};
 		},
 	},
 	{
@@ -248,8 +301,11 @@ export const createTools: ToolDef[] = [
 				}
 				return {
 					ok: false,
-					error: '改名未生效。EDA 的 modifyBoardName 实测不稳定，原因未查明；'
-						+ '若新名字与现有板子重名也会失败。建议让用户在 EDA 界面里手动改名。',
+					error: '改名未生效（modifyBoardName 谎报了成功）。最常见的原因是**这块板刚建出来、'
+						+ '原理图文档还没落盘** —— 此时改名一定失败且返回 true，等多久、重试多少次都没用。'
+						+ '解法：先用 eda_open_document 打开这块板的原理图页，跑一次 eda_execute '
+						+ '"await eda.sch_Document.save()"，再回来改名。'
+						+ '（另一种可能是新名字与现有板子重名，板名在工程内必须唯一。）',
 					boards: names,
 				};
 			`,

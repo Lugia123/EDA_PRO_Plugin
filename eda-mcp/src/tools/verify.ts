@@ -110,7 +110,7 @@ export async function stableRead<T = unknown>(
 		return { __text: __text, __hash: await __hash(__text) };
 	`;
 
-	let prev: { text: string; hash: string } | null = null;
+	let prev: { text: string; hash: string; client?: string } | null = null;
 	let reads = 0;
 	let lastErr = '';
 
@@ -118,6 +118,12 @@ export async function stableRead<T = unknown>(
 		if (settleMs > 0 || i > 0) {
 			await sleep(i === 0 ? settleMs : settleMs + 300 * i);
 		}
+		// 哪个浏览器标签页在回答。多开 tab 时每个页面都是一个独立的扩展实例，
+		// bridge 默认发给「最后一个认证成功的」，于是新开一个 tab、或者某页
+		// 重载后重连，调用目标就会**静默漂移**到另一个文档上去 ——
+		// 表现出来就是「工程怎么自己变了」「读到的是别的板子」。
+		// 把它纳入一致性判据：两次读取不是同一个 tab 回的，就不能算一致。
+		const clientId = ctx.bridge.activeClient()?.id;
 		let got: { __text?: unknown; __hash?: unknown };
 		try {
 			got = await ctx.exec<{ __text?: unknown; __hash?: unknown }>(wrapped, timeoutMs);
@@ -146,7 +152,15 @@ export async function stableRead<T = unknown>(
 			continue;
 		}
 
-		// 第三道：稳定。连续两次一模一样才采信
+		// 第三道：稳定。连续两次一模一样、且出自同一个 tab，才采信
+		if (prev && prev.client !== clientId) {
+			notes.push(
+				`第 ${i + 1} 次换了标签页回答（${prev.client ?? '?'} → ${clientId ?? '?'}）—— ` +
+					'多开 EDA 页面时调用目标会漂移，重新读',
+			);
+			prev = { text, hash, client: clientId };
+			continue;
+		}
 		if (prev && prev.hash === hash) {
 			try {
 				return { value: JSON.parse(text) as T, reads, hash, notes };
@@ -159,7 +173,7 @@ export async function stableRead<T = unknown>(
 		if (prev && prev.hash !== hash) {
 			notes.push(`第 ${i + 1} 次与上一次不一致（缓存或状态未稳），继续读`);
 		}
-		prev = { text, hash };
+		prev = { text, hash, client: clientId };
 	}
 
 	throw new Error(
@@ -186,6 +200,10 @@ export interface PageIdentity {
 	pageName?: string;
 	schematicUuid?: string;
 	schematicName?: string;
+	pcbUuid?: string;
+	pcbName?: string;
+	/** 焦点在哪个编辑器里：打开原理图时 pcb 为 null，反之亦然 */
+	editor: 'schematic' | 'pcb' | 'other';
 	projectUuid?: string;
 	projectName?: string;
 	/** 三个来源互相印证的结果；不一致时这里会说明哪里对不上 */
@@ -207,14 +225,17 @@ export async function currentPage(ctx: ToolContext, attempts = DEFAULT_ATTEMPTS)
 	const { value } = await stableRead<PageIdentity>(
 		ctx,
 		`
-		const proj = await eda.dmt_Project.getCurrentProjectInfo();
-		const board = await eda.dmt_Board.getCurrentBoardInfo();
-		const sch = await eda.dmt_Schematic.getCurrentSchematicInfo();
-		const page = await eda.dmt_Schematic.getCurrentSchematicPageInfo();
+		const proj = await eda.dmt_Project.getCurrentProjectInfo().catch(function () { return null; });
+		const board = await eda.dmt_Board.getCurrentBoardInfo().catch(function () { return null; });
+		const sch = await eda.dmt_Schematic.getCurrentSchematicInfo().catch(function () { return null; });
+		const page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(function () { return null; });
+		const pcb = await eda.dmt_Pcb.getCurrentPcbInfo().catch(function () { return null; });
+		const editor = page ? 'schematic' : (pcb ? 'pcb' : 'other');
 
+		// 焦点在 PCB 或别处时，「查不到原理图页」是正常状态而不是错误 ——
+		// 只有当自己声称在原理图编辑器里，各项才必须齐备且互相对得上。
 		const problems = [];
-		if (!page) problems.push('查不到当前原理图图页（焦点可能不在原理图上）');
-		if (!sch) problems.push('查不到当前原理图');
+		if (editor === 'schematic' && !sch) problems.push('在原理图编辑器里却查不到当前原理图');
 		if (page && sch && page.parentSchematicUuid !== sch.uuid) {
 			problems.push('图页声明的所属原理图(' + page.parentSchematicUuid +
 				') 与当前原理图(' + sch.uuid + ') 不一致');
@@ -233,6 +254,9 @@ export async function currentPage(ctx: ToolContext, attempts = DEFAULT_ATTEMPTS)
 			pageName: page ? page.name : undefined,
 			schematicUuid: sch ? sch.uuid : undefined,
 			schematicName: sch ? sch.name : undefined,
+			pcbUuid: pcb ? pcb.uuid : undefined,
+			pcbName: pcb ? pcb.name : undefined,
+			editor: editor,
 			projectUuid: proj ? proj.uuid : undefined,
 			projectName: proj ? (proj.friendlyName || proj.name) : undefined,
 			consistent: problems.length === 0,
@@ -440,45 +464,122 @@ export const verifyTools: ToolDef[] = [
 	{
 		name: 'eda_current_context',
 		description:
-			'【只读】确认当前所在的工程／板／原理图／图页，并普查图上有多少图元。' +
+			'当前正在编辑的对象：哪块板、哪一页原理图、哪个 PCB。' +
+			'\n\n用户说「这个原理图」「当前这块板」时，用本工具把指代解析成具体 uuid。' +
+			'\n注意：打开原理图时 pcb 为 null，反之亦然 —— 由此可判断用户此刻在哪个编辑器里。' +
+			'\n**板子没有 uuid**：EDA 里板名就是它在工程内的唯一标识。' +
 			'\n\n**写图纸之前先调它**：所有原理图工具都作用在隐式的「当前页」上，' +
 			'焦点不对就会把图画进别的板子。' +
-			'\n\n数据经过三道校验才返回：结构检查、传输哈希比对、同一读取连做两遍取一致值。' +
-			'查到的板／原理图／图页还会互相印证（图页声明的父原理图必须就是当前原理图）。' +
-			'任何一道过不了就如实报错，**不会返回可能是脏的数据** —— 慢一点没关系，' +
-			'拿到的信息必须是确定的。',
+			'\n\n数据经过三道校验才返回：结构检查、传输哈希比对、同一读取连做两遍取一致值；' +
+			'板／原理图／图页还会互相印证（图页声明的父原理图必须就是当前原理图）。' +
+			'任何一道过不了就如实报错，**不会返回可能是脏的数据** —— 慢一点没关系，信息必须确定。' +
+			'\n\ncensus=true 时额外普查图上各类图元的数量与内容摘要，' +
+			'可用于在写操作前后比对「图纸到底变了没有」。',
 		inputSchema: {
 			type: 'object',
 			properties: {
 				census: {
 					type: 'boolean',
-					description: '是否同时普查图元数量与内容摘要，默认 true',
+					description: '是否同时普查图元数量与内容摘要，默认 false',
 				},
 			},
 		},
 		handler: async (args, ctx) => {
-			const wantCensus = args.census !== false;
 			const id = await currentPage(ctx);
+			const tabs = ctx.bridge.authedClients();
+			const activeId = ctx.bridge.activeClient()?.id;
+			// 保持原有字段形状 —— 已有的 skill 和工具按这个结构读
 			const out: Record<string, unknown> = {
-				context: id,
-				verified: id.consistent && !!id.pageUuid,
+				answered_by_tab: activeId,
+				open_tabs: tabs.length,
+				board: id.boardName ? { name: id.boardName } : null,
+				schematic: id.schematicUuid ? { uuid: id.schematicUuid, name: id.schematicName } : null,
+				schematic_page: id.pageUuid ? { uuid: id.pageUuid, name: id.pageName } : null,
+				pcb: id.pcbUuid ? { uuid: id.pcbUuid, name: id.pcbName } : null,
+				editor: id.editor,
+				project: id.projectUuid ? { uuid: id.projectUuid, name: id.projectName } : null,
+				verified: id.consistent,
+				inconsistency: id.inconsistency,
 			};
-			if (!id.pageUuid) {
-				out.note =
-					'当前编辑器里没有打开原理图图页（或查不到它的身份）。' +
-					'原理图类工具此时不该调用 —— 请先在 EDA 里打开目标图页。';
-				return out;
-			}
 			if (!id.consistent) {
 				out.note = `身份自相矛盾，不要在这个状态下写图纸：${id.inconsistency}`;
 				return out;
 			}
-			if (wantCensus) {
+			if (args.census === true && id.editor === 'schematic') {
 				const c = await census(ctx);
 				out.census = { counts: c.counts, total: c.total, digest: c.digest };
 			}
-			out.note = '身份已确认，可以安全地在这一页上操作。';
+			const notes: string[] = [];
+			notes.push(
+				id.editor === 'schematic'
+					? '身份已确认，可以安全地在这一页上操作。'
+					: `当前在 ${id.editor} 编辑器里，没有打开原理图页 —— 原理图类工具此时不该调用。`,
+			);
+			if (tabs.length > 1) {
+				notes.push(
+					`**注意有 ${tabs.length} 个 EDA 标签页连着**（${tabs.map((c) => c.id).join('、')}），` +
+						`当前应答的是 ${activeId}。调用默认发给最后一个连上的页面，` +
+						'新开页面或某页刷新重连都会让目标静默漂移到另一个文档上 —— ' +
+						'连续操作前请用 eda_use_tab 钉住一个，或只留一个 EDA 页面。',
+				);
+			}
+			out.note = notes.join(' ');
 			return out;
+		},
+	},
+	{
+		name: 'eda_use_tab',
+		description:
+			'【只读】把后续所有调用钉在指定的 EDA 标签页上。' +
+			'\n\n**多开 EDA 页面时必须先钉**：每个浏览器标签页都是一个独立的扩展实例，' +
+			'调用默认发给「最后一个连上的」，新开页面或某页刷新重连都会让目标静默漂移 —— ' +
+			'表现出来就是「工程怎么自己变了」「读到的是别的板子的数据」。' +
+			'\n\n标签页 id 从 eda_status 的 connected_clients 或 eda_current_context 的 answered_by_tab 拿。' +
+			'不给 tab_id 则只列出当前有哪些页面连着。',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				tab_id: { type: 'string', description: '要钉住的标签页 id；不给则只列出可选项' },
+			},
+		},
+		handler: async (args, ctx) => {
+			const tabs = ctx.bridge.authedClients();
+			const listing = tabs.map((c) => ({
+				id: c.id,
+				host: c.info?.host,
+				connected_seconds: Math.round((Date.now() - c.connectedAt) / 1000),
+				active: c.id === ctx.bridge.activeClient()?.id,
+			}));
+			const wanted = typeof args.tab_id === 'string' ? args.tab_id.trim() : '';
+			if (!wanted) {
+				return {
+					tabs: listing,
+					note:
+						tabs.length > 1
+							? '有多个页面连着 —— 传 tab_id 钉住一个，否则调用目标会随重连漂移。'
+							: '只有一个页面连着，暂时不用钉。',
+				};
+			}
+			if (!ctx.bridge.setActiveClient(wanted)) {
+				return {
+					ok: false,
+					error: `没有已认证的标签页 ${wanted}`,
+					tabs: listing,
+				};
+			}
+			// 钉住之后立刻回读一次，告诉调用方这个 tab 里到底打开着什么
+			const id = await currentPage(ctx);
+			return {
+				ok: true,
+				pinned_tab: wanted,
+				context: {
+					project: id.projectName,
+					board: id.boardName,
+					schematic_page: id.pageName,
+					editor: id.editor,
+				},
+				note: '后续调用都会发到这个页面。它若被关闭或刷新重连，需要重新钉。',
+			};
 		},
 	},
 ];

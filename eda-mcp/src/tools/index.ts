@@ -28,6 +28,14 @@ export const allTools: ToolDef[] = [
 	...pcbTools,
 ];
 
+// 重名会被 Map 静默覆盖 —— 真发生过：新加的 eda_current_context 撞上
+// project.ts 里的同名工具，注册表里只剩一个，工具总数还是 48，调用时跑的是
+// 另一份实现，排查了半天才发现。启动即崩总比跑错实现好。
+const dupes = allTools.map((t) => t.name).filter((n, i, a) => a.indexOf(n) !== i);
+if (dupes.length) {
+	throw new Error(`工具名重复：${[...new Set(dupes)].join('、')} —— 同名工具会被静默覆盖，必须改名或合并实现`);
+}
+
 export const toolMap = new Map<string, ToolDef>(allTools.map((t) => [t.name, t]));
 
 export type { ToolDef, ToolContext } from './types.js';

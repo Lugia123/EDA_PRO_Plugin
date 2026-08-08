@@ -44,7 +44,22 @@
    正解：用 `createSchematic()` 返回的 uuid 去 `find(b => b.schematic.uuid === schUuid)`，
    那是自己刚造的、全局唯一的锚点。列表有缓存，轮询等它出现，宁可多等。
 
-10. **拿不到确定信息就拒绝动手，不要退化成猜**。
+10. **新建的文档没落盘之前，很多写操作会静默失败**。
+    `modifyBoardName` 对刚 `createBoard` 出来的板子改名，**返回 `true` 而名字纹丝不动**，
+    等 3 分钟、重试 6 次都没用；对同一块板，只要先
+    `openDocument(图页) → activateDocument → sch_Document.save()`，改名立刻成功。
+    同一状态下 `modifySchematicName` 老老实实返回 `false` —— 只有 `modifyBoardName` 谎报，
+    又一条「返回值只作参考」的例证。凡是对新建对象的属性写入，先想想它保存了没有。
+
+11. **多开 EDA 标签页时，调用目标会静默漂移**。
+    每个浏览器标签页是一个独立的扩展实例，bridge 默认发给「最后一个认证成功的」
+    （`bridge.ts` 的 `activeClient()`），于是新开一个页面、或某页刷新重连，
+    后续调用就落到**另一个文档**上 —— 表现为「工程怎么自己变了」「读到的是别的板子」。
+    排查诡异数据前先看 `eda_current_context` 的 `open_tabs` / `answered_by_tab`；
+    连续操作前用 `eda_use_tab` 钉住一个。`stableRead` 已把 tab id 纳入一致性判据：
+    两次读取不是同一个 tab 回的，不算一致。
+
+12. **拿不到确定信息就拒绝动手，不要退化成猜**。
     读到的数据要能自证没被污染（见 `tools/verify.ts`）：EDA 侧对返回文本算哈希、
     本侧重算比对（挡桥接层损坏），同一读取连做两遍、两遍一致才采信（挡缓存与
     不稳定返回）。三道校验都过不了就如实报错。
