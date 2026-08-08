@@ -829,9 +829,11 @@ export const schematicEditTools: ToolDef[] = [
 				}
 				// 标题放在框**内**左上角。放框外看着清爽，但区框常常紧贴图纸边缘，
 				// 往外挪一点标题就掉到图纸外面去了 —— 实测 A4 上就这么丢过一次。
-				const t = await eda.sch_PrimitiveText.create(${JSON.stringify(title)}, ${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 25);
+				// 签名是 create(x, y, text) —— 坐标在前。传成 (text, x, y) 的话
+				// 文字会被当成 x 坐标，图元跑到天边去，图上什么都看不见。
+				const t = await eda.sch_PrimitiveText.create(${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 25, ${JSON.stringify(title)});
 				let n = null;
-				${note ? `n = await eda.sch_PrimitiveText.create(${JSON.stringify(note)}, ${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 45);` : ''}
+				${note ? `n = await eda.sch_PrimitiveText.create(${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 45, ${JSON.stringify(note)});` : ''}
 				return {
 					ok: !!rc, rect_id: rc && rc.primitiveId, title_id: t && t.primitiveId, note_id: n && n.primitiveId,
 					box: [${Math.min(x1, x2)}, ${Math.min(y1, y2)}, ${Math.max(x1, x2)}, ${Math.max(y1, y2)}],
@@ -890,7 +892,7 @@ export const schematicEditTools: ToolDef[] = [
 					for (const x of (pins || [])) if (String(x.pinNumber || '').toUpperCase() === k) { p = x; break; }
 					if (!p) for (const x of (pins || [])) if (String(x.pinName || '').toUpperCase() === k) { p = x; break; }
 					if (!p) { failed.push(j.des + '.' + j.pin + ' 找不到该引脚'); continue; }
-					const t = await eda.sch_PrimitiveText.create(String.fromCharCode(10005), p.x - 4, p.y - 4);
+					const t = await eda.sch_PrimitiveText.create(p.x - 4, p.y - 4, String.fromCharCode(10005));
 					if (t) done.push(j.des + '.' + String(p.pinNumber));
 					else failed.push(j.des + '.' + j.pin + ' 标记创建失败');
 				}
