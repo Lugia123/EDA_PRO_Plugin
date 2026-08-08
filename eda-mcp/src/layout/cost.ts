@@ -37,6 +37,8 @@ export interface Weights {
 	tooClose: number;
 	/** 接地的引脚没朝下、接电源的引脚没朝上 */
 	supplyDir: number;
+	/** 整体占地面积 —— 没有这一项，网络少的时候器件会散得到处都是 */
+	spread: number;
 }
 
 /** 器件之间至少要留出的间隙，小于它就开始罚。留给走线和文字。
@@ -59,6 +61,11 @@ export const DEFAULT_WEIGHTS: Weights = {
 	// 「电源在上、地在下」是原理图最强的视觉约定，值得给个不低的权重，
 	// 让退火主动把器件转到地脚朝下的姿势，而不是事后硬掰符号方向。
 	supplyDir: 60,
+	// 占地面积。单位是「格数」，一个 600x400 的块约合 24 格，
+	// 权重 4 意味着多占一格约等于多走 4 个单位线长 —— 够把器件收拢，又不至于挤成一堆
+	// （挤过头会被 tooClose 拦住）。缺了这一项，组内网络少时器件会散得到处都是：
+	// 实测 3 个器件的电源区占到 749x629，组框直接顶出图纸。
+	spread: 4,
 };
 
 export interface CostBreakdown {
@@ -71,6 +78,7 @@ export interface CostBreakdown {
 	netSpread: number;
 	tooClose: number;
 	supplyDir: number;
+	spread: number;
 }
 
 /** 两个盒子的间隙（负数表示重叠）。取两轴间隙的较大者：
@@ -166,6 +174,30 @@ export function evaluate(
 		for (const id of ids) {
 			const b = boxes.get(id);
 			if (b) textOverlap += overlapArea(t, b);
+		}
+	}
+
+	// ── 整体占地：所有器件的总包围盒，按格计 ──
+	let spread = 0;
+	{
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		for (const b of boxes.values()) {
+			minX = Math.min(minX, b.minX);
+			minY = Math.min(minY, b.minY);
+			maxX = Math.max(maxX, b.maxX);
+			maxY = Math.max(maxY, b.maxY);
+		}
+		if (Number.isFinite(minX)) {
+			const w = maxX - minX;
+			const h = maxY - minY;
+			// 只罚面积的话，器件会排成一条竖线 —— 那样面积最小，但完全不能看。
+			// 原理图偏横向（图纸是横的、信号左右流），所以再罚一项偏离 1.4:1 的宽高比。
+			const area = (w / 100) * (h / 100);
+			const aspectPenalty = Math.abs(w - h * 1.4) / 100;
+			spread = area + aspectPenalty * 3;
 		}
 	}
 
@@ -271,7 +303,8 @@ export function evaluate(
 		weights.pinFacing * pinFacing +
 		weights.netSpread * netSpread +
 		weights.tooClose * tooClose +
-		weights.supplyDir * supplyDir;
+		weights.supplyDir * supplyDir +
+		weights.spread * spread;
 
-	return { total, partOverlap, textOverlap, wireLength, crossing, pinFacing, netSpread, tooClose, supplyDir };
+	return { total, partOverlap, textOverlap, wireLength, crossing, pinFacing, netSpread, tooClose, supplyDir, spread };
 }
