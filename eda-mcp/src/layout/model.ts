@@ -41,7 +41,18 @@ export interface Part {
 	labels?: Array<{ text: string; dx: number; dy: number }>;
 	/** 为 true 时不参与优化，位置锁死（比如接口连接器要钉在图纸边缘）*/
 	fixed?: boolean;
+	/**
+	 * 这些引脚外侧要留出空间挂电源符号或地符号。
+	 * 不留的话布局收紧后符号会压在邻近器件上 —— 符号不是 part，
+	 * 优化器看不见它们，只能靠这里替它们占位。
+	 */
+	stubPins?: string[];
+	/** stubPins 里哪些是接电源的（该朝上）；其余按接地处理（该朝下）*/
+	stubUp?: string[];
 }
+
+/** 电源／地符号连引出线占的地方，约一格半见方 */
+export const SYMBOL_RESERVE = 55;
 
 /** 一条连接需求：把这些引脚接到一起 */
 export interface Net {

@@ -8,7 +8,7 @@
  * 算的时候完全不碰 EDA，所以可以离线跑、可以单测、迭代八轮也只要两秒。
  */
 import { optimize } from '../layout/optimize.js';
-import { type Layout, type Net, type Part, type Placement, type Rotation, pinLocal } from '../layout/model.js';
+import { type Layout, type Net, type Part, type Placement, type Rotation, dirVec, pinLocal, pinWorld } from '../layout/model.js';
 import type { ToolDef } from './types.js';
 
 const ENSURE_SCH = `
@@ -53,6 +53,15 @@ export const layoutTools: ToolDef[] = [
 					description: '{ 网络名: ["位号.引脚号", …] }，与 eda_arrange_block 同格式。只放信号网。',
 					additionalProperties: { type: 'array', items: { type: 'string' } },
 				},
+				power_nets: {
+					type: 'object',
+					description:
+						'电源与地网络：{ "GND": ["U1.1","C1.1"], "+5V": ["U1.3"] }。' +
+						'这些网络不参与布线（它们该用符号表达），但工具会为每个引脚**预留符号位置**，' +
+						'并在写回时自动把符号放上去。不传的话布局一收紧，符号就会压在邻近器件上 —— ' +
+						'实测漏掉这一步，三个电容各被 GND 符号压住一块。',
+					additionalProperties: { type: 'array', items: { type: 'string' } },
+				},
 				keep_fixed: {
 					type: 'array',
 					items: { type: 'string' },
@@ -77,6 +86,30 @@ export const layoutTools: ToolDef[] = [
 		mutating: true,
 		handler: async (args, ctx) => {
 			const netsIn = (args.nets && typeof args.nets === 'object' ? args.nets : {}) as Record<string, string[]>;
+			const powerIn = (args.power_nets && typeof args.power_nets === 'object' ? args.power_nets : {}) as Record<string, string[]>;
+			// 位号 -> 该器件上要挂符号的引脚
+			const stubOf = new Map<string, string[]>();
+			const stubUpOf = new Map<string, string[]>(); // 接电源的引脚，该朝上
+			const flagKind = new Map<string, string>(); // "位号.引脚" -> 网络名
+			const isGroundNet = (n: string): boolean => {
+				const u = n.toUpperCase();
+				return ['GND', 'AGND', 'DGND', 'PGND', 'SGND', 'VSS', 'VEE', 'GNDA', 'GNDD', 'EARTH'].includes(u);
+			};
+			for (const [net, refs] of Object.entries(powerIn)) {
+				for (const ref of Array.isArray(refs) ? refs : []) {
+					const dot = String(ref).lastIndexOf('.');
+					if (dot <= 0) continue;
+					const des = String(ref).slice(0, dot).toUpperCase();
+					const pin = String(ref).slice(dot + 1);
+					if (!stubOf.has(des)) stubOf.set(des, []);
+					stubOf.get(des)?.push(pin);
+					if (!isGroundNet(net)) {
+						if (!stubUpOf.has(des)) stubUpOf.set(des, []);
+						stubUpOf.get(des)?.push(pin);
+					}
+					flagKind.set(`${des}.${pin}`, net);
+				}
+			}
 			const fixed = new Set((Array.isArray(args.keep_fixed) ? (args.keep_fixed as string[]) : []).map((s) => String(s).toUpperCase()));
 			const dryRun = args.dry_run === true;
 			const rounds = typeof args.rounds === 'number' ? args.rounds : 8;
@@ -138,6 +171,8 @@ export const layoutTools: ToolDef[] = [
 					h: p.h,
 					fixed: fixed.has(p.des.toUpperCase()),
 					labels: p.labels,
+					stubPins: stubOf.get(p.des.toUpperCase()) ?? [],
+					stubUp: stubUpOf.get(p.des.toUpperCase()) ?? [],
 					pins: p.pins.map((q) =>
 						pinLocal(pl, { x: q.x, y: q.y, dir: (((q.dir % 360) + 360) % 360) as Rotation }, q.n),
 					),
@@ -172,6 +207,41 @@ export const layoutTools: ToolDef[] = [
 				n.paths.map((p) => ({ net: n.netId, points: p.flat() })),
 			);
 
+			// 电源地符号：按优化后的引脚位置算出落点，写回时一并放上去。
+			// 优化器移动的是 part，符号不是 part，不在这里补就会留在原地变成孤儿。
+			const flags: Array<{ net: string; x: number; y: number; ex: number; ey: number; rot: number }> = [];
+			for (const [ref, net] of flagKind) {
+				const dot = ref.lastIndexOf('.');
+				const des = ref.slice(0, dot);
+				const part = parts.get(des);
+				const pl = r.layout.get(des);
+				if (!part || !pl) continue;
+				const pin = part.pins.find((q) => q.id === ref.slice(dot + 1));
+				if (!pin) continue;
+				const w = pinWorld(part, pl, pin);
+				const [vx, vy] = dirVec(w.dir);
+				const L = 40;
+				const ex = w.x + vx * L;
+				const ey = w.y + vy * L;
+				// 符号朝向**固定**：地永远朝下、电源永远朝上，跟引脚朝哪无关。
+				// 这是原理图里最强的视觉约定 —— 按「背对器件」算会让朝上的引脚
+				// 挂出一个倒过来的地符号，实测 C3/C4 就是这么倒的。
+				const rot = 0;
+				flags.push({ net, x: w.x, y: w.y, ex, ey, rot });
+			}
+			const KIND: Record<string, string> = {};
+			for (const net of Object.keys(powerIn)) {
+				const u = net.toUpperCase();
+				KIND[net] =
+					u === 'AGND' || u === 'GNDA'
+						? 'AnalogGround'
+						: u === 'PGND' || u === 'EARTH'
+							? 'ProtectGround'
+							: ['GND', 'DGND', 'SGND', 'VSS', 'VEE', 'GNDD'].includes(u)
+								? 'Ground'
+								: 'Power';
+			}
+
 			const summary = {
 				parts: parts.size,
 				nets: nets.length,
@@ -199,6 +269,15 @@ export const layoutTools: ToolDef[] = [
 				const olds = await eda.sch_PrimitiveWire.getAll();
 				let removed = 0;
 				for (const w of olds) { await eda.sch_PrimitiveWire.delete(w.primitiveId).catch(() => {}); removed += 1; }
+				// 旧的电源地符号一并清掉，稍后按新位置重放；留着就是一堆孤儿
+				const comps = await eda.sch_PrimitiveComponent.getAll();
+				let flagsRemoved = 0;
+				for (const c of comps) {
+					if (c.componentType === 'netflag') {
+						await eda.sch_PrimitiveComponent.delete(c.primitiveId).catch(() => {});
+						flagsRemoved += 1;
+					}
+				}
 				let moved = 0;
 				for (const m of MOVES) {
 					const r = await eda.sch_PrimitiveComponent.modify(m.id, {
@@ -211,7 +290,17 @@ export const layoutTools: ToolDef[] = [
 					const ok = await eda.sch_PrimitiveWire.create(w.points, w.net);
 					if (ok) drawn += 1;
 				}
-				return { wires_removed: removed, parts_moved: moved, wires_drawn: drawn };
+				// 电源地符号：引一小段线，末端放符号。线不带网络名 —— 否则导线的
+				// NET 标签和符号名会把同一个网络名画两遍，挤在一起。
+				const FLAGS = ${JSON.stringify(flags)};
+				const KINDS = ${JSON.stringify(KIND)};
+				let flagsDrawn = 0;
+				for (const f of FLAGS) {
+					await eda.sch_PrimitiveWire.create([f.x, f.y, f.ex, f.ey]).catch(() => {});
+					const ok = await eda.sch_PrimitiveComponent.createNetFlag(KINDS[f.net] || 'Ground', f.net, f.ex, f.ey, f.rot);
+					if (ok) flagsDrawn += 1;
+				}
+				return { wires_removed: removed, parts_moved: moved, wires_drawn: drawn, flags_removed: flagsRemoved, flags_drawn: flagsDrawn };
 			`,
 				180_000,
 			);

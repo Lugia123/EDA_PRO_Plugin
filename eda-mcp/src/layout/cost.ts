@@ -8,7 +8,17 @@
  * 优化阶段不做真实布线（太慢），用曼哈顿距离和线段相交做快速估计；
  * 收敛之后再跑一次真正的 A* 布线。
  */
-import { type Box, type Layout, type Net, type Part, dirVec, overlapArea, partBox, pinWorld } from './model.js';
+import {
+	type Box,
+	type Layout,
+	type Net,
+	type Part,
+	SYMBOL_RESERVE,
+	dirVec,
+	overlapArea,
+	partBox,
+	pinWorld,
+} from './model.js';
 
 export interface Weights {
 	/** 器件互相压住 —— 最严重，压住就没法看 */
@@ -25,6 +35,8 @@ export interface Weights {
 	netSpread: number;
 	/** 器件贴得太近 —— 不重叠不代表能看，导线得有地方走 */
 	tooClose: number;
+	/** 接地的引脚没朝下、接电源的引脚没朝上 */
+	supplyDir: number;
 }
 
 /** 器件之间至少要留出的间隙，小于它就开始罚。留给走线和文字。
@@ -44,6 +56,9 @@ export const DEFAULT_WEIGHTS: Weights = {
 	pinFacing: 250,
 	netSpread: 0.3,
 	tooClose: 6,
+	// 「电源在上、地在下」是原理图最强的视觉约定，值得给个不低的权重，
+	// 让退火主动把器件转到地脚朝下的姿势，而不是事后硬掰符号方向。
+	supplyDir: 60,
 };
 
 export interface CostBreakdown {
@@ -55,6 +70,7 @@ export interface CostBreakdown {
 	pinFacing: number;
 	netSpread: number;
 	tooClose: number;
+	supplyDir: number;
 }
 
 /** 两个盒子的间隙（负数表示重叠）。取两轴间隙的较大者：
@@ -91,10 +107,24 @@ export function evaluate(
 ): CostBreakdown {
 	const ids = [...parts.keys()];
 	const boxes = new Map<string, Box>();
+	// 挂符号的引脚，在它朝外那一侧占一块地。符号本身不是 part，
+	// 不替它占位的话，布局一收紧符号就压到邻居身上了。
+	const reserved: Box[] = [];
 	for (const id of ids) {
 		const p = parts.get(id);
 		const pl = layout.get(id);
-		if (p && pl) boxes.set(id, partBox(p, pl));
+		if (!p || !pl) continue;
+		boxes.set(id, partBox(p, pl));
+		for (const pid of p.stubPins ?? []) {
+			const pin = p.pins.find((q) => q.id === pid);
+			if (!pin) continue;
+			const w = pinWorld(p, pl, pin);
+			const [vx, vy] = dirVec(w.dir);
+			const cx = w.x + (vx * SYMBOL_RESERVE) / 2;
+			const cy = w.y + (vy * SYMBOL_RESERVE) / 2;
+			const half = SYMBOL_RESERVE / 2;
+			reserved.push({ minX: cx - half, minY: cy - half, maxX: cx + half, maxY: cy + half });
+		}
 	}
 
 	// ── 器件重叠，以及「不重叠但贴太近」──
@@ -110,6 +140,14 @@ export function evaluate(
 			const gap = gapBetween(a, b);
 			// 只罚 0 到 MIN_GAP 之间的：已经重叠的交给 partOverlap，离得远的不管
 			if (gap >= 0 && gap < MIN_GAP) tooClose += MIN_GAP - gap;
+		}
+		// 别的器件压到本器件的符号占位上，同样算重叠
+		for (const rbox of reserved) {
+			const ov = overlapArea(a, rbox);
+			// 占位是从自己的引脚长出来的，跟自己重叠不算数
+			if (ov > 0 && !(rbox.minX >= a.minX && rbox.maxX <= a.maxX && rbox.minY >= a.minY && rbox.maxY <= a.maxY)) {
+				partOverlap += ov * 0.6;
+			}
 		}
 	}
 
@@ -128,6 +166,21 @@ export function evaluate(
 		for (const id of ids) {
 			const b = boxes.get(id);
 			if (b) textOverlap += overlapArea(t, b);
+		}
+	}
+
+	// ── 电源地引脚的朝向：接地的该朝下（270），接电源的该朝上（90）──
+	let supplyDir = 0;
+	for (const id of ids) {
+		const p = parts.get(id);
+		const pl = layout.get(id);
+		if (!p || !pl) continue;
+		for (const pid of p.stubPins ?? []) {
+			const pin = p.pins.find((q) => q.id === pid);
+			if (!pin) continue;
+			const w = pinWorld(p, pl, pin);
+			const want = (p.stubUp ?? []).includes(pid) ? 90 : 270;
+			if (w.dir !== want) supplyDir += w.dir === (want + 180) % 360 ? 2 : 1; // 完全反向罚双倍
 		}
 	}
 
@@ -217,7 +270,8 @@ export function evaluate(
 		weights.crossing * crossing +
 		weights.pinFacing * pinFacing +
 		weights.netSpread * netSpread +
-		weights.tooClose * tooClose;
+		weights.tooClose * tooClose +
+		weights.supplyDir * supplyDir;
 
-	return { total, partOverlap, textOverlap, wireLength, crossing, pinFacing, netSpread, tooClose };
+	return { total, partOverlap, textOverlap, wireLength, crossing, pinFacing, netSpread, tooClose, supplyDir };
 }

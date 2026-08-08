@@ -974,9 +974,13 @@ export const schematicEditTools: ToolDef[] = [
 						}
 						if (best >= 2) floating.push({ ref: label + '.' + String(p.pinNumber), name: String(p.pinName || ''), xy: [p.x, p.y] });
 					}
-					if (c.componentType === 'part') {
+					// 电源符号、地符号、端口也要参与重叠检测。
+					// 只收 part 会漏掉最常见的一类压叠：布局收紧后地符号压在电容身上 ——
+					// 实测漏报过三处（C2/C3/C4 各被 GND 符号压住 17x10），
+					// 体检却报「通过」。假阳性的体检比不体检更坏。
+					if (c.componentType !== 'sheet') {
 						const b = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => null);
-						if (b) boxes.push({ des: label, b });
+						if (b) boxes.push({ des: label + (c.componentType === 'part' ? '' : '[' + c.componentType + ']'), b });
 					}
 				}
 
