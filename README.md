@@ -42,8 +42,8 @@ eda_pair_start → 6 位配对码 → 用户在 EDA 扩展面板输入 → 换�
 ### 1. 装 plugin
 
 ```bash
-# 在 Claude Code 里
-/plugin marketplace add /Users/lugia/hardware/EDA_PRO_Plugin/plugin
+# 在 Claude Code 里，把路径换成本仓库 clone 到的位置
+/plugin marketplace add /path/to/EDA_PRO_Plugin/plugin
 /plugin install eda-pro@eda-pro-plugins
 ```
 
