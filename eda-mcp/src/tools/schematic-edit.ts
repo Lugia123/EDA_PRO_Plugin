@@ -921,10 +921,19 @@ export const schematicEditTools: ToolDef[] = [
 					items: { type: 'string' },
 					description: '允许悬空的引脚，如 ["U2.2","U2.3"]（未用 IO、NC 空脚、只发不收的 RO 等）',
 				},
+				sheet: {
+					type: 'object',
+					description:
+						'图纸尺寸 {w,h}（0.01 inch）。**改过图纸就要传** —— titleBlockData 里的尺寸' +
+						'字段常读不到（实测返回 null），读不到就只能退回 A4 1170×825，' +
+						'于是 A3 上画的图会被误判成大面积出框。',
+					properties: { w: { type: 'number' }, h: { type: 'number' } },
+				},
 			},
 		},
 		handler: async (args, ctx) => {
 			const allow = new Set((Array.isArray(args.allow_floating) ? (args.allow_floating as string[]) : []).map((x) => String(x).toUpperCase()));
+			const sheetIn = args.sheet as { w?: number; h?: number } | undefined;
 			const r = await ctx.exec<Record<string, unknown>>(
 				`
 				${ENSURE_SCH}
@@ -1038,8 +1047,8 @@ export const schematicEditTools: ToolDef[] = [
 
 				// 出框：拿图纸尺寸比
 				const tb = _page.titleBlockData || {};
-				const W = tb.Width && tb.Width.value ? Number(tb.Width.value) : 1170;
-				const H = tb.Height && tb.Height.value ? Number(tb.Height.value) : 825;
+				const W = ${sheetIn?.w ?? 0} || (tb.Width && tb.Width.value ? Number(tb.Width.value) : 1170);
+				const H = ${sheetIn?.h ?? 0} || (tb.Height && tb.Height.value ? Number(tb.Height.value) : 825);
 				const outside = boxes
 					.filter((x) => x.b.minX < 0 || x.b.minY < 0 || x.b.maxX > W || x.b.maxY > H)
 					.map((x) => x.des + '(' + Math.round(x.b.minX) + ',' + Math.round(x.b.minY) + '..' + Math.round(x.b.maxX) + ',' + Math.round(x.b.maxY) + ')');

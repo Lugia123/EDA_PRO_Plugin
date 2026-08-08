@@ -4,6 +4,7 @@ import { createTools } from './create.js';
 import { datasheetTools } from './datasheet.js';
 import { layoutTools } from './layout-tool.js';
 import { libraryTools } from './library.js';
+import { mapApplyTools } from './map-apply.js';
 import { mapTools } from './map-tool.js';
 import { pcbTools } from './pcb.js';
 import { projectTools } from './project.js';
@@ -18,6 +19,7 @@ export const allTools: ToolDef[] = [
 	...schematicEditTools,
 	...layoutTools,
 	...mapTools,
+	...mapApplyTools,
 	...libraryTools,
 	...datasheetTools,
 	...createTools,

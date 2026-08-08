@@ -211,13 +211,62 @@ export const mapTools: ToolDef[] = [
 						}
 					}
 				}
-				// 电源地符号也算网络成员：它们本身是器件，引脚落在线上
+				// 电源地和端口要**从符号反推**，不能靠导线的网络名。
+				// 符号的引出线是刻意不带网络名的（带了会让同一个网络名画两遍，
+				// 挤在一小段线的两端），所以那些线段在 wireNet 里查不到归属。
+				// 做法：把所有线段当成图，从符号引脚出发做连通搜索，
+				// 沿途碰到的器件引脚就归这个符号的网络。
+				// 只收**没有网络名**的线段。带名字的线段已经属于某条具体网络，
+				// 顺着它继续走就会把两条无关网络串成一条 —— 实测 +3V3 因此吞掉了
+				// 整个 RESET 网络的成员。符号的引出线恰恰都是不带名字的，够用。
+				const allSegs = [];
+				for (const ln of lines) {
+					if (ln.indexOf('"type":"LINE"') < 0) continue;
+					const q = ln.indexOf('||');
+					if (q < 0) continue;
+					let b = ln.slice(q + 2);
+					const l = b.lastIndexOf('|');
+					if (l >= 0) b = b.slice(0, l);
+					let o = null;
+					try { o = JSON.parse(b); } catch (e) { continue; }
+					if (o.startX == null) continue;
+					if (wireNet[String(o.lineGroup)]) continue;
+					allSegs.push({ x1: o.startX, y1: -o.startY, x2: o.endX, y2: -o.endY });
+				}
+				const near = (ax, ay, bx, by) => Math.abs(ax - bx) + Math.abs(ay - by) < 3;
 				for (const c of all) {
 					if (c.componentType !== 'netflag' && c.componentType !== 'netport') continue;
-					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
 					const nm = String(c.name || '');
 					if (!nm) continue;
 					if (!nets[nm]) nets[nm] = [];
+					const symPins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					// 从符号的每个引脚出发，顺着线段一路走
+					const frontier = (symPins || []).map((p) => ({ x: p.x, y: p.y }));
+					const seen = [];
+					const usedSeg = {};
+					let guard = 0;
+					while (frontier.length && guard < 400) {
+						guard += 1;
+						const cur = frontier.pop();
+						if (seen.some((s) => near(s.x, s.y, cur.x, cur.y))) continue;
+						seen.push(cur);
+						// 落在这个点上的器件引脚
+						for (const pr of pinRefs) {
+							if (near(pr.x, pr.y, cur.x, cur.y) && nets[nm].indexOf(pr.ref) < 0) nets[nm].push(pr.ref);
+						}
+						// 顺着共端点的线段继续走
+						for (let si = 0; si < allSegs.length; si++) {
+							if (usedSeg[si]) continue;
+							const s2 = allSegs[si];
+							if (near(s2.x1, s2.y1, cur.x, cur.y)) {
+								usedSeg[si] = 1;
+								frontier.push({ x: s2.x2, y: s2.y2 });
+							} else if (near(s2.x2, s2.y2, cur.x, cur.y)) {
+								usedSeg[si] = 1;
+								frontier.push({ x: s2.x1, y: s2.y1 });
+							}
+						}
+					}
 				}
 
 				const tb = _page.titleBlockData || {};

@@ -38,7 +38,15 @@ createServer((req, res) => {
 		void (async () => {
 			try {
 				const { tool, args } = JSON.parse(body) as { tool: string; args?: Record<string, unknown> };
-				const r = await client.callTool({ name: tool, arguments: args ?? {} });
+				// MCP SDK 默认 60 秒就判超时，而布局渲染这类工具要跑好几分钟
+				// （几十次 EDA 写操作，中间还会因删图元触发扩展重连）。
+				// 超时不代表失败 —— 动作还在继续执行，只是拿不到回包，
+				// 反倒让人误以为工具坏了。给足 15 分钟。
+				const r = await client.callTool(
+					{ name: tool, arguments: args ?? {} },
+					undefined,
+					{ timeout: 900_000, resetTimeoutOnProgress: true },
+				);
 				const text = ((r as { content?: Array<{ text?: string }> }).content ?? []).map((c) => c.text ?? '').join('\n');
 				res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
 				res.end(text || '{}');

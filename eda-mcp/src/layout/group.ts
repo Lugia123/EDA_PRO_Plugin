@@ -253,7 +253,9 @@ export function layoutByGroups(
 	const gRes =
 		groupIds.length > 1
 			? anneal(gParts, gNets, gInit, {
-					iterations: Math.max(4000, iterations / 3),
+					// 组间摆放看着简单（只有几个矩形），但解空间是离散的、代价面很崎岖：
+					// 三个区排成一行、一列、还是 2x2，差别巨大。迭代给足才找得到能塞进图纸的排布。
+					iterations: Math.max(20000, iterations),
 					weights: gWeights,
 					seed: seed + 101,
 					bounds: { minX: margin, minY: margin, maxX: sheet.w - margin, maxY: sheet.h - margin },
