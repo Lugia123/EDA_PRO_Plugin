@@ -5,7 +5,7 @@
  * 换台机器、别人打开工程，地图都还在，才谈得上「下次接着优化」。
  * 载体选了 sch_PrimitiveText：实测单个文字图元存 60000 字符仍然无损。
  */
-import { EMPTY_MAP, type SchematicMap, guessNetKind, defaultStyle, validateMap } from '../layout/map.js';
+import { EMPTY_MAP, MAP_MARK, type SchematicMap, guessNetKind, defaultStyle, packMap, unpackMap, validateMap } from '../layout/map.js';
 import type { ToolDef } from './types.js';
 
 const ENSURE_SCH = `
@@ -13,8 +13,8 @@ const ENSURE_SCH = `
 	if (!_page) return { error: 'NOT_SCH_EDITOR' };
 `;
 
-/** 地图文字图元的标记前缀，靠它在图上认出哪一条是地图 */
-const MARK = 'EDAMCP_MAP_V1:';
+/** 标记前缀与打包方式统一放在 layout/map.ts，存与读必须用同一份 */
+const MARK = MAP_MARK;
 /** 地图存放的位置：图纸左下角外侧，字号最小，不干扰读图 */
 const MAP_X = -400;
 const MAP_Y = -400;
@@ -44,7 +44,7 @@ export const mapTools: ToolDef[] = [
 
 			map.version = 1;
 			map.meta = { ...(map.meta ?? { sheet: { w: 1170, h: 825 }, grid: 10 }), updatedAt: new Date().toISOString() };
-			const payload = MARK + JSON.stringify(map);
+			const payload = packMap(map);
 
 			const r = await ctx.exec<Record<string, unknown>>(
 				`
@@ -100,7 +100,7 @@ export const mapTools: ToolDef[] = [
 			if (r.error) return { error: '当前编辑器里没有打开原理图页' };
 			if (!r.raw) return { exists: false, map: EMPTY_MAP, note: '这张图还没有地图。用 eda_map_import 从现有图生成一份。' };
 			try {
-				const map = JSON.parse(r.raw) as SchematicMap;
+				const map = unpackMap(r.raw);
 				return {
 					exists: true,
 					map,

@@ -164,3 +164,30 @@ export function validateMap(m: SchematicMap): string[] {
 	}
 	return errs;
 }
+
+/** 地图文字图元的标记前缀，靠它在图上认出哪一条是地图 */
+export const MAP_MARK = 'EDAMCP_MAP_V1:';
+
+/**
+ * 地图切成短行再存。
+ *
+ * 地图是当作**一个文字图元**存进图纸的，六七千字符挤在一行，这个图元的
+ * 渲染宽度就有两万多个单位（图纸本身才 1655）—— 画布包围盒被它一路撑到
+ * 二十多米宽，于是 `zoomToAllPrimitives`、界面上的「适应全部」全部失效，
+ * 缩放卡在 7%，图上的电路缩成左上角一个小点，根本没法看。
+ *
+ * 切成短行之后，渲染宽度按最长的一行算，包围盒就回到正常范围。
+ */
+const MAP_CHUNK = 96;
+
+export function packMap(map: SchematicMap): string {
+	const json = JSON.stringify(map);
+	const lines: string[] = [];
+	for (let i = 0; i < json.length; i += MAP_CHUNK) lines.push(json.slice(i, i + MAP_CHUNK));
+	return MAP_MARK + '\n' + lines.join('\n');
+}
+
+/** 读回地图。换行是存的时候加的，解析前一律去掉；旧的单行格式也照样能读 */
+export function unpackMap(rawAfterMark: string): SchematicMap {
+	return JSON.parse(rawAfterMark.replace(/[\r\n]+/g, '')) as SchematicMap;
+}

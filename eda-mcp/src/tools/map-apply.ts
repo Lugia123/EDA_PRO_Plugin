@@ -6,7 +6,8 @@
  */
 import { layoutByGroups } from '../layout/group.js';
 import { LABEL_SLOTS, type Layout, type Net, type Part, type Rotation, dirVec, pinWorld } from '../layout/model.js';
-import type { NetKind, SchematicMap } from '../layout/map.js';
+import { MAP_MARK, type NetKind, type SchematicMap, defaultStyle, packMap } from '../layout/map.js';
+import { Trace, checkRouteEndpoints } from '../layout/trace.js';
 import type { ToolDef } from './types.js';
 import { census, diffCensus } from './verify.js';
 
@@ -14,7 +15,8 @@ const ENSURE_SCH = `
 	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
 	if (!_page) return { error: 'NOT_SCH_EDITOR' };
 `;
-const MARK = 'EDAMCP_MAP_V1:';
+/** 标记前缀与打包方式统一放在 layout/map.ts —— 存与读必须用同一份 */
+const MARK = MAP_MARK;
 
 /** 网络性质 → EDA 的符号种类 */
 const FLAG_OF: Record<NetKind, string | null> = {
@@ -44,6 +46,14 @@ export const mapApplyTools: ToolDef[] = [
 				map: { type: 'object', description: '地图；不传则读图纸里存的那份' },
 				iterations: { type: 'number', description: '每组退火迭代次数，默认 20000' },
 				dry_run: { type: 'boolean', description: '只算不画，先看能优化到什么程度' },
+				trace: {
+					type: 'boolean',
+					description:
+						'过程日志，**默认开**。返回里的 trace.issues 会直接指出是哪一步出的问题' +
+						'（引脚端点没对上、网络被跳过、某步写失败），不用回头翻代码猜。' +
+						'trace_full=true 时连正常流水一起返回。',
+				},
+				trace_full: { type: 'boolean', description: '返回完整流水而不只是问题行，默认 false' },
 				save_map: { type: 'boolean', description: '是否把优化结果写回地图，默认 true' },
 			},
 		},
@@ -51,6 +61,8 @@ export const mapApplyTools: ToolDef[] = [
 		handler: async (args, ctx) => {
 			const iterations = typeof args.iterations === 'number' ? args.iterations : 20000;
 			const dryRun = args.dry_run === true;
+			const trace = new Trace(args.trace !== false);
+			const traceFull = args.trace_full === true;
 			const saveMap = args.save_map !== false;
 
 			let map = args.map as SchematicMap | undefined;
@@ -95,10 +107,22 @@ export const mapApplyTools: ToolDef[] = [
 			const anchors = new Map<string, { x: number; y: number }>();
 			for (const g of map.groups) if (g.anchor) anchors.set(g.id, g.anchor);
 
-			// 要画线的只有 signal；电源地走符号，跨区走端口
-			const wireNets: Net[] = map.nets
+			// 布局与渲染看的是两件事，不能用同一份网络列表：
+			//
+			//   布局要看**所有电气连接** —— 谁跟谁有关系就该摆在一起。
+			//   渲染只画**声明了 wire 画法**的那些，port 走端口、电源地走符号。
+			//
+			// 混为一谈两头都出错：只按 kind 筛，port 网络会被多画一遍导线；
+			// 只按 style 筛，布局就看不见 port 网络的亲和关系 —— IO_KEY 连着
+			// 同一个区里的 R4 和 SW2，布局不知道，于是把 io 区的六个器件排成
+			// 一列 220×1040 的长条，直接顶出图纸。
+			const layoutNets: Net[] = map.nets
 				.filter((n) => n.kind === 'signal' && n.pins.length >= 2)
 				.map((n) => ({ id: n.id, pins: n.pins }));
+			const wireNetIds = new Set(
+				map.nets.filter((n) => (n.style ?? defaultStyle(n.kind)) === 'wire').map((n) => n.id),
+			);
+			const wireNets = layoutNets.filter((n) => wireNetIds.has(n.id));
 			const symbolNets = map.nets.filter((n) => n.kind !== 'signal');
 
 			// 挂符号的引脚要预留位置，否则布局收紧后符号会压在邻居身上
@@ -116,7 +140,7 @@ export const mapApplyTools: ToolDef[] = [
 			}
 
 			const t0 = Date.now();
-			const res = layoutByGroups(parts, wireNets, assign, titles, {
+			const res = layoutByGroups(parts, layoutNets, assign, titles, {
 				iterations,
 				sheet: map.meta.sheet,
 				anchors: anchors.size ? anchors : undefined,
@@ -129,7 +153,63 @@ export const mapApplyTools: ToolDef[] = [
 				const pid = idToPrimitive.get(des);
 				if (pid) moves.push({ id: pid, x: pl.x, y: pl.y, rotation: pl.rot, mirror: pl.mirror });
 			}
-			const wires = res.routed.nets.flatMap((n) => n.paths.map((p) => ({ net: n.netId, points: p.flat() })));
+			// 只画声明了 wire 的；port/symbol 的路径算了但不落笔
+			const wires = res.routed.nets
+				.filter((n) => wireNetIds.has(n.netId))
+				.flatMap((n) => n.paths.map((p) => ({ net: n.netId, points: p.flat() })));
+
+			// ── 过程日志 ──
+			// 记的都是能判对错的数字：谁被跳过了、每个区多大、引脚端点差多少。
+			trace.at('地图');
+			trace.log(`器件 ${parts.size}，网络 ${map.nets.length}`, {
+				画线: wireNets.length,
+				符号: symbolNets.length,
+				跨区端口: res.crossGroupNets.length,
+			});
+			for (const n of map.nets) {
+				const style = n.style ?? defaultStyle(n.kind);
+				if (style !== 'wire' && n.kind === 'signal') {
+					trace.log(`网络 ${n.id} 不画导线（style=${style}）`, { 引脚: n.pins });
+				}
+				if (n.pins.length < 2) trace.warn(`网络 ${n.id} 只有 ${n.pins.length} 个引脚，连不成`, {});
+			}
+			trace.at('分组布局');
+			for (const g of res.groups) {
+				trace.log(`区 ${g.id}`, {
+					尺寸: `${g.maxX - g.minX}×${g.maxY - g.minY}`,
+					框: [g.minX, g.minY, g.maxX, g.maxY],
+				});
+			}
+			for (const a of res.groups) {
+				for (const b of res.groups) {
+					if (a.id >= b.id) continue;
+					const hit = a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
+					if (hit) trace.error(`分区框 ${a.id} 与 ${b.id} 重叠`, { a: [a.minX, a.minY, a.maxX, a.maxY], b: [b.minX, b.minY, b.maxX, b.maxY] });
+				}
+			}
+			for (const w of res.warnings) trace.warn(w, {});
+
+			// 引脚的精确世界坐标 —— 判定「线到底有没有接到引脚上」的唯一依据
+			const pinXY = new Map<string, { x: number; y: number }>();
+			for (const [des, pl] of res.layout) {
+				const part = parts.get(des);
+				if (!part) continue;
+				for (const pin of part.pins) {
+					const w = pinWorld(part, pl, pin);
+					pinXY.set(`${des}.${pin.id}`, { x: w.x, y: w.y });
+				}
+			}
+			const endpointBad = checkRouteEndpoints(
+				trace,
+				res.routed.nets
+					.filter((n) => wireNetIds.has(n.netId))
+					.map((n) => ({
+						id: n.netId,
+						pins: wireNets.find((w) => w.id === n.netId)?.pins ?? [],
+						paths: n.paths,
+					})),
+				pinXY,
+			);
 
 			// 电源地符号：引一小段线，末端放符号。朝向固定 —— 地朝下、电源朝上
 			const flags: Array<{ kind: string; net: string; x: number; y: number; ex: number; ey: number }> = [];
@@ -158,11 +238,13 @@ export const mapApplyTools: ToolDef[] = [
 				}
 			}
 
-			// 跨区网络用端口。它们不参与布线，靠同名端口相连
+			// 跨区网络用端口。它们不参与布线，靠同名端口相连。
+			// 判据是**地图声明的 style**，不是 res.crossGroupNets ——
+			// 后者由 layoutByGroups 从它收到的网络里算，而 port 网络压根没传给它，
+			// 于是那个列表恒为空、端口一个也画不出来。AI 说了用端口就画端口。
 			const ports: Array<{ dir: string; net: string; x: number; y: number; ex: number; ey: number }> = [];
-			for (const netId of res.crossGroupNets) {
-				const n = map.nets.find((x) => x.id === netId);
-				if (!n || n.kind !== 'signal') continue;
+			for (const n of map.nets) {
+				if ((n.style ?? defaultStyle(n.kind)) !== 'port') continue;
 				for (const ref of n.pins) {
 					const dot = ref.lastIndexOf('.');
 					if (dot <= 0) continue;
@@ -198,7 +280,23 @@ export const mapApplyTools: ToolDef[] = [
 				rotated: [...res.layout.values()].filter((p) => p.rot === 90 || p.rot === 270).length,
 				warnings: res.warnings,
 			};
-			if (dryRun) return { ...summary, dry_run: true, note: '只算了没画。去掉 dry_run 才会落到图上。' };
+			const traceOut = () => ({
+				trace: trace.enabled
+					? { ...trace.summary(), ...(traceFull ? { full: trace.format() } : {}) }
+					: undefined,
+			});
+			if (dryRun) {
+				return {
+					...summary,
+					...traceOut(),
+					endpoint_mismatches: endpointBad,
+					dry_run: true,
+					note:
+						endpointBad > 0
+							? `只算了没画。**但有 ${endpointBad} 个引脚端点没落在自己的线上** —— 看 trace.lines，画上去也是断的。`
+							: '只算了没画。去掉 dry_run 才会落到图上。',
+				};
+			}
 
 			// ── 渲染：分步执行 ──
 			// 不能塞进一次 exec：删图元会让扩展重连（sch_PrimitiveComponent.delete
@@ -207,10 +305,16 @@ export const mapApplyTools: ToolDef[] = [
 			// 断了也只影响那一步，而且能报出是哪步没做完。
 			const steps: Record<string, unknown> = {};
 			const runStep = async (name: string, code: string, timeout = 120_000): Promise<void> => {
+				trace.at(`渲染:${name}`);
 				try {
-					steps[name] = await ctx.exec<Record<string, unknown>>(`${ENSURE_SCH}${code}`, timeout);
+					const r = await ctx.exec<Record<string, unknown>>(`${ENSURE_SCH}${code}`, timeout);
+					steps[name] = r;
+					if (r && typeof r === 'object' && 'error' in r) trace.error(`这一步返回了错误`, r as Record<string, unknown>);
+					else trace.log('完成', r as Record<string, unknown>);
 				} catch (e) {
-					steps[name] = { failed: e instanceof Error ? e.message : String(e) };
+					const msg = e instanceof Error ? e.message : String(e);
+					steps[name] = { failed: msg };
+					trace.error(`这一步抛错，后面的步骤会在残图上继续`, { error: msg });
 				}
 			};
 
@@ -361,7 +465,7 @@ export const mapApplyTools: ToolDef[] = [
 					if (r) n.routes = r.paths;
 				}
 				map.meta.updatedAt = new Date().toISOString();
-				const payload = MARK + JSON.stringify(map);
+				const payload = packMap(map);
 				mapSaved = await ctx.exec<Record<string, unknown>>(
 					`
 					${ENSURE_SCH}
@@ -397,9 +501,14 @@ export const mapApplyTools: ToolDef[] = [
 				notes.push('**图纸内容摘要前后没变 —— 这一趟很可能一步都没生效**，逐条看 steps 里有没有 failed。');
 			}
 
+			if (endpointBad > 0) {
+				notes.push(`**${endpointBad} 个引脚端点没落在自己的线上**，图上看着连了实际是断的 —— 看 trace.lines。`);
+			}
 			return {
 				...summary,
 				...applied,
+				...traceOut(),
+				endpoint_mismatches: endpointBad,
 				map_saved: mapSaved,
 				census_diff: diff ? { delta: diff.delta, changed: diff.changed, summary: diff.summary } : undefined,
 				note: notes.join(' '),

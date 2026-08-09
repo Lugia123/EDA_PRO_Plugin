@@ -226,8 +226,12 @@ export function layoutByGroups(
 			w: s.w + GROUP_GAP,
 			h: s.h + GROUP_GAP,
 			pins: [{ id: 'c', dx: 0, dy: 0, dir: 0 }],
-			// AI 指定了位置就锁死，不再参与优化
-			fixed: pinned != null,
+			// anchor 是**软**约束：拿它当起点，但仍参与退火。
+			// 原来这里按 `fixed: pinned != null` 锁死，结果 AI 随手给的三个
+			// 等距 anchor 一旦装不下（某个组比间距还宽），组框就直接叠在一起，
+			// 算法明明有重叠代价却动不了它们。MapGroup.anchor 的语义本来就是
+			// 「期望位置，算法在附近安排」—— 实现跟设计对齐。
+			fixed: false,
 		});
 		if (pinned) {
 			gInit.set(g, { x: snap(pinned.x), y: snap(pinned.y), rot: 0, mirror: false });

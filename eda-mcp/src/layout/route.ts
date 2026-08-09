@@ -128,6 +128,16 @@ export function route(
 		for (let x = x0; x <= x1; x += GRID) for (let y = y0; y <= y1; y += GRID) blocked.add(key(x, y));
 	}
 	const pinCells = new Map<string, { x: number; y: number; dir: Rotation }>();
+	/**
+	 * 引脚的**精确**世界坐标。
+	 *
+	 * 搜索必须在网格上进行，所以上面把引脚吸附到了最近的格点；但引脚本身
+	 * 往往不在格点上 —— ATTINY85 的引脚 y 是 255/245/235/225，GRID 是 10，
+	 * 吸附后差 5。导线端点全是格点的倍数，于是**数学上永远碰不到引脚**：
+	 * 图上看着线都拉到芯片边上了，实际每根都差半格，引脚全部悬空。
+	 * 走线算完后要用这份精确坐标把首尾接回真正的引脚。
+	 */
+	const pinExact = new Map<string, { x: number; y: number }>();
 	/** 引脚所在格 → 该引脚的 ref。走线经过别人的引脚就是误连，必须拦住 */
 	const pinAt = new Map<number, string>();
 	for (const [id, pl] of layout) {
@@ -139,6 +149,7 @@ export function route(
 			const gy = Math.round(w.y / GRID) * GRID;
 			const ref = `${id}.${pin.id}`;
 			pinCells.set(ref, { x: gx, y: gy, dir: w.dir });
+			pinExact.set(ref, { x: w.x, y: w.y });
 			pinAt.set(key(gx, gy), ref);
 			blocked.delete(key(gx, gy));
 			// 把引脚正前方一格也挖开，保证有出口
@@ -259,6 +270,28 @@ export function route(
 				const collinear = (a[0] === b[0] && b[0] === c[0]) || (a[1] === b[1] && b[1] === c[1]);
 				if (!collinear) poly.push(b);
 			}
+			// ── 把首尾从格点接回真正的引脚 ──
+			// poly 是从 found（已接入本网络的那一端）回溯到 start（target 引脚），
+			// 两头都还停在格点上。差的这几个单位不接回去，引脚就是悬空的。
+			// 接的时候保持正交：两个轴都偏了才插一个拐点，通常只偏一个轴。
+			const stitch = (grid: [number, number], ex: { x: number; y: number }): Array<[number, number]> => {
+				const seg: Array<[number, number]> = [];
+				if (grid[0] !== ex.x && grid[1] !== ex.y) seg.push([ex.x, grid[1]]);
+				seg.push([ex.x, ex.y]);
+				return seg;
+			};
+			const tailExact = pinExact.get(target.ref);
+			const tail = poly[poly.length - 1];
+			if (tailExact && tail && (tail[0] !== tailExact.x || tail[1] !== tailExact.y)) {
+				poly.push(...stitch(tail, tailExact));
+			}
+			const headRef = pinAt.get(found);
+			const headExact = headRef && ownPins.has(headRef) ? pinExact.get(headRef) : undefined;
+			const head = poly[0];
+			if (headExact && head && (head[0] !== headExact.x || head[1] !== headExact.y)) {
+				poly.unshift(...stitch(head, headExact).reverse());
+			}
+
 			paths.push(poly);
 			totalBends += Math.max(0, poly.length - 2);
 			for (let k = 1; k < raw.length; k++) {
