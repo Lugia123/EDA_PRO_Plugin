@@ -6,6 +6,7 @@ import { layoutTools } from './layout-tool.js';
 import { libraryTools } from './library.js';
 import { mapApplyTools } from './map-apply.js';
 import { mapTools } from './map-tool.js';
+import { netcheckTools } from './netcheck.js';
 import { pcbTools } from './pcb.js';
 import { projectTools } from './project.js';
 import { schematicEditTools } from './schematic-edit.js';
@@ -19,6 +20,7 @@ export const allTools: ToolDef[] = [
 	...projectTools,
 	...schematicTools,
 	...schematicEditTools,
+	...netcheckTools,
 	...layoutTools,
 	...mapTools,
 	...mapApplyTools,
