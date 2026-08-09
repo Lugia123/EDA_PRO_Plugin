@@ -8,6 +8,7 @@ import { layoutByGroups } from '../layout/group.js';
 import { LABEL_SLOTS, type Layout, type Net, type Part, type Rotation, dirVec, pinWorld } from '../layout/model.js';
 import type { NetKind, SchematicMap } from '../layout/map.js';
 import type { ToolDef } from './types.js';
+import { census, diffCensus } from './verify.js';
 
 const ENSURE_SCH = `
 	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
@@ -213,6 +214,11 @@ export const mapApplyTools: ToolDef[] = [
 				}
 			};
 
+			// 渲染前后各普查一次。每一步自己报的 drawn 数只代表「调用没报错」，
+			// 而这条链上有十几次写操作、中间还可能断连重连；只有前后一比才知道
+			// 图纸整体到底变成了什么样 —— 尤其能抓住「一步都没生效」这种情形。
+			const before = await census(ctx).catch(() => null);
+
 			await runStep(
 				'清导线',
 				`
@@ -372,14 +378,31 @@ export const mapApplyTools: ToolDef[] = [
 				);
 			}
 
+			// 回读确认整张图确实变了，并跟「本该画多少」对一对
+			// 刻意不声明 expect：清场删了多少、器件数怎么变，算起来绕且容易算错，
+			// 而一个算错的预期会变成假阳性告警 —— 那比不检查更坏。这里只报实际
+			// 变化量，「一步都没生效」这类硬失败靠 changed 就足以抓住。
+			const after = before ? await census(ctx).catch(() => null) : null;
+			const diff = before && after ? diffCensus(before, after) : null;
+
+			const notes: string[] = [];
+			if (res.routed.failedCount > 0) {
+				notes.push(
+					`${res.routed.failedCount} 条连接没走通，多半是分区之间没留够通道 —— 加大 iterations，或给分区换个 anchor。`,
+				);
+			} else {
+				notes.push('布局、走线、符号、分区框都已重画，结果已写回地图。文字位置算过但落不到图上（EDA 不开放属性文字的位置修改）。');
+			}
+			if (diff && !diff.changed) {
+				notes.push('**图纸内容摘要前后没变 —— 这一趟很可能一步都没生效**，逐条看 steps 里有没有 failed。');
+			}
+
 			return {
 				...summary,
 				...applied,
 				map_saved: mapSaved,
-				note:
-					res.routed.failedCount > 0
-						? `${res.routed.failedCount} 条连接没走通，多半是分区之间没留够通道 —— 加大 iterations，或给分区换个 anchor。`
-						: '布局、走线、符号、分区框都已重画，结果已写回地图。文字位置算过但落不到图上（EDA 不开放属性文字的位置修改）。',
+				census_diff: diff ? { delta: diff.delta, changed: diff.changed, summary: diff.summary } : undefined,
+				note: notes.join(' '),
 			};
 		},
 	},

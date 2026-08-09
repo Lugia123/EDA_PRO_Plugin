@@ -16,6 +16,7 @@
  */
 import type { ToolDef } from './types.js';
 import { optionalString, requireString } from './types.js';
+import { verifyPlaced } from './verify.js';
 
 const EDIT_TIMEOUT_MS = 60_000;
 
@@ -535,24 +536,49 @@ export const schematicEditTools: ToolDef[] = [
 				180_000,
 			);
 
+			// 回读确认：上面 modify 的返回值只说明「调用没报错」，说明不了器件
+			// 真的挪到位了。placed 若直接回显计算值，等于向调用方谎报排布结果。
+			const check = await verifyPlaced(
+				ctx,
+				moves.map((m) => ({ designator: m.des, x: m.x, y: m.y })),
+			);
+			const actualOf = new Map(check.checks.map((c) => [c.designator, c]));
+
 			const minY = Math.min(...moves.map((m) => m.y));
 			const minX = Math.min(...moves.map((m) => m.x));
 			const outOfFrame = minX < 40 ? `x=${minX}` : minY < 40 ? `y=${minY}` : null;
+			const warnings: string[] = [];
+			if (declared.size === 0) {
+				warnings.push('没传 nets 声明，无从判断方位，器件全堆到了右边一列 —— 补上 nets 再排一次');
+			}
+			if (minY < 40) warnings.push(`最上面的器件 y=${minY} 已贴近图框上沿，把 center_y 调大些`);
+			if (outOfFrame) warnings.push(`有器件排到了图框外（${outOfFrame}）`);
+			if (!check.allOk) warnings.push(check.summary);
+
 			return schHint({
 				ok: true,
 				core,
 				core_size: { w: coreInfo.w, h: coreInfo.h },
 				declared_pins: declared.size,
 				moved: w.moved,
-				placed: moves.map((m) => ({ des: m.des, side: m.side, x: m.x, y: m.y })),
+				// x/y 是回读到的实际位置；requested_x/y 只在两者不符时出现
+				placed: moves.map((m) => {
+					const got = actualOf.get(m.des);
+					const ok = got?.ok !== false;
+					return {
+						des: m.des,
+						side: m.side,
+						x: got?.actualX ?? m.x,
+						y: got?.actualY ?? m.y,
+						...(ok ? {} : { requested_x: m.x, requested_y: m.y, problem: got?.note }),
+					};
+				}),
+				positions_verified: check.allOk,
 				unresolved: unresolved.length ? unresolved : undefined,
-				warning:
-					declared.size === 0
-						? '没传 nets 声明，无从判断方位，器件全堆到了右边一列 —— 补上 nets 再排一次'
-						: minY < 40
-							? `最上面的器件 y=${minY} 已贴近图框上沿，把 center_y 调大些`
-							: undefined,
-				note: '块内已按声明的连接关系排布。整张图排完后跑 eda_auto_route。',
+				warning: warnings.length ? warnings.join('；') : undefined,
+				note: check.allOk
+					? '块内已按声明的连接关系排布，位置都已回读确认。整张图排完后跑 eda_auto_route。'
+					: '排布写回了，但回读发现有器件没到位 —— 先看 placed 里的 problem，别急着走线。',
 			});
 		},
 	},
