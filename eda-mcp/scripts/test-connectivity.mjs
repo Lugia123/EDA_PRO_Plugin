@@ -11,7 +11,7 @@
  *
  *   node scripts/test-connectivity.mjs
  */
-import { buildConnectivity, diffConnectivity } from '../dist/connectivity.mjs';
+import { buildConnectivity, diffConnectivity, findCrossings } from '../dist/connectivity.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -144,6 +144,27 @@ function check(name, cond, detail) {
 		{ id: 'f9', x: 100, y: 100, kind: 'flag', net: '+3V3' },
 	]);
 	check('符号贴着引脚 → 相连', c.of.get('C3.1') != null && c.of.get('C3.1') === c.of.get('f9'));
+}
+
+
+// ── 9. 导线压在器件身上 ──
+{
+	const box = [{ id: 'U1', minX: 100, minY: 100, maxX: 300, maxY: 200 }];
+	// 从器件正中间横穿
+	const through = [{ x1: 0, y1: 150, x2: 400, y2: 150, net: 'GND' }];
+	check('横穿器件 → 报出', findCrossings(through, box).length === 1);
+
+	// 贴着引脚进出（端点落在边缘），不该报
+	const atPin = [{ x1: 0, y1: 150, x2: 100, y2: 150, net: 'VIN' }];
+	check('停在器件边缘（引脚）→ 不报', findCrossings(atPin, box).length === 0, findCrossings(atPin, box));
+
+	// 完全在外面
+	const away = [{ x1: 0, y1: 0, x2: 50, y2: 0, net: 'X' }];
+	check('离得远 → 不报', findCrossings(away, box).length === 0);
+
+	// 竖着穿过
+	const vert = [{ x1: 200, y1: 0, x2: 200, y2: 400, net: 'Y' }];
+	check('竖穿器件 → 报出', findCrossings(vert, box).length === 1);
 }
 
 console.log(`\n${pass} 通过, ${fail} 失败`);

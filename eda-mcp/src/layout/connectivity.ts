@@ -285,3 +285,78 @@ export function diffConnectivity(
 
 	return { broken, shorts, orphans, ok: broken.length === 0 && shorts.length === 0 && orphans.length === 0 };
 }
+
+/** 器件包围盒，用于判断导线是否从器件身上压过去 */
+export interface PartBox {
+	id: string;
+	minX: number;
+	minY: number;
+	maxX: number;
+	maxY: number;
+}
+
+export interface Crossing {
+	part: string;
+	seg: Segment;
+	note: string;
+}
+
+/**
+ * 找出压在器件身上的导线。
+ *
+ * 为什么需要单独查：A* 走线会绕开器件（器件 bbox 的格子进了 blocked 集合），
+ * 但**电源地符号和端口的引出线不过 A\***，是从引脚直接画出去的直线 ——
+ * 那条线穿过谁没人管。图上看就是一根线从芯片身上横穿过去。
+ *
+ * bbox 要往里收一点再判：引脚本来就长在器件边缘上，不收缩的话每根正常的
+ * 引脚连线都会被判成"穿过器件"，又是一屏假警报。
+ */
+export function findCrossings(segs: Segment[], boxes: PartBox[], shrink = 6): Crossing[] {
+	const out: Crossing[] = [];
+	for (const b of boxes) {
+		const x0 = b.minX + shrink;
+		const y0 = b.minY + shrink;
+		const x1 = b.maxX - shrink;
+		const y1 = b.maxY - shrink;
+		if (x1 <= x0 || y1 <= y0) continue; // 器件太小，收缩后没了，跳过
+		for (const s of segs) {
+			if (segmentHitsBox(s, x0, y0, x1, y1)) {
+				out.push({
+					part: b.id,
+					seg: s,
+					note: `网络 ${s.net || '(无名)'} 的导线从 ${b.id} 身上压过去了`,
+				});
+			}
+		}
+	}
+	return out;
+}
+
+/** 线段与矩形是否相交（含线段完全在矩形内）—— Liang-Barsky 裁剪 */
+function segmentHitsBox(s: Segment, x0: number, y0: number, x1: number, y1: number): boolean {
+	let t0 = 0;
+	let t1 = 1;
+	const dx = s.x2 - s.x1;
+	const dy = s.y2 - s.y1;
+	const tests: Array<[number, number]> = [
+		[-dx, s.x1 - x0],
+		[dx, x1 - s.x1],
+		[-dy, s.y1 - y0],
+		[dy, y1 - s.y1],
+	];
+	for (const [p, q] of tests) {
+		if (p === 0) {
+			if (q < 0) return false; // 平行且在外侧
+			continue;
+		}
+		const r = q / p;
+		if (p < 0) {
+			if (r > t1) return false;
+			if (r > t0) t0 = r;
+		} else {
+			if (r < t0) return false;
+			if (r < t1) t1 = r;
+		}
+	}
+	return t0 < t1;
+}

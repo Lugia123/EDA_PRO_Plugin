@@ -119,14 +119,24 @@ export const mapApplyTools: ToolDef[] = [
 			const layoutNets: Net[] = map.nets
 				.filter((n) => n.kind === 'signal' && n.pins.length >= 2)
 				.map((n) => ({ id: n.id, pins: n.pins }));
-			const wireNetIds = new Set(
-				map.nets.filter((n) => (n.style ?? defaultStyle(n.kind)) === 'wire').map((n) => n.id),
-			);
-			const wireNets = layoutNets.filter((n) => wireNetIds.has(n.id));
-			const symbolNets = map.nets.filter((n) => n.kind !== 'signal');
 
-			// 挂符号的引脚要预留位置，否则布局收紧后符号会压在邻居身上
-			for (const n of symbolNets) {
+			// ── 画法必须互斥：一条网络只画一种图形 ──
+			// 这里原来是 symbolNets 按 kind 筛（power/ground → 画电源地符号）、
+			// ports 按 style 筛（style=port → 画端口），两个集合会**重叠**：
+			// 一条 kind=power、style=port 的网络两边都命中，于是同一个引脚旁边
+			// 既放了电源符号又放了端口，看起来就像"引脚出来接了个输入，旁边又
+			// 挂了个电源"。§4.7 说连接语义决定图形，那就只能有一个决定者 ——
+			// 一律以 style 为准，kind 只用来选符号种类（Power / Ground / …）。
+			const styleOf = (n: SchematicMap['nets'][number]) => n.style ?? defaultStyle(n.kind);
+			const wireNetIds = new Set(map.nets.filter((n) => styleOf(n) === 'wire').map((n) => n.id));
+			const wireNets = layoutNets.filter((n) => wireNetIds.has(n.id));
+			const symbolNets = map.nets.filter((n) => styleOf(n) === 'symbol');
+			const portNets = map.nets.filter((n) => styleOf(n) === 'port');
+			// 需要预留引出空间的是「要挂东西」的引脚，符号和端口都算
+			const stubNets = [...symbolNets, ...portNets];
+
+			// 挂符号／端口的引脚都要预留位置，否则布局收紧后会压在邻居身上
+			for (const n of stubNets) {
 				const up = n.kind === 'power';
 				for (const ref of n.pins) {
 					const dot = ref.lastIndexOf('.');
@@ -211,12 +221,20 @@ export const mapApplyTools: ToolDef[] = [
 				pinXY,
 			);
 
-			// 电源地符号：引一小段线，末端放符号。朝向固定 —— 地朝下、电源朝上
-			const flags: Array<{ kind: string; net: string; x: number; y: number; ex: number; ey: number }> = [];
-			// 同一器件上挂几个符号时，引出长度要**逐个错开**。
-			// 芯片相邻引脚间距只有 10，而符号本身连文字有几十宽 ——
-			// 都引出 40 就必然撞在一起（实测 U1 的 +3V3 与 +5V 符号重叠）。
-			const stubSeq = new Map<string, number>();
+			// ── 电源地符号：直接放在引脚上，不画引出线 ──
+			//
+			// 试过两版引出线，都会造成**真短路**：
+			//   沿引脚方向直着拉 → 一排水平引脚的 stub 落在同一条 y 线上首尾相接
+			//   改成 L 形转向   → 转向后在垂直方向又互相撞上，反而并了五条网络
+			// 根子在于 stub 不参与 A* 避让，在密集区怎么走都会碰到别人；这些线
+			// 又刻意不带网络名，碰上就是一条连通导线 —— DRC 不报，肉眼只看到
+			// "几个符号排成一列"。
+			//
+			// 所以不画线，符号直接落在引脚上：EDA 里 netflag 放在引脚位置就表示
+			// 该引脚接入该网络，手工画图也是这么做的。代价是相邻引脚的符号可能
+			// 视觉重叠（芯片引脚间距只有 10），但那是可读性问题，比电气短路轻。
+			// 真要把符号分开，正解是让 stub 也走 A* 避让 —— 那是后话。
+			const flags: Array<{ kind: string; net: string; x: number; y: number }> = [];
 			for (const n of symbolNets) {
 				const kind = FLAG_OF[n.kind];
 				if (!kind) continue;
@@ -230,11 +248,7 @@ export const mapApplyTools: ToolDef[] = [
 					const pin = part.pins.find((q) => q.id === ref.slice(dot + 1));
 					if (!pin) continue;
 					const w = pinWorld(part, pl, pin);
-					const [vx, vy] = dirVec(w.dir);
-					const seq = stubSeq.get(des) ?? 0;
-					stubSeq.set(des, seq + 1);
-					const L = 40 + seq * 30;
-					flags.push({ kind, net: n.id, x: w.x, y: w.y, ex: w.x + vx * L, ey: w.y + vy * L });
+					flags.push({ kind, net: n.id, x: w.x, y: w.y });
 				}
 			}
 
@@ -243,8 +257,7 @@ export const mapApplyTools: ToolDef[] = [
 			// 后者由 layoutByGroups 从它收到的网络里算，而 port 网络压根没传给它，
 			// 于是那个列表恒为空、端口一个也画不出来。AI 说了用端口就画端口。
 			const ports: Array<{ dir: string; net: string; x: number; y: number; ex: number; ey: number }> = [];
-			for (const n of map.nets) {
-				if ((n.style ?? defaultStyle(n.kind)) !== 'port') continue;
+			for (const n of portNets) {
 				for (const ref of n.pins) {
 					const dot = ref.lastIndexOf('.');
 					if (dot <= 0) continue;
@@ -388,10 +401,8 @@ export const mapApplyTools: ToolDef[] = [
 				const FLAGS = ${JSON.stringify(flags)};
 				let n = 0;
 				for (const f of FLAGS) {
-					// 引出线**不带网络名**：带了会让导线的 NET 标签和符号名把同一个
-					// 网络名画两遍，挤在一小段线的两端
-					await eda.sch_PrimitiveWire.create([f.x, f.y, f.ex, f.ey]).catch(() => {});
-					if (await eda.sch_PrimitiveComponent.createNetFlag(f.kind, f.net, f.ex, f.ey, 0)) n += 1;
+					// 不画引出线 —— 那是短路的来源，见 map-apply.ts 里的说明
+					if (await eda.sch_PrimitiveComponent.createNetFlag(f.kind, f.net, f.x, f.y, 0)) n += 1;
 				}
 				return { drawn: n, total: FLAGS.length };
 			`,

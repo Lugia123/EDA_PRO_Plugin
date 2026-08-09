@@ -15,10 +15,12 @@
  */
 import { MAP_MARK, type SchematicMap } from '../layout/map.js';
 import {
+	type PartBox,
 	type Segment,
 	type Terminal,
 	buildConnectivity,
 	diffConnectivity,
+	findCrossings,
 } from '../layout/connectivity.js';
 import type { ToolDef } from './types.js';
 
@@ -113,7 +115,7 @@ interface Collected {
 	error?: string;
 	segs: Segment[];
 	terms: Terminal[];
-	parts: Array<{ des: string; xy: [number, number]; pins: number }>;
+	parts: Array<{ des: string; xy: [number, number]; pins: number; box: { minX: number; minY: number; maxX: number; maxY: number } | null }>;
 	decorations: Array<{ id: string; xy: [number, number] }>;
 	sheet: { w: number; h: number } | null;
 	mapRaw: string | null;
@@ -179,8 +181,15 @@ export const netcheckTools: ToolDef[] = [
 				}
 			}
 
+			// 导线压在器件身上：A* 会绕开器件，但符号／端口的引出线不过 A*，
+			// 是从引脚直接画出去的直线，穿过谁没人管。
+			const boxes: PartBox[] = d.parts
+				.filter((p) => p.box)
+				.map((p) => ({ id: p.des, ...(p.box as { minX: number; minY: number; maxX: number; maxY: number }) }));
+			const crossings = findCrossings(d.segs, boxes);
+
 			const problems =
-				diff.broken.length + diff.shorts.length + orphans.length + out.length;
+				diff.broken.length + diff.shorts.length + orphans.length + out.length + crossings.length;
 			return {
 				page_sheet: d.sheet ?? '读不到（titleBlockData 为空），本次跳过出框检查',
 				counted: {
@@ -197,6 +206,12 @@ export const netcheckTools: ToolDef[] = [
 				shorts: diff.shorts,
 				orphans,
 				outside_sheet: out,
+				wires_crossing_parts: crossings.map((c) => ({
+					part: c.part,
+					net: c.seg.net || '(无名)',
+					from: [c.seg.x1, c.seg.y1],
+					to: [c.seg.x2, c.seg.y2],
+				})),
 				actual_groups: args.verbose === true ? conn.groups : undefined,
 				verdict: problems === 0 ? '通过' : `发现 ${problems} 处问题`,
 				note:
