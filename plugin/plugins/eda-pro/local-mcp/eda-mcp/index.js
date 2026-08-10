@@ -21,9 +21,9 @@ var __export = (target, all) => {
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    for (let key2 of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key2) && key2 !== except)
+        __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
   }
   return to;
 };
@@ -112,7 +112,7 @@ var require_code = __commonJS({
         addCodeArg(expr, args[i]);
         expr.push(plus, safeStringify(strs[++i]));
       }
-      optimize(expr);
+      optimize2(expr);
       return new _Code(expr);
     }
     exports.str = str;
@@ -125,7 +125,7 @@ var require_code = __commonJS({
         code.push(interpolate(arg));
     }
     exports.addCodeArg = addCodeArg;
-    function optimize(expr) {
+    function optimize2(expr) {
       let i = 1;
       while (i < expr.length - 1) {
         if (expr[i] === plus) {
@@ -172,15 +172,15 @@ var require_code = __commonJS({
       return JSON.stringify(x).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
     }
     exports.safeStringify = safeStringify;
-    function getProperty(key) {
-      return typeof key == "string" && exports.IDENTIFIER.test(key) ? new _Code(`.${key}`) : _`[${key}]`;
+    function getProperty(key2) {
+      return typeof key2 == "string" && exports.IDENTIFIER.test(key2) ? new _Code(`.${key2}`) : _`[${key2}]`;
     }
     exports.getProperty = getProperty;
-    function getEsmExportName(key) {
-      if (typeof key == "string" && exports.IDENTIFIER.test(key)) {
-        return new _Code(`${key}`);
+    function getEsmExportName(key2) {
+      if (typeof key2 == "string" && exports.IDENTIFIER.test(key2)) {
+        return new _Code(`${key2}`);
       }
-      throw new Error(`CodeGen: invalid export name: ${key}, use explicit $id name mapping`);
+      throw new Error(`CodeGen: invalid export name: ${key2}, use explicit $id name mapping`);
     }
     exports.getEsmExportName = getEsmExportName;
     function regexpCode(rx) {
@@ -807,11 +807,11 @@ var require_codegen = __commonJS({
       // returns code for object literal for the passed argument list of key-value pairs
       object(...keyValues) {
         const code = ["{"];
-        for (const [key, value] of keyValues) {
+        for (const [key2, value] of keyValues) {
           if (code.length > 1)
             code.push(",");
-          code.push(key);
-          if (key !== value || this.opts.es5) {
+          code.push(key2);
+          if (key2 !== value || this.opts.es5) {
             code.push(":");
             (0, code_1.addCodeArg)(code, value);
           }
@@ -1086,17 +1086,17 @@ var require_util = __commonJS({
       if (typeof schema === "boolean")
         return;
       const rules = self.RULES.keywords;
-      for (const key in schema) {
-        if (!rules[key])
-          checkStrictMode(it, `unknown keyword: "${key}"`);
+      for (const key2 in schema) {
+        if (!rules[key2])
+          checkStrictMode(it, `unknown keyword: "${key2}"`);
       }
     }
     exports.checkUnknownRules = checkUnknownRules;
     function schemaHasRules(schema, rules) {
       if (typeof schema == "boolean")
         return !schema;
-      for (const key in schema)
-        if (rules[key])
+      for (const key2 in schema)
+        if (rules[key2])
           return true;
       return false;
     }
@@ -1104,8 +1104,8 @@ var require_util = __commonJS({
     function schemaHasRulesButRef(schema, RULES) {
       if (typeof schema == "boolean")
         return !schema;
-      for (const key in schema)
-        if (key !== "$ref" && RULES.all[key])
+      for (const key2 in schema)
+        if (key2 !== "$ref" && RULES.all[key2])
           return true;
       return false;
     }
@@ -1683,8 +1683,8 @@ var require_defaults = __commonJS({
     function assignDefaults(it, ty) {
       const { properties, items } = it.schema;
       if (ty === "object" && properties) {
-        for (const key in properties) {
-          assignDefault(it, key, properties[key].default);
+        for (const key2 in properties) {
+          assignDefault(it, key2, properties[key2].default);
         }
       } else if (ty === "array" && Array.isArray(items)) {
         items.forEach((sch, i) => assignDefault(it, i, sch.default));
@@ -2068,8 +2068,8 @@ var require_fast_deep_equal = __commonJS({
         for (i = length; i-- !== 0; )
           if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
         for (i = length; i-- !== 0; ) {
-          var key = keys[i];
-          if (!equal(a[key], b[key])) return false;
+          var key2 = keys[i];
+          if (!equal(a[key2], b[key2])) return false;
         }
         return true;
       }
@@ -2141,20 +2141,20 @@ var require_json_schema_traverse = __commonJS({
     function _traverse(opts, pre, post, schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex) {
       if (schema && typeof schema == "object" && !Array.isArray(schema)) {
         pre(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
-        for (var key in schema) {
-          var sch = schema[key];
+        for (var key2 in schema) {
+          var sch = schema[key2];
           if (Array.isArray(sch)) {
-            if (key in traverse.arrayKeywords) {
+            if (key2 in traverse.arrayKeywords) {
               for (var i = 0; i < sch.length; i++)
-                _traverse(opts, pre, post, sch[i], jsonPtr + "/" + key + "/" + i, rootSchema, jsonPtr, key, schema, i);
+                _traverse(opts, pre, post, sch[i], jsonPtr + "/" + key2 + "/" + i, rootSchema, jsonPtr, key2, schema, i);
             }
-          } else if (key in traverse.propsKeywords) {
+          } else if (key2 in traverse.propsKeywords) {
             if (sch && typeof sch == "object") {
               for (var prop in sch)
-                _traverse(opts, pre, post, sch[prop], jsonPtr + "/" + key + "/" + escapeJsonPtr(prop), rootSchema, jsonPtr, key, schema, prop);
+                _traverse(opts, pre, post, sch[prop], jsonPtr + "/" + key2 + "/" + escapeJsonPtr(prop), rootSchema, jsonPtr, key2, schema, prop);
             }
-          } else if (key in traverse.keywords || opts.allKeys && !(key in traverse.skipKeywords)) {
-            _traverse(opts, pre, post, sch, jsonPtr + "/" + key, rootSchema, jsonPtr, key, schema);
+          } else if (key2 in traverse.keywords || opts.allKeys && !(key2 in traverse.skipKeywords)) {
+            _traverse(opts, pre, post, sch, jsonPtr + "/" + key2, rootSchema, jsonPtr, key2, schema);
           }
         }
         post(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
@@ -2211,10 +2211,10 @@ var require_resolve = __commonJS({
       "$dynamicAnchor"
     ]);
     function hasRef(schema) {
-      for (const key in schema) {
-        if (REF_KEYWORDS.has(key))
+      for (const key2 in schema) {
+        if (REF_KEYWORDS.has(key2))
           return true;
-        const sch = schema[key];
+        const sch = schema[key2];
         if (Array.isArray(sch) && sch.some(hasRef))
           return true;
         if (typeof sch == "object" && hasRef(sch))
@@ -2224,14 +2224,14 @@ var require_resolve = __commonJS({
     }
     function countKeys(schema) {
       let count = 0;
-      for (const key in schema) {
-        if (key === "$ref")
+      for (const key2 in schema) {
+        if (key2 === "$ref")
           return Infinity;
         count++;
-        if (SIMPLE_INLINED.has(key))
+        if (SIMPLE_INLINED.has(key2))
           continue;
-        if (typeof schema[key] == "object") {
-          (0, util_1.eachItem)(schema[key], (sch) => count += countKeys(sch));
+        if (typeof schema[key2] == "object") {
+          (0, util_1.eachItem)(schema[key2], (sch) => count += countKeys(sch));
         }
         if (count === Infinity)
           return Infinity;
@@ -2420,8 +2420,8 @@ var require_validate = __commonJS({
     function schemaCxtHasRules({ schema, self }) {
       if (typeof schema == "boolean")
         return !schema;
-      for (const key in schema)
-        if (self.RULES.all[key])
+      for (const key2 in schema)
+        if (self.RULES.all[key2])
           return true;
       return false;
     }
@@ -4036,7 +4036,7 @@ var require_core = __commonJS({
       var _a3, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0;
       const s = o.strict;
       const _optz = (_a3 = o.code) === null || _a3 === void 0 ? void 0 : _a3.optimize;
-      const optimize = _optz === true || _optz === void 0 ? 1 : _optz || 0;
+      const optimize2 = _optz === true || _optz === void 0 ? 1 : _optz || 0;
       const regExp = (_c = (_b = o.code) === null || _b === void 0 ? void 0 : _b.regExp) !== null && _c !== void 0 ? _c : defaultRegExp;
       const uriResolver = (_d = o.uriResolver) !== null && _d !== void 0 ? _d : uri_1.default;
       return {
@@ -4045,7 +4045,7 @@ var require_core = __commonJS({
         strictTypes: (_k = (_j = o.strictTypes) !== null && _j !== void 0 ? _j : s) !== null && _k !== void 0 ? _k : "log",
         strictTuples: (_m = (_l = o.strictTuples) !== null && _l !== void 0 ? _l : s) !== null && _m !== void 0 ? _m : "log",
         strictRequired: (_p = (_o = o.strictRequired) !== null && _o !== void 0 ? _o : s) !== null && _p !== void 0 ? _p : false,
-        code: o.code ? { ...o.code, optimize, regExp } : { optimize, regExp },
+        code: o.code ? { ...o.code, optimize: optimize2, regExp } : { optimize: optimize2, regExp },
         loopRequired: (_q = o.loopRequired) !== null && _q !== void 0 ? _q : MAX_EXPRESSION,
         loopEnum: (_r = o.loopEnum) !== null && _r !== void 0 ? _r : MAX_EXPRESSION,
         meta: (_s = o.meta) !== null && _s !== void 0 ? _s : true,
@@ -4176,7 +4176,7 @@ var require_core = __commonJS({
         }
       }
       // Adds schema to the instance
-      addSchema(schema, key, _meta, _validateSchema = this.opts.validateSchema) {
+      addSchema(schema, key2, _meta, _validateSchema = this.opts.validateSchema) {
         if (Array.isArray(schema)) {
           for (const sch of schema)
             this.addSchema(sch, void 0, _meta, _validateSchema);
@@ -4190,15 +4190,15 @@ var require_core = __commonJS({
             throw new Error(`schema ${schemaId} must be string`);
           }
         }
-        key = (0, resolve_1.normalizeId)(key || id);
-        this._checkUnique(key);
-        this.schemas[key] = this._addSchema(schema, _meta, key, _validateSchema, true);
+        key2 = (0, resolve_1.normalizeId)(key2 || id);
+        this._checkUnique(key2);
+        this.schemas[key2] = this._addSchema(schema, _meta, key2, _validateSchema, true);
         return this;
       }
       // Add schema that will be used to validate other schemas
       // options in META_IGNORE_OPTIONS are alway set to false
-      addMetaSchema(schema, key, _validateSchema = this.opts.validateSchema) {
-        this.addSchema(schema, key, true, _validateSchema);
+      addMetaSchema(schema, key2, _validateSchema = this.opts.validateSchema) {
+        this.addSchema(schema, key2, true, _validateSchema);
         return this;
       }
       //  Validate schema against its meta-schema
@@ -4354,14 +4354,14 @@ var require_core = __commonJS({
           let keywords = metaSchema;
           for (const seg of segments)
             keywords = keywords[seg];
-          for (const key in rules) {
-            const rule = rules[key];
+          for (const key2 in rules) {
+            const rule = rules[key2];
             if (typeof rule != "object")
               continue;
             const { $data } = rule.definition;
-            const schema = keywords[key];
+            const schema = keywords[key2];
             if ($data && schema)
-              keywords[key] = schemaOrData(schema);
+              keywords[key2] = schemaOrData(schema);
           }
         }
         return metaSchema;
@@ -4434,10 +4434,10 @@ var require_core = __commonJS({
     Ajv2.MissingRefError = ref_error_1.default;
     exports.default = Ajv2;
     function checkOptions(checkOpts, options, msg, log2 = "error") {
-      for (const key in checkOpts) {
-        const opt = key;
+      for (const key2 in checkOpts) {
+        const opt = key2;
         if (opt in options)
-          this.logger[log2](`${msg}: option ${key}. ${checkOpts[opt]}`);
+          this.logger[log2](`${msg}: option ${key2}. ${checkOpts[opt]}`);
       }
     }
     function getSchEnv(keyRef) {
@@ -4451,8 +4451,8 @@ var require_core = __commonJS({
       if (Array.isArray(optsSchemas))
         this.addSchema(optsSchemas);
       else
-        for (const key in optsSchemas)
-          this.addSchema(optsSchemas[key], key);
+        for (const key2 in optsSchemas)
+          this.addSchema(optsSchemas[key2], key2);
     }
     function addInitialFormats() {
       for (const name in this.opts.formats) {
@@ -5500,11 +5500,11 @@ var require_dependencies = __commonJS({
     function splitDependencies({ schema }) {
       const propertyDeps = {};
       const schemaDeps = {};
-      for (const key in schema) {
-        if (key === "__proto__")
+      for (const key2 in schema) {
+        if (key2 === "__proto__")
           continue;
-        const deps = Array.isArray(schema[key]) ? propertyDeps : schemaDeps;
-        deps[key] = schema[key];
+        const deps = Array.isArray(schema[key2]) ? propertyDeps : schemaDeps;
+        deps[key2] = schema[key2];
       }
       return [propertyDeps, schemaDeps];
     }
@@ -5581,13 +5581,13 @@ var require_propertyNames = __commonJS({
         if ((0, util_1.alwaysValidSchema)(it, schema))
           return;
         const valid = gen.name("valid");
-        gen.forIn("key", data, (key) => {
-          cxt.setParams({ propertyName: key });
+        gen.forIn("key", data, (key2) => {
+          cxt.setParams({ propertyName: key2 });
           cxt.subschema({
             keyword: "propertyNames",
-            data: key,
+            data: key2,
             dataTypes: ["string"],
-            propertyName: key,
+            propertyName: key2,
             compositeRule: true
           }, valid);
           gen.if((0, codegen_1.not)(valid), () => {
@@ -5636,38 +5636,38 @@ var require_additionalProperties = __commonJS({
         checkAdditionalProperties();
         cxt.ok((0, codegen_1._)`${errsCount} === ${names_1.default.errors}`);
         function checkAdditionalProperties() {
-          gen.forIn("key", data, (key) => {
+          gen.forIn("key", data, (key2) => {
             if (!props.length && !patProps.length)
-              additionalPropertyCode(key);
+              additionalPropertyCode(key2);
             else
-              gen.if(isAdditional(key), () => additionalPropertyCode(key));
+              gen.if(isAdditional(key2), () => additionalPropertyCode(key2));
           });
         }
-        function isAdditional(key) {
+        function isAdditional(key2) {
           let definedProp;
           if (props.length > 8) {
             const propsSchema = (0, util_1.schemaRefOrVal)(it, parentSchema.properties, "properties");
-            definedProp = (0, code_1.isOwnProperty)(gen, propsSchema, key);
+            definedProp = (0, code_1.isOwnProperty)(gen, propsSchema, key2);
           } else if (props.length) {
-            definedProp = (0, codegen_1.or)(...props.map((p) => (0, codegen_1._)`${key} === ${p}`));
+            definedProp = (0, codegen_1.or)(...props.map((p) => (0, codegen_1._)`${key2} === ${p}`));
           } else {
             definedProp = codegen_1.nil;
           }
           if (patProps.length) {
-            definedProp = (0, codegen_1.or)(definedProp, ...patProps.map((p) => (0, codegen_1._)`${(0, code_1.usePattern)(cxt, p)}.test(${key})`));
+            definedProp = (0, codegen_1.or)(definedProp, ...patProps.map((p) => (0, codegen_1._)`${(0, code_1.usePattern)(cxt, p)}.test(${key2})`));
           }
           return (0, codegen_1.not)(definedProp);
         }
-        function deleteAdditional(key) {
-          gen.code((0, codegen_1._)`delete ${data}[${key}]`);
+        function deleteAdditional(key2) {
+          gen.code((0, codegen_1._)`delete ${data}[${key2}]`);
         }
-        function additionalPropertyCode(key) {
+        function additionalPropertyCode(key2) {
           if (opts.removeAdditional === "all" || opts.removeAdditional && schema === false) {
-            deleteAdditional(key);
+            deleteAdditional(key2);
             return;
           }
           if (schema === false) {
-            cxt.setParams({ additionalProperty: key });
+            cxt.setParams({ additionalProperty: key2 });
             cxt.error();
             if (!allErrors)
               gen.break();
@@ -5676,22 +5676,22 @@ var require_additionalProperties = __commonJS({
           if (typeof schema == "object" && !(0, util_1.alwaysValidSchema)(it, schema)) {
             const valid = gen.name("valid");
             if (opts.removeAdditional === "failing") {
-              applyAdditionalSchema(key, valid, false);
+              applyAdditionalSchema(key2, valid, false);
               gen.if((0, codegen_1.not)(valid), () => {
                 cxt.reset();
-                deleteAdditional(key);
+                deleteAdditional(key2);
               });
             } else {
-              applyAdditionalSchema(key, valid);
+              applyAdditionalSchema(key2, valid);
               if (!allErrors)
                 gen.if((0, codegen_1.not)(valid), () => gen.break());
             }
           }
         }
-        function applyAdditionalSchema(key, valid, errors) {
+        function applyAdditionalSchema(key2, valid, errors) {
           const subschema = {
             keyword: "additionalProperties",
-            dataProp: key,
+            dataProp: key2,
             dataPropType: util_1.Type.Str
           };
           if (errors === false) {
@@ -5816,19 +5816,19 @@ var require_patternProperties = __commonJS({
           }
         }
         function validateProperties(pat) {
-          gen.forIn("key", data, (key) => {
-            gen.if((0, codegen_1._)`${(0, code_1.usePattern)(cxt, pat)}.test(${key})`, () => {
+          gen.forIn("key", data, (key2) => {
+            gen.if((0, codegen_1._)`${(0, code_1.usePattern)(cxt, pat)}.test(${key2})`, () => {
               const alwaysValid = alwaysValidPatterns.includes(pat);
               if (!alwaysValid) {
                 cxt.subschema({
                   keyword: "patternProperties",
                   schemaProp: pat,
-                  dataProp: key,
+                  dataProp: key2,
                   dataPropType: util_2.Type.Str
                 }, valid);
               }
               if (it.opts.unevaluated && props !== true) {
-                gen.assign((0, codegen_1._)`${props}[${key}]`, true);
+                gen.assign((0, codegen_1._)`${props}[${key2}]`, true);
               } else if (!alwaysValid && !it.allErrors) {
                 gen.if((0, codegen_1.not)(valid), () => gen.break());
               }
@@ -7251,44 +7251,44 @@ var require_permessage_deflate = __commonJS({
        */
       normalizeParams(configurations) {
         configurations.forEach((params) => {
-          Object.keys(params).forEach((key) => {
-            let value = params[key];
+          Object.keys(params).forEach((key2) => {
+            let value = params[key2];
             if (value.length > 1) {
-              throw new Error(`Parameter "${key}" must have only a single value`);
+              throw new Error(`Parameter "${key2}" must have only a single value`);
             }
             value = value[0];
-            if (key === "client_max_window_bits") {
+            if (key2 === "client_max_window_bits") {
               if (value !== true) {
                 const num2 = +value;
                 if (!Number.isInteger(num2) || num2 < 8 || num2 > 15) {
                   throw new TypeError(
-                    `Invalid value for parameter "${key}": ${value}`
+                    `Invalid value for parameter "${key2}": ${value}`
                   );
                 }
                 value = num2;
               } else if (!this._isServer) {
                 throw new TypeError(
-                  `Invalid value for parameter "${key}": ${value}`
+                  `Invalid value for parameter "${key2}": ${value}`
                 );
               }
-            } else if (key === "server_max_window_bits") {
+            } else if (key2 === "server_max_window_bits") {
               const num2 = +value;
               if (!Number.isInteger(num2) || num2 < 8 || num2 > 15) {
                 throw new TypeError(
-                  `Invalid value for parameter "${key}": ${value}`
+                  `Invalid value for parameter "${key2}": ${value}`
                 );
               }
               value = num2;
-            } else if (key === "client_no_context_takeover" || key === "server_no_context_takeover") {
+            } else if (key2 === "client_no_context_takeover" || key2 === "server_no_context_takeover") {
               if (value !== true) {
                 throw new TypeError(
-                  `Invalid value for parameter "${key}": ${value}`
+                  `Invalid value for parameter "${key2}": ${value}`
                 );
               }
             } else {
-              throw new Error(`Unknown parameter "${key}"`);
+              throw new Error(`Unknown parameter "${key2}"`);
             }
-            params[key] = value;
+            params[key2] = value;
           });
         });
         return configurations;
@@ -7336,8 +7336,8 @@ var require_permessage_deflate = __commonJS({
       _decompress(data, fin, callback) {
         const endpoint = this._isServer ? "client" : "server";
         if (!this._inflate) {
-          const key = `${endpoint}_max_window_bits`;
-          const windowBits = typeof this.params[key] !== "number" ? zlib.Z_DEFAULT_WINDOWBITS : this.params[key];
+          const key2 = `${endpoint}_max_window_bits`;
+          const windowBits = typeof this.params[key2] !== "number" ? zlib.Z_DEFAULT_WINDOWBITS : this.params[key2];
           this._inflate = zlib.createInflateRaw({
             ...this._options.zlibInflateOptions,
             windowBits
@@ -7387,8 +7387,8 @@ var require_permessage_deflate = __commonJS({
       _compress(data, fin, callback) {
         const endpoint = this._isServer ? "server" : "client";
         if (!this._deflate) {
-          const key = `${endpoint}_max_window_bits`;
-          const windowBits = typeof this.params[key] !== "number" ? zlib.Z_DEFAULT_WINDOWBITS : this.params[key];
+          const key2 = `${endpoint}_max_window_bits`;
+          const windowBits = typeof this.params[key2] !== "number" ? zlib.Z_DEFAULT_WINDOWBITS : this.params[key2];
           this._deflate = zlib.createDeflateRaw({
             ...this._options.zlibDeflateOptions,
             windowBits
@@ -9695,7 +9695,7 @@ var require_websocket = __commonJS({
         }
       }
       const defaultPort = isSecure ? 443 : 80;
-      const key = randomBytes2(16).toString("base64");
+      const key2 = randomBytes2(16).toString("base64");
       const request = isSecure ? https.request : http.request;
       const protocolSet = /* @__PURE__ */ new Set();
       let perMessageDeflate;
@@ -9706,7 +9706,7 @@ var require_websocket = __commonJS({
       opts.headers = {
         ...opts.headers,
         "Sec-WebSocket-Version": opts.protocolVersion,
-        "Sec-WebSocket-Key": key,
+        "Sec-WebSocket-Key": key2,
         Connection: "Upgrade",
         Upgrade: "websocket"
       };
@@ -9757,8 +9757,8 @@ var require_websocket = __commonJS({
           const headers = options && options.headers;
           options = { ...options, headers: {} };
           if (headers) {
-            for (const [key2, value] of Object.entries(headers)) {
-              options.headers[key2.toLowerCase()] = value;
+            for (const [key3, value] of Object.entries(headers)) {
+              options.headers[key3.toLowerCase()] = value;
             }
           }
         } else if (websocket.listenerCount("redirect") === 0) {
@@ -9825,7 +9825,7 @@ var require_websocket = __commonJS({
           abortHandshake(websocket, socket, "Invalid Upgrade header");
           return;
         }
-        const digest = createHash("sha1").update(key + GUID).digest("base64");
+        const digest = createHash("sha1").update(key2 + GUID).digest("base64");
         if (res.headers["sec-websocket-accept"] !== digest) {
           abortHandshake(websocket, socket, "Invalid Sec-WebSocket-Accept header");
           return;
@@ -10393,7 +10393,7 @@ var require_websocket_server = __commonJS({
        */
       handleUpgrade(req, socket, head, cb) {
         socket.on("error", socketOnError);
-        const key = req.headers["sec-websocket-key"];
+        const key2 = req.headers["sec-websocket-key"];
         const upgrade = req.headers.upgrade;
         const version2 = +req.headers["sec-websocket-version"];
         if (req.method !== "GET") {
@@ -10406,7 +10406,7 @@ var require_websocket_server = __commonJS({
           abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
           return;
         }
-        if (key === void 0 || !keyRegex.test(key)) {
+        if (key2 === void 0 || !keyRegex.test(key2)) {
           const message = "Missing or invalid Sec-WebSocket-Key header";
           abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
           return;
@@ -10466,7 +10466,7 @@ var require_websocket_server = __commonJS({
               }
               this.completeUpgrade(
                 extensions,
-                key,
+                key2,
                 protocols,
                 req,
                 socket,
@@ -10478,7 +10478,7 @@ var require_websocket_server = __commonJS({
           }
           if (!this.options.verifyClient(info)) return abortHandshake(socket, 401);
         }
-        this.completeUpgrade(extensions, key, protocols, req, socket, head, cb);
+        this.completeUpgrade(extensions, key2, protocols, req, socket, head, cb);
       }
       /**
        * Upgrade the connection to WebSocket.
@@ -10493,7 +10493,7 @@ var require_websocket_server = __commonJS({
        * @throws {Error} If called more than once with the same socket
        * @private
        */
-      completeUpgrade(extensions, key, protocols, req, socket, head, cb) {
+      completeUpgrade(extensions, key2, protocols, req, socket, head, cb) {
         if (!socket.readable || !socket.writable) return socket.destroy();
         if (socket[kWebSocket]) {
           throw new Error(
@@ -10501,7 +10501,7 @@ var require_websocket_server = __commonJS({
           );
         }
         if (this._state > RUNNING) return abortHandshake(socket, 503);
-        const digest = createHash("sha1").update(key + GUID).digest("base64");
+        const digest = createHash("sha1").update(key2 + GUID).digest("base64");
         const headers = [
           "HTTP/1.1 101 Switching Protocols",
           "Upgrade: websocket",
@@ -10785,9 +10785,9 @@ function floatSafeRemainder(val, step) {
   return ratio - roundedRatio;
 }
 var EVALUATING = /* @__PURE__ */ Symbol("evaluating");
-function defineLazy(object3, key, getter) {
+function defineLazy(object3, key2, getter) {
   let value = void 0;
-  Object.defineProperty(object3, key, {
+  Object.defineProperty(object3, key2, {
     get() {
       if (value === EVALUATING) {
         return void 0;
@@ -10799,7 +10799,7 @@ function defineLazy(object3, key, getter) {
       return value;
     },
     set(v) {
-      Object.defineProperty(object3, key, {
+      Object.defineProperty(object3, key2, {
         value: v
         // configurable: true,
       });
@@ -10832,11 +10832,11 @@ function cloneDef(schema) {
 function getElementAtPath(obj, path) {
   if (!path)
     return obj;
-  return path.reduce((acc, key) => acc?.[key], obj);
+  return path.reduce((acc, key2) => acc?.[key2], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
-  const promises = keys.map((key) => promisesObj[key]);
+  const promises = keys.map((key2) => promisesObj[key2]);
   return Promise.all(promises).then((results) => {
     const resolvedObj = {};
     for (let i = 0; i < keys.length; i++) {
@@ -10908,8 +10908,8 @@ function shallowClone(o) {
 }
 function numKeys(data) {
   let keyCount = 0;
-  for (const key in data) {
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
+  for (const key2 in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key2)) {
       keyCount++;
     }
   }
@@ -11059,13 +11059,13 @@ function pick(schema, mask) {
   const def = mergeDefs(schema._zod.def, {
     get shape() {
       const newShape = {};
-      for (const key in mask) {
-        if (!(key in currDef.shape)) {
-          throw new Error(`Unrecognized key: "${key}"`);
+      for (const key2 in mask) {
+        if (!(key2 in currDef.shape)) {
+          throw new Error(`Unrecognized key: "${key2}"`);
         }
-        if (!mask[key])
+        if (!mask[key2])
           continue;
-        newShape[key] = currDef.shape[key];
+        newShape[key2] = currDef.shape[key2];
       }
       assignProp(this, "shape", newShape);
       return newShape;
@@ -11084,13 +11084,13 @@ function omit(schema, mask) {
   const def = mergeDefs(schema._zod.def, {
     get shape() {
       const newShape = { ...schema._zod.def.shape };
-      for (const key in mask) {
-        if (!(key in currDef.shape)) {
-          throw new Error(`Unrecognized key: "${key}"`);
+      for (const key2 in mask) {
+        if (!(key2 in currDef.shape)) {
+          throw new Error(`Unrecognized key: "${key2}"`);
         }
-        if (!mask[key])
+        if (!mask[key2])
           continue;
-        delete newShape[key];
+        delete newShape[key2];
       }
       assignProp(this, "shape", newShape);
       return newShape;
@@ -11107,8 +11107,8 @@ function extend(schema, shape) {
   const hasChecks = checks && checks.length > 0;
   if (hasChecks) {
     const existingShape = schema._zod.def.shape;
-    for (const key in shape) {
-      if (Object.getOwnPropertyDescriptor(existingShape, key) !== void 0) {
+    for (const key2 in shape) {
+      if (Object.getOwnPropertyDescriptor(existingShape, key2) !== void 0) {
         throw new Error("Cannot overwrite keys on object schemas containing refinements. Use `.safeExtend()` instead.");
       }
     }
@@ -11164,23 +11164,23 @@ function partial(Class2, schema, mask) {
       const oldShape = schema._zod.def.shape;
       const shape = { ...oldShape };
       if (mask) {
-        for (const key in mask) {
-          if (!(key in oldShape)) {
-            throw new Error(`Unrecognized key: "${key}"`);
+        for (const key2 in mask) {
+          if (!(key2 in oldShape)) {
+            throw new Error(`Unrecognized key: "${key2}"`);
           }
-          if (!mask[key])
+          if (!mask[key2])
             continue;
-          shape[key] = Class2 ? new Class2({
+          shape[key2] = Class2 ? new Class2({
             type: "optional",
-            innerType: oldShape[key]
-          }) : oldShape[key];
+            innerType: oldShape[key2]
+          }) : oldShape[key2];
         }
       } else {
-        for (const key in oldShape) {
-          shape[key] = Class2 ? new Class2({
+        for (const key2 in oldShape) {
+          shape[key2] = Class2 ? new Class2({
             type: "optional",
-            innerType: oldShape[key]
-          }) : oldShape[key];
+            innerType: oldShape[key2]
+          }) : oldShape[key2];
         }
       }
       assignProp(this, "shape", shape);
@@ -11196,22 +11196,22 @@ function required(Class2, schema, mask) {
       const oldShape = schema._zod.def.shape;
       const shape = { ...oldShape };
       if (mask) {
-        for (const key in mask) {
-          if (!(key in shape)) {
-            throw new Error(`Unrecognized key: "${key}"`);
+        for (const key2 in mask) {
+          if (!(key2 in shape)) {
+            throw new Error(`Unrecognized key: "${key2}"`);
           }
-          if (!mask[key])
+          if (!mask[key2])
             continue;
-          shape[key] = new Class2({
+          shape[key2] = new Class2({
             type: "nonoptional",
-            innerType: oldShape[key]
+            innerType: oldShape[key2]
           });
         }
       } else {
-        for (const key in oldShape) {
-          shape[key] = new Class2({
+        for (const key2 in oldShape) {
+          shape[key2] = new Class2({
             type: "nonoptional",
-            innerType: oldShape[key]
+            innerType: oldShape[key2]
           });
         }
       }
@@ -12535,13 +12535,13 @@ var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
     return payload;
   };
 });
-function handlePropertyResult(result, final, key, input, isOptionalIn, isOptionalOut) {
-  const isPresent = key in input;
+function handlePropertyResult(result, final, key2, input, isOptionalIn, isOptionalOut) {
+  const isPresent = key2 in input;
   if (result.issues.length) {
     if (isOptionalIn && isOptionalOut && !isPresent) {
       return;
     }
-    final.issues.push(...prefixIssues(key, result.issues));
+    final.issues.push(...prefixIssues(key2, result.issues));
   }
   if (!isPresent && !isOptionalIn) {
     if (!result.issues.length) {
@@ -12549,17 +12549,17 @@ function handlePropertyResult(result, final, key, input, isOptionalIn, isOptiona
         code: "invalid_type",
         expected: "nonoptional",
         input: void 0,
-        path: [key]
+        path: [key2]
       });
     }
     return;
   }
   if (result.value === void 0) {
     if (isPresent) {
-      final.value[key] = void 0;
+      final.value[key2] = void 0;
     }
   } else {
-    final.value[key] = result.value;
+    final.value[key2] = result.value;
   }
 }
 function normalizeDef(def) {
@@ -12585,20 +12585,20 @@ function handleCatchall(proms, input, payload, ctx2, def, inst) {
   const t = _catchall.def.type;
   const isOptionalIn = _catchall.optin === "optional";
   const isOptionalOut = _catchall.optout === "optional";
-  for (const key in input) {
-    if (key === "__proto__")
+  for (const key2 in input) {
+    if (key2 === "__proto__")
       continue;
-    if (keySet.has(key))
+    if (keySet.has(key2))
       continue;
     if (t === "never") {
-      unrecognized.push(key);
+      unrecognized.push(key2);
       continue;
     }
-    const r = _catchall.run({ value: input[key], issues: [] }, ctx2);
+    const r = _catchall.run({ value: input[key2], issues: [] }, ctx2);
     if (r instanceof Promise) {
-      proms.push(r.then((r2) => handlePropertyResult(r2, payload, key, input, isOptionalIn, isOptionalOut)));
+      proms.push(r.then((r2) => handlePropertyResult(r2, payload, key2, input, isOptionalIn, isOptionalOut)));
     } else {
-      handlePropertyResult(r, payload, key, input, isOptionalIn, isOptionalOut);
+      handlePropertyResult(r, payload, key2, input, isOptionalIn, isOptionalOut);
     }
   }
   if (unrecognized.length) {
@@ -12634,12 +12634,12 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   defineLazy(inst._zod, "propValues", () => {
     const shape = def.shape;
     const propValues = {};
-    for (const key in shape) {
-      const field = shape[key]._zod;
+    for (const key2 in shape) {
+      const field = shape[key2]._zod;
       if (field.values) {
-        propValues[key] ?? (propValues[key] = /* @__PURE__ */ new Set());
+        propValues[key2] ?? (propValues[key2] = /* @__PURE__ */ new Set());
         for (const v of field.values)
-          propValues[key].add(v);
+          propValues[key2].add(v);
       }
     }
     return propValues;
@@ -12662,15 +12662,15 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     payload.value = {};
     const proms = [];
     const shape = value.shape;
-    for (const key of value.keys) {
-      const el = shape[key];
+    for (const key2 of value.keys) {
+      const el = shape[key2];
       const isOptionalIn = el._zod.optin === "optional";
       const isOptionalOut = el._zod.optout === "optional";
-      const r = el._zod.run({ value: input[key], issues: [] }, ctx2);
+      const r = el._zod.run({ value: input[key2], issues: [] }, ctx2);
       if (r instanceof Promise) {
-        proms.push(r.then((r2) => handlePropertyResult(r2, payload, key, input, isOptionalIn, isOptionalOut)));
+        proms.push(r.then((r2) => handlePropertyResult(r2, payload, key2, input, isOptionalIn, isOptionalOut)));
       } else {
-        handlePropertyResult(r, payload, key, input, isOptionalIn, isOptionalOut);
+        handlePropertyResult(r, payload, key2, input, isOptionalIn, isOptionalOut);
       }
     }
     if (!catchall) {
@@ -12686,24 +12686,24 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   const generateFastpass = (shape) => {
     const doc = new Doc(["shape", "payload", "ctx"]);
     const normalized = _normalized.value;
-    const parseStr = (key) => {
-      const k = esc(key);
+    const parseStr = (key2) => {
+      const k = esc(key2);
       return `shape[${k}]._zod.run({ value: input[${k}], issues: [] }, ctx)`;
     };
     doc.write(`const input = payload.value;`);
     const ids = /* @__PURE__ */ Object.create(null);
     let counter = 0;
-    for (const key of normalized.keys) {
-      ids[key] = `key_${counter++}`;
+    for (const key2 of normalized.keys) {
+      ids[key2] = `key_${counter++}`;
     }
     doc.write(`const newResult = {};`);
-    for (const key of normalized.keys) {
-      const id = ids[key];
-      const k = esc(key);
-      const schema = shape[key];
+    for (const key2 of normalized.keys) {
+      const id = ids[key2];
+      const k = esc(key2);
+      const schema = shape[key2];
       const isOptionalIn = schema?._zod?.optin === "optional";
       const isOptionalOut = schema?._zod?.optout === "optional";
-      doc.write(`const ${id} = ${parseStr(key)};`);
+      doc.write(`const ${id} = ${parseStr(key2)};`);
       if (isOptionalIn && isOptionalOut) {
         doc.write(`
         if (${id}.issues.length) {
@@ -12962,17 +12962,17 @@ function mergeValues(a, b) {
   }
   if (isPlainObject(a) && isPlainObject(b)) {
     const bKeys = Object.keys(b);
-    const sharedKeys = Object.keys(a).filter((key) => bKeys.indexOf(key) !== -1);
+    const sharedKeys = Object.keys(a).filter((key2) => bKeys.indexOf(key2) !== -1);
     const newObj = { ...a, ...b };
-    for (const key of sharedKeys) {
-      const sharedValue = mergeValues(a[key], b[key]);
+    for (const key2 of sharedKeys) {
+      const sharedValue = mergeValues(a[key2], b[key2]);
       if (!sharedValue.valid) {
         return {
           valid: false,
-          mergeErrorPath: [key, ...sharedValue.mergeErrorPath]
+          mergeErrorPath: [key2, ...sharedValue.mergeErrorPath]
         };
       }
-      newObj[key] = sharedValue.data;
+      newObj[key2] = sharedValue.data;
     }
     return { valid: true, data: newObj };
   }
@@ -13054,10 +13054,10 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
     if (values) {
       payload.value = {};
       const recordKeys = /* @__PURE__ */ new Set();
-      for (const key of values) {
-        if (typeof key === "string" || typeof key === "number" || typeof key === "symbol") {
-          recordKeys.add(typeof key === "number" ? key.toString() : key);
-          const keyResult = def.keyType._zod.run({ value: key, issues: [] }, ctx2);
+      for (const key2 of values) {
+        if (typeof key2 === "string" || typeof key2 === "number" || typeof key2 === "symbol") {
+          recordKeys.add(typeof key2 === "number" ? key2.toString() : key2);
+          const keyResult = def.keyType._zod.run({ value: key2, issues: [] }, ctx2);
           if (keyResult instanceof Promise) {
             throw new Error("Async schemas not supported in object keys currently");
           }
@@ -13066,34 +13066,34 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
               code: "invalid_key",
               origin: "record",
               issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx2, config())),
-              input: key,
-              path: [key],
+              input: key2,
+              path: [key2],
               inst
             });
             continue;
           }
           const outKey = keyResult.value;
-          const result = def.valueType._zod.run({ value: input[key], issues: [] }, ctx2);
+          const result = def.valueType._zod.run({ value: input[key2], issues: [] }, ctx2);
           if (result instanceof Promise) {
             proms.push(result.then((result2) => {
               if (result2.issues.length) {
-                payload.issues.push(...prefixIssues(key, result2.issues));
+                payload.issues.push(...prefixIssues(key2, result2.issues));
               }
               payload.value[outKey] = result2.value;
             }));
           } else {
             if (result.issues.length) {
-              payload.issues.push(...prefixIssues(key, result.issues));
+              payload.issues.push(...prefixIssues(key2, result.issues));
             }
             payload.value[outKey] = result.value;
           }
         }
       }
       let unrecognized;
-      for (const key in input) {
-        if (!recordKeys.has(key)) {
+      for (const key2 in input) {
+        if (!recordKeys.has(key2)) {
           unrecognized = unrecognized ?? [];
-          unrecognized.push(key);
+          unrecognized.push(key2);
         }
       }
       if (unrecognized && unrecognized.length > 0) {
@@ -13106,18 +13106,18 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
       }
     } else {
       payload.value = {};
-      for (const key of Reflect.ownKeys(input)) {
-        if (key === "__proto__")
+      for (const key2 of Reflect.ownKeys(input)) {
+        if (key2 === "__proto__")
           continue;
-        if (!Object.prototype.propertyIsEnumerable.call(input, key))
+        if (!Object.prototype.propertyIsEnumerable.call(input, key2))
           continue;
-        let keyResult = def.keyType._zod.run({ value: key, issues: [] }, ctx2);
+        let keyResult = def.keyType._zod.run({ value: key2, issues: [] }, ctx2);
         if (keyResult instanceof Promise) {
           throw new Error("Async schemas not supported in object keys currently");
         }
-        const checkNumericKey = typeof key === "string" && number.test(key) && keyResult.issues.length;
+        const checkNumericKey = typeof key2 === "string" && number.test(key2) && keyResult.issues.length;
         if (checkNumericKey) {
-          const retryResult = def.keyType._zod.run({ value: Number(key), issues: [] }, ctx2);
+          const retryResult = def.keyType._zod.run({ value: Number(key2), issues: [] }, ctx2);
           if (retryResult instanceof Promise) {
             throw new Error("Async schemas not supported in object keys currently");
           }
@@ -13127,30 +13127,30 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
         }
         if (keyResult.issues.length) {
           if (def.mode === "loose") {
-            payload.value[key] = input[key];
+            payload.value[key2] = input[key2];
           } else {
             payload.issues.push({
               code: "invalid_key",
               origin: "record",
               issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx2, config())),
-              input: key,
-              path: [key],
+              input: key2,
+              path: [key2],
               inst
             });
           }
           continue;
         }
-        const result = def.valueType._zod.run({ value: input[key], issues: [] }, ctx2);
+        const result = def.valueType._zod.run({ value: input[key2], issues: [] }, ctx2);
         if (result instanceof Promise) {
           proms.push(result.then((result2) => {
             if (result2.issues.length) {
-              payload.issues.push(...prefixIssues(key, result2.issues));
+              payload.issues.push(...prefixIssues(key2, result2.issues));
             }
             payload.value[keyResult.value] = result2.value;
           }));
         } else {
           if (result.issues.length) {
-            payload.issues.push(...prefixIssues(key, result.issues));
+            payload.issues.push(...prefixIssues(key2, result.issues));
           }
           payload.value[keyResult.value] = result.value;
         }
@@ -14288,8 +14288,8 @@ function extractDefs(ctx2, schema) {
     if (defId)
       seen.defId = defId;
     const schema2 = seen.schema;
-    for (const key in schema2) {
-      delete schema2[key];
+    for (const key2 in schema2) {
+      delete schema2[key2];
     }
     schema2.$ref = ref;
   };
@@ -14358,20 +14358,20 @@ function finalize(ctx2, schema) {
       Object.assign(schema2, _cached);
       const isParentRef = zodSchema._zod.parent === ref;
       if (isParentRef) {
-        for (const key in schema2) {
-          if (key === "$ref" || key === "allOf")
+        for (const key2 in schema2) {
+          if (key2 === "$ref" || key2 === "allOf")
             continue;
-          if (!(key in _cached)) {
-            delete schema2[key];
+          if (!(key2 in _cached)) {
+            delete schema2[key2];
           }
         }
       }
       if (refSchema.$ref && refSeen.def) {
-        for (const key in schema2) {
-          if (key === "$ref" || key === "allOf")
+        for (const key2 in schema2) {
+          if (key2 === "$ref" || key2 === "allOf")
             continue;
-          if (key in refSeen.def && JSON.stringify(schema2[key]) === JSON.stringify(refSeen.def[key])) {
-            delete schema2[key];
+          if (key2 in refSeen.def && JSON.stringify(schema2[key2]) === JSON.stringify(refSeen.def[key2])) {
+            delete schema2[key2];
           }
         }
       }
@@ -14383,11 +14383,11 @@ function finalize(ctx2, schema) {
       if (parentSeen?.schema.$ref) {
         schema2.$ref = parentSeen.schema.$ref;
         if (parentSeen.def) {
-          for (const key in schema2) {
-            if (key === "$ref" || key === "allOf")
+          for (const key2 in schema2) {
+            if (key2 === "$ref" || key2 === "allOf")
               continue;
-            if (key in parentSeen.def && JSON.stringify(schema2[key]) === JSON.stringify(parentSeen.def[key])) {
-              delete schema2[key];
+            if (key2 in parentSeen.def && JSON.stringify(schema2[key2]) === JSON.stringify(parentSeen.def[key2])) {
+              delete schema2[key2];
             }
           }
         }
@@ -14488,8 +14488,8 @@ function isTransforming(_schema, _ctx) {
     return isTransforming(def.in, ctx2) || isTransforming(def.out, ctx2);
   }
   if (def.type === "object") {
-    for (const key in def.shape) {
-      if (isTransforming(def.shape[key], ctx2))
+    for (const key2 in def.shape) {
+      if (isTransforming(def.shape[key2], ctx2))
         return true;
     }
     return false;
@@ -14696,15 +14696,15 @@ var objectProcessor = (schema, ctx2, _json, params) => {
   json.type = "object";
   json.properties = {};
   const shape = def.shape;
-  for (const key in shape) {
-    json.properties[key] = process2(shape[key], ctx2, {
+  for (const key2 in shape) {
+    json.properties[key2] = process2(shape[key2], ctx2, {
       ...params,
-      path: [...params.path, "properties", key]
+      path: [...params.path, "properties", key2]
     });
   }
   const allKeys = new Set(Object.keys(shape));
-  const requiredKeys = new Set([...allKeys].filter((key) => {
-    const v = def.shape[key]._zod;
+  const requiredKeys = new Set([...allKeys].filter((key2) => {
+    const v = def.shape[key2]._zod;
     if (ctx2.io === "input") {
       return v.optin === void 0;
     } else {
@@ -15028,14 +15028,14 @@ function _installLazyMethods(inst, group, methods) {
   if (installed.has(group))
     return;
   installed.add(group);
-  for (const key in methods) {
-    const fn = methods[key];
-    Object.defineProperty(proto, key, {
+  for (const key2 in methods) {
+    const fn = methods[key2];
+    Object.defineProperty(proto, key2, {
       configurable: true,
       enumerable: false,
       get() {
         const bound = fn.bind(this);
-        Object.defineProperty(this, key, {
+        Object.defineProperty(this, key2, {
           configurable: true,
           writable: true,
           enumerable: true,
@@ -15044,7 +15044,7 @@ function _installLazyMethods(inst, group, methods) {
         return bound;
       },
       set(v) {
-        Object.defineProperty(this, key, {
+        Object.defineProperty(this, key2, {
           configurable: true,
           writable: true,
           enumerable: true,
@@ -18351,8 +18351,8 @@ function isPlainObject2(value) {
 }
 function mergeCapabilities(base, additional) {
   const result = { ...base };
-  for (const key in additional) {
-    const k = key;
+  for (const key2 in additional) {
+    const k = key2;
     const addValue = additional[k];
     if (addValue === void 0)
       continue;
@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 12e4;
-var VERSION = "0.1.25";
+var VERSION = "0.1.69";
 var Bridge = class {
   http = null;
   wss = null;
@@ -19522,15 +19522,22 @@ ${msg.stack}` : msg.error));
   /**
    * 在 EDA 里执行一段 JS（AsyncFunction，可 await，`eda` 已注入）。
    *
-   * 断连会自动重试一次：部分 EDA 操作（实测 createNetFlag）会让扩展重连，
+   * 断连后**只读操作**自动重试一次：部分 EDA 操作（实测 createNetFlag）会让扩展重连，
    * 此时请求已经发出但回包永远不会来。扩展几秒内就会自己连回来，重试即可成功 ——
    * 比把一个本可恢复的抖动报成失败要好。
+   *
+   * **写操作（noRetry）不重试**：重试一个已经生效的写操作会做第二遍。
    */
-  async execute(code, timeoutMs = DEFAULT_EXEC_TIMEOUT_MS) {
+  async execute(code, timeoutMs = DEFAULT_EXEC_TIMEOUT_MS, noRetry = false) {
     try {
       return await this.executeOnce(code, timeoutMs);
     } catch (e) {
       if (!(e instanceof Error) || e.message !== "DISCONNECTED") throw e;
+      if (noRetry) {
+        throw new Error(
+          "\u6267\u884C\u671F\u95F4\u8FDE\u63A5\u65AD\u5F00\uFF0C\u62FF\u4E0D\u5230\u8FD4\u56DE\u503C\u3002**\u8FD9\u662F\u5199\u64CD\u4F5C\uFF0C\u52A8\u4F5C\u5F88\u53EF\u80FD\u5DF2\u7ECF\u751F\u6548** \u2014\u2014 \u65AD\u5F00\u7684\u662F\u56DE\u5305\uFF0C\u4E0D\u662F\u6267\u884C\u672C\u8EAB\u3002\u8BF7\u5148\u7528\u53EA\u8BFB\u5DE5\u5177\u6838\u5B9E\u5F53\u524D\u72B6\u6001\uFF08\u5982 eda_schematic_components \u770B\u5668\u4EF6\u662F\u5426\u5DF2\u5B58\u5728\uFF09\uFF0C\u786E\u8BA4\u540E\u518D\u51B3\u5B9A\u662F\u5426\u91CD\u505A\uFF0C\u4E0D\u8981\u76F4\u63A5\u91CD\u8BD5\u3002"
+        );
+      }
       log("\u6267\u884C\u671F\u95F4\u8FDE\u63A5\u65AD\u5F00\uFF0C\u7B49\u5F85\u6269\u5C55\u91CD\u8FDE\u540E\u91CD\u8BD5\u4E00\u6B21");
       const back = await this.waitForClient(RECONNECT_WAIT_MS);
       if (!back) {
@@ -19637,13 +19644,25 @@ var connectionTools = [
         active: c.id === ctx2.bridge.activeClient()?.id,
         connected_seconds: Math.round((Date.now() - c.connectedAt) / 1e3)
       }));
+      const verNum = (v) => {
+        const m = v.match(/^(\d+)\.(\d+)\.(\d+)/);
+        if (!m) return null;
+        return Number(m[1]) * 1e6 + Number(m[2]) * 1e3 + Number(m[3]);
+      };
+      const FIXED_IN = verNum("0.1.69");
+      const stale = clients.filter((c) => {
+        const n = verNum(String(c.ext_version ?? ""));
+        return n != null && n < FIXED_IN;
+      });
+      const leak = clients.length > 3 ? `**\u68C0\u6D4B\u5230 ${clients.length} \u6761\u8FDE\u63A5**\uFF0C\u4F46\u6B63\u5E38\u53EA\u8BE5\u6709\u4E00\u6761\uFF08\u6BCF\u4E2A EDA \u6807\u7B7E\u9875\u4E00\u6761\uFF09\u3002` + (stale.length ? `\u5176\u4E2D ${stale.length} \u6761\u6765\u81EA v0.1.69 \u4E4B\u524D\u7684\u6269\u5C55\uFF0C\u90A3\u4E2A\u7248\u672C\u91CD\u8FDE\u65F6\u4E0D\u5173\u65E7\u8FDE\u63A5 \u2014\u2014 \u8BF7\u5728 EDA \u91CC\u91CD\u65B0\u5BFC\u5165 plugin/plugins/eda-pro/extension/ \u4E0B\u7684\u6700\u65B0 .eext\u3002` : "\u5237\u65B0 EDA \u9875\u9762\u53EF\u4EE5\u6E05\u6389\u591A\u4F59\u7684\u3002") + "\u591A\u4F59\u7684\u8FDE\u63A5\u4F1A\u8BA9\u8C03\u7528\u53D1\u5230\u65E9\u5C31\u4E0D\u7528\u7684\u90A3\u6761\u4E0A\uFF0C\u8868\u73B0\u4E3A\u300C\u6CA1\u53CD\u5E94\u300D\u3002" : null;
       return {
         bridge_port: ctx2.bridge.listeningPort,
         paired: rec !== null,
         paired_at: rec ? new Date(rec.pairedAt).toISOString() : null,
         pairing_file: pairingFilePath(),
         connected_clients: clients,
-        hint: clients.length === 0 ? await notConnectedHint(ctx2.bridge.listeningPort) : "\u8FDE\u63A5\u6B63\u5E38\uFF0C\u53EF\u4EE5\u64CD\u4F5C EDA\u3002"
+        connection_leak: leak ?? void 0,
+        hint: clients.length === 0 ? await notConnectedHint(ctx2.bridge.listeningPort) : leak ?? "\u8FDE\u63A5\u6B63\u5E38\uFF0C\u53EF\u4EE5\u64CD\u4F5C EDA\u3002"
       };
     }
   },
@@ -19697,17 +19716,17 @@ var connectionTools = [
 ];
 
 // src/tools/types.ts
-function requireString(args, key) {
-  const v = args[key];
-  if (typeof v !== "string" || !v.trim()) throw new Error(`${key} \u5FC5\u586B\uFF08string\uFF09`);
+function requireString(args, key2) {
+  const v = args[key2];
+  if (typeof v !== "string" || !v.trim()) throw new Error(`${key2} \u5FC5\u586B\uFF08string\uFF09`);
   return v;
 }
-function optionalString(args, key) {
-  const v = args[key];
+function optionalString(args, key2) {
+  const v = args[key2];
   return typeof v === "string" && v.trim() ? v : void 0;
 }
-function optionalBool(args, key, dflt = false) {
-  const v = args[key];
+function optionalBool(args, key2, dflt = false) {
+  const v = args[key2];
   return typeof v === "boolean" ? v : dflt;
 }
 
@@ -19748,7 +19767,7 @@ var createTools = [
   },
   {
     name: "eda_create_board",
-    description: '\u3010\u5199\u64CD\u4F5C\u3011\u5728**\u5F53\u524D\u5DE5\u7A0B**\u91CC\u65B0\u5EFA\u4E00\u5757\u677F\u5B50\uFF0C\u81EA\u52A8\u914D\u597D\u4E00\u5F20\u539F\u7406\u56FE\uFF08\u542B 1 \u9875\uFF09\u548C\u4E00\u4E2A PCB\u3002\n\n\u8FD9\u662F"\u65B0\u5EFA\u677F\u5B50"\u7684\u6B63\u786E\u505A\u6CD5\uFF1A\u5E95\u5C42\u8981\u5148\u5EFA\u539F\u7406\u56FE\u548C PCB \u518D\u7ED1\u5B9A\uFF0C\u672C\u5DE5\u5177\u5DF2\u5C01\u88C5\u3002\n\n\u7ED9\u4E86 name \u4F1A\u5C1D\u8BD5\u521B\u5EFA\u540E\u6539\u540D\uFF1B\u4E0D\u7ED9\u5219\u7528 EDA \u7684\u9ED8\u8BA4\u547D\u540D\uFF08Board1\u3001Board2\u2026\uFF09\u3002\n**\u6539\u540D\u4E0D\u4FDD\u8BC1\u6210\u529F**\uFF1AEDA \u7684 modifyBoardName \u5B9E\u6D4B\u4E0D\u7A33\u5B9A\uFF08\u6709\u65F6\u8FD4\u56DE true \u5374\u6CA1\u751F\u6548\uFF0C\u6709\u65F6\u76F4\u63A5\u8FD4\u56DE false\uFF0C\u539F\u56E0\u672A\u67E5\u660E\uFF09\u3002\u6539\u540D\u5931\u8D25\u65F6\u677F\u5B50\u4ECD\u4F1A\u4EE5\u9ED8\u8BA4\u540D\u6B63\u5E38\u5EFA\u597D\uFF0C\u8FD4\u56DE\u91CC renamed=false \u4E14 rename_failed \u4F1A\u8BF4\u660E\u2014\u2014\u8FD9\u65F6\u8BF7\u8BA9\u7528\u6237\u5728 EDA \u754C\u9762\u91CC\u624B\u52A8\u6539\u540D\u3002\n\n\u6CE8\u610F\u4F5C\u7528\u5728\u5F53\u524D\u6253\u5F00\u7684\u5DE5\u7A0B\u4E0A \u2014\u2014 \u5148\u7528 eda_project_overview \u786E\u8BA4\u662F\u4E0D\u662F\u76EE\u6807\u5DE5\u7A0B\u3002',
+    description: '\u3010\u5199\u64CD\u4F5C\u3011\u5728**\u5F53\u524D\u5DE5\u7A0B**\u91CC\u65B0\u5EFA\u4E00\u5757\u677F\u5B50\uFF0C\u81EA\u52A8\u914D\u597D\u4E00\u5F20\u539F\u7406\u56FE\uFF08\u542B 1 \u9875\uFF09\u548C\u4E00\u4E2A PCB\u3002\n\n\u8FD9\u662F"\u65B0\u5EFA\u677F\u5B50"\u7684\u6B63\u786E\u505A\u6CD5\uFF1A\u5E95\u5C42\u8981\u5148\u5EFA\u539F\u7406\u56FE\u548C PCB \u518D\u7ED1\u5B9A\uFF0C\u672C\u5DE5\u5177\u5DF2\u5C01\u88C5\u3002\n\n\u7ED9\u4E86 name \u4F1A\u521B\u5EFA\u540E\u6539\u540D\uFF1B\u4E0D\u7ED9\u5219\u7528 EDA \u7684\u9ED8\u8BA4\u547D\u540D\uFF08Board1\u3001Board2\u2026\uFF09\u3002\n**\u7ED9\u4E86 name \u65F6\u4F1A\u987A\u5E26\u6253\u5F00\u8FD9\u5757\u677F\u7684\u539F\u7406\u56FE\u9875**\uFF1A\u521A\u5EFA\u7684\u677F\u6587\u6863\u6CA1\u843D\u76D8\uFF0C\u4E0D\u5148\u4FDD\u5B58\u4E00\u6B21\u7684\u8BDD modifyBoardName \u4F1A\u9759\u9ED8\u5931\u8D25\uFF08\u8FD4\u56DE true \u4F46\u540D\u5B57\u6CA1\u53D8\u3001\u91CD\u8BD5\u591A\u4E45\u90FD\u6CA1\u7528\uFF09\u3002\u5DE5\u5177\u4F1A\u81EA\u52A8 openDocument \u2192 save \u2192 \u6539\u540D \u2192 \u6309 schematic uuid \u91CD\u67E5\u786E\u8BA4\uFF0C\u56E0\u6B64\u5EFA\u677F\u8981\u82B1\u5341\u51E0\u79D2\uFF0C\u4E14\u7ED3\u675F\u540E\u5F53\u524D\u7F16\u8F91\u5668\u505C\u5728\u65B0\u677F\u7684\u56FE\u9875\u4E0A\u3002\u4ECD\u672A\u6210\u529F\u65F6 renamed=false \u4E14 rename_failed \u4F1A\u8BF4\u660E\u3002\n\n\u6CE8\u610F\u4F5C\u7528\u5728\u5F53\u524D\u6253\u5F00\u7684\u5DE5\u7A0B\u4E0A \u2014\u2014 \u5148\u7528 eda_project_overview \u786E\u8BA4\u662F\u4E0D\u662F\u76EE\u6807\u5DE5\u7A0B\u3002',
     inputSchema: {
       type: "object",
       properties: { name: { type: "string", description: "\u677F\u5B50\u540D\uFF0C\u53EF\u9009\uFF1B\u4E0D\u7ED9\u7528 EDA \u9ED8\u8BA4\u547D\u540D" } }
@@ -19756,7 +19775,7 @@ var createTools = [
     mutating: true,
     handler: async (args, ctx2) => {
       const name = optionalString(args, "name");
-      return ctx2.exec(
+      const res = await ctx2.exec(
         `
 				const proj = await eda.dmt_Project.getCurrentProjectInfo();
 				if (!proj) return { ok: false, error: '\u5F53\u524D\u6CA1\u6709\u6253\u5F00\u7684\u5DE5\u7A0B' };
@@ -19767,47 +19786,138 @@ var createTools = [
 				const createdName = await eda.dmt_Board.createBoard(schUuid, pcbUuid);
 				if (!createdName) return { ok: false, error: '\u7ED1\u5B9A\u677F\u5B50\u5931\u8D25' };
 
-				// \u5148\u6309\u521B\u5EFA\u65F6\u7684\u540D\u5B57\u53D6\u56DE\u5B8C\u6574\u4FE1\u606F \u2014\u2014 \u6539\u540D\u653E\u5728\u540E\u9762\uFF0C\u56E0\u4E3A\u6539\u540D\u53EF\u80FD\u5931\u8D25\uFF0C
-				// \u5931\u8D25\u65F6\u6211\u4EEC\u4ECD\u8981\u6709 sch/pcb \u7684 uuid \u53EF\u8FD4\u56DE\u3002
-				// \u521A\u5EFA\u597D\u7684\u677F\u5076\u5C14\u67E5\u5230\u65F6 pcb \u5B57\u6BB5\u8FD8\u6CA1\u6302\u4E0A\uFF0C\u91CD\u67E5\u4E00\u6B21\u5373\u53EF\u3002
-				let info = (await eda.dmt_Board.getAllBoardsInfo()).find(b => b.name === createdName);
-				if (!info?.pcb) {
-					await new Promise(r => setTimeout(r, 400));
-					info = (await eda.dmt_Board.getAllBoardsInfo()).find(b => b.name === createdName) || info;
+				// \u2500\u2500 \u5B9A\u4F4D\u521A\u5EFA\u7684\u677F \u2500\u2500
+				// \u5173\u952E\uFF1A\u4E0D\u80FD\u6309\u540D\u5B57\u67E5\u3002\u677F\u5B50\u6CA1\u6709 uuid\uFF0C\u540D\u5B57\u5C31\u662F\u5B83\u7684\u552F\u4E00\u6807\u8BC6\uFF0C\u800C
+				// createBoard \u7ED9\u7684\u662F EDA \u9ED8\u8BA4\u547D\u540D\uFF08Board1\u3001Board2\u2026\uFF09\uFF0C\u5DE5\u7A0B\u91CC
+				// \u5B8C\u5168\u53EF\u80FD\u5DF2\u7ECF\u6709\u4E2A\u540C\u540D\u7684\u65E7\u677F \u2014\u2014 \u6309\u540D\u5B57 find \u4F1A\u649E\u4E0A\u90A3\u4E2A\u65E7\u677F\uFF0C
+				// \u4E8E\u662F\u8FD4\u56DE\u522B\u4EBA\u7684 page uuid\u3002\u8FD9\u4E2A\u5751\u771F\u8E29\u8FC7\uFF1A\u8FDE\u7740\u5EFA\u4E24\u5757\u677F\uFF0C\u4E24\u5757\u90FD
+				// \u62A5\u544A\u4E86\u7B2C\u4E09\u5757\u677F\u7684\u56FE\u9875 uuid\u3002
+				//
+				// \u552F\u4E00\u53EF\u9760\u7684\u5224\u636E\u662F schUuid\uFF1A\u90A3\u662F\u6211\u4EEC\u81EA\u5DF1\u521A\u521B\u5EFA\u7684\u539F\u7406\u56FE uuid\uFF0C
+				// \u5168\u5C40\u552F\u4E00\uFF0C\u8C01\u4E5F\u5192\u5145\u4E0D\u4E86\u3002\u5217\u8868\u6709\u7F13\u5B58\uFF0C\u6240\u4EE5\u8981\u8F6E\u8BE2\u7B49\u5B83\u51FA\u73B0\uFF0C
+				// \u5B81\u53EF\u591A\u7B49 \u2014\u2014 \u62FF\u5230\u786E\u5B9A\u4FE1\u606F\u6BD4\u5FEB\u8FD4\u56DE\u91CD\u8981\u3002
+				let info;
+				let attempts = 0;
+				const tried = [];
+				for (let i = 0; i < 8; i += 1) {
+					attempts = i + 1;
+					const all = (await eda.dmt_Board.getAllBoardsInfo()) || [];
+					info = all.find(function (b) { return b.schematic && b.schematic.uuid === schUuid; });
+					// pcb \u5B57\u6BB5\u5076\u5C14\u6BD4 schematic \u665A\u6302\u4E0A\uFF0C\u7B49\u9F50\u518D\u6536
+					if (info && info.pcb) break;
+					tried.push(all.length);
+					info = undefined;
+					await new Promise(function (r) { setTimeout(r, 500 + i * 500); });
+				}
+				if (!info) {
+					return {
+						ok: false,
+						error: '\u677F\u5B50\u5EFA\u51FA\u6765\u4E86\uFF0C\u4F46\u67E5\u8BE2\u4E0D\u5230\u5B83\u7684\u5B8C\u6574\u4FE1\u606F \u2014\u2014 \u8F6E\u8BE2 ' + attempts +
+							' \u6B21\u90FD\u6CA1\u5728\u677F\u5B50\u5217\u8868\u91CC\u627E\u5230 schematic.uuid=' + schUuid + ' \u7684\u677F\u5B50\u3002' +
+							'\u677F\u5B50\u672C\u8EAB\u5E94\u8BE5\u662F\u597D\u7684\uFF08\u9ED8\u8BA4\u540D ' + createdName + '\uFF09\uFF0C\u8BF7\u5728 EDA \u754C\u9762\u91CC\u786E\u8BA4\u3002' +
+							'\u8FD9\u91CC\u62D2\u7EDD\u8FD4\u56DE\u53EF\u80FD\u662F\u522B\u7684\u677F\u5B50\u7684\u6570\u636E\u3002',
+						created_name: createdName,
+						schematic_uuid: schUuid,
+						pcb_uuid: pcbUuid,
+						boards_seen_per_attempt: tried,
+					};
 				}
 
-				const want = ${JSON.stringify(name ?? null)};
-				let finalName = createdName;
-				let renameNote;
-				if (want && want !== createdName) {
-					// modifyBoardName \u7684\u8FD4\u56DE\u503C\u4E0D\u53EF\u4FE1\uFF08\u5B9E\u6D4B\u6709\u65F6\u8FD4\u56DE true \u5374\u6CA1\u751F\u6548\uFF09\uFF0C
-					// \u4E00\u5F8B\u4EE5\u300C\u91CD\u65B0\u67E5\u8BE2\u5217\u8868\u91CC\u6709\u6CA1\u6709\u65B0\u540D\u5B57\u300D\u4E3A\u51C6\u3002
-					await eda.dmt_Board.modifyBoardName(createdName, want);
-					const names = (await eda.dmt_Board.getAllBoardsInfo()).map(b => b.name);
-					if (names.includes(want)) {
-						finalName = want;
-					} else {
-						renameNote = '\u6539\u540D\u672A\u751F\u6548\uFF0C\u677F\u5B50\u4EE5\u9ED8\u8BA4\u540D ' + createdName + ' \u521B\u5EFA\uFF08\u677F\u5B50\u672C\u8EAB\u662F\u597D\u7684\uFF09\u3002'
-							+ 'EDA \u7684 modifyBoardName \u5B9E\u6D4B\u4E0D\u7A33\u5B9A\uFF0C\u539F\u56E0\u672A\u67E5\u660E\uFF1B\u8BF7\u8BA9\u7528\u6237\u5728 EDA \u754C\u9762\u91CC\u624B\u52A8\u6539\u540D\u3002';
-					}
+				// \u2500\u2500 \u4EA4\u53C9\u6821\u9A8C\uFF1A\u62FF\u5230\u7684\u8FD9\u4EFD\u6570\u636E\u5FC5\u987B\u5904\u5904\u81EA\u6D3D \u2500\u2500
+				const checks = {
+					schematic_uuid_matches: info.schematic.uuid === schUuid,
+					pcb_uuid_matches: !!info.pcb && info.pcb.uuid === pcbUuid,
+					name_matches_create: info.name === createdName,
+					in_current_project: info.parentProjectUuid === proj.uuid,
+					has_page: !!(info.schematic.page && info.schematic.page.length),
+				};
+				const failed = Object.keys(checks).filter(function (k) { return !checks[k]; });
+				if (failed.length) {
+					return {
+						ok: false,
+						error: '\u67E5\u5230\u7684\u677F\u5B50\u6570\u636E\u6CA1\u901A\u8FC7\u4EA4\u53C9\u6821\u9A8C\uFF0C\u4E0D\u6562\u7528\uFF1A' + failed.join('\u3001') +
+							'\u3002\u591A\u534A\u662F\u67E5\u5230\u4E86\u522B\u7684\u677F\u5B50\u6216\u534A\u65E7\u7684\u7F13\u5B58\u3002\u677F\u5B50\u672C\u8EAB\u5E94\u8BE5\u5DF2\u5EFA\u597D\uFF08' + createdName + '\uFF09\uFF0C\u8BF7\u5728 EDA \u754C\u9762\u786E\u8BA4\u3002',
+						checks: checks,
+						schematic_uuid: schUuid,
+						pcb_uuid: pcbUuid,
+					};
 				}
 
 				return {
 					ok: true,
 					board: {
-						name: finalName,
-						uuid: info?.uuid,
-						schematic: info?.schematic ? { uuid: info.schematic.uuid, name: info.schematic.name,
-							pages: (info.schematic.page || []).map(p => ({ uuid: p.uuid, name: p.name })) } : null,
-						pcb: info?.pcb ? { uuid: info.pcb.uuid, name: info.pcb.name } : null,
+						name: createdName,
+						schematic: { uuid: info.schematic.uuid, name: info.schematic.name,
+							pages: (info.schematic.page || []).map(function (p) { return { uuid: p.uuid, name: p.name }; }) },
+						pcb: { uuid: info.pcb.uuid, name: info.pcb.name },
 					},
-					renamed: finalName === want,
-					rename_failed: renameNote,
+					schematic_uuid: schUuid,
 					project: proj.friendlyName || proj.name,
+					// \u8FD9\u5757\u677F\u662F\u9760\u4EC0\u4E48\u8BA4\u51FA\u6765\u7684\u3001\u6821\u9A8C\u8FC7\u54EA\u4E9B\u9879 \u2014\u2014 \u4FBF\u4E8E\u8C03\u7528\u65B9\u5224\u65AD\u53EF\u4FE1\u5EA6
+					identified_by: 'schematic.uuid === createSchematic() \u7684\u8FD4\u56DE\u503C',
+					lookup_attempts: attempts,
+					cross_checks: checks,
 				};
 			`,
         CREATE_TIMEOUT_MS
       );
+      const created = res;
+      if (!created?.ok || !name || !created.board?.name || created.board.name === name) {
+        return res;
+      }
+      const firstPage = created.board.schematic?.pages?.[0]?.uuid ?? "";
+      const renamed = await ctx2.exec(
+        `
+				const WANT = ${JSON.stringify(name)};
+				const SCH = ${JSON.stringify(created.schematic_uuid ?? "")};
+				const PAGE = ${JSON.stringify(firstPage)};
+				const findMine = async function () {
+					return ((await eda.dmt_Board.getAllBoardsInfo()) || [])
+						.find(function (b) { return b.schematic && b.schematic.uuid === SCH; });
+				};
+				const taken = ((await eda.dmt_Board.getAllBoardsInfo()) || [])
+					.some(function (b) { return b.name === WANT && !(b.schematic && b.schematic.uuid === SCH); });
+				if (taken) {
+					return { ok: false, reason: '\u5DE5\u7A0B\u91CC\u5DF2\u7ECF\u6709\u4E00\u5757\u677F\u53EB ' + WANT + '\uFF0C\u677F\u540D\u5FC5\u987B\u552F\u4E00' };
+				}
+
+				// \u5148\u8BA9\u6587\u6863\u843D\u76D8\uFF0C\u5426\u5219\u4E0B\u9762\u7684\u6539\u540D\u4F1A\u8C0E\u62A5\u6210\u529F
+				let saved = false;
+				if (PAGE) {
+					const tab = await eda.dmt_EditorControl.openDocument(PAGE);
+					if (tab) {
+						await eda.dmt_EditorControl.activateDocument(tab);
+						await new Promise(function (r) { setTimeout(r, 1200); });
+						saved = (await eda.sch_Document.save().catch(function () { return false; })) === true;
+						await new Promise(function (r) { setTimeout(r, 1200); });
+					}
+				}
+
+				// \u8FD4\u56DE\u503C\u4E0D\u53EF\u4FE1\uFF0C\u5224\u636E\u4E00\u5F8B\u662F\u300C\u6309 schUuid \u91CD\u67E5\u8FD9\u5757\u677F\u53EB\u4EC0\u4E48\u300D
+				let tries = 0;
+				for (let i = 0; i < 4; i += 1) {
+					tries = i + 1;
+					const mine = await findMine();
+					if (!mine) break;
+					if (mine.name === WANT) return { ok: true, tries: tries, saved: saved };
+					await eda.dmt_Board.modifyBoardName(mine.name, WANT);
+					await new Promise(function (r) { setTimeout(r, 800 + i * 800); });
+					const back = await findMine();
+					if (back && back.name === WANT) return { ok: true, tries: tries, saved: saved };
+				}
+				const last = await findMine();
+				return { ok: false, tries: tries, saved: saved, current_name: last ? last.name : undefined };
+			`,
+        CREATE_TIMEOUT_MS
+      );
+      const okRenamed = renamed?.ok === true;
+      return {
+        ...created,
+        board: { ...created.board, name: okRenamed ? name : created.board.name },
+        renamed: okRenamed,
+        rename_tries: renamed?.tries,
+        rename_failed: okRenamed ? void 0 : `\u6539\u540D\u6CA1\u6210\u529F${renamed?.reason ? `\uFF1A${String(renamed.reason)}` : ""}\u3002\u677F\u5B50\u4EE5 ${String(renamed?.current_name ?? created.board.name)} \u5B58\u5728\uFF0C\u677F\u5B50\u672C\u8EAB\u662F\u597D\u7684\uFF0C\u8BF7\u5728 EDA \u754C\u9762\u91CC\u624B\u52A8\u6539\u540D\u3002`
+      };
     }
   },
   {
@@ -19870,8 +19980,11 @@ var createTools = [
 				}
 				return {
 					ok: false,
-					error: '\u6539\u540D\u672A\u751F\u6548\u3002EDA \u7684 modifyBoardName \u5B9E\u6D4B\u4E0D\u7A33\u5B9A\uFF0C\u539F\u56E0\u672A\u67E5\u660E\uFF1B'
-						+ '\u82E5\u65B0\u540D\u5B57\u4E0E\u73B0\u6709\u677F\u5B50\u91CD\u540D\u4E5F\u4F1A\u5931\u8D25\u3002\u5EFA\u8BAE\u8BA9\u7528\u6237\u5728 EDA \u754C\u9762\u91CC\u624B\u52A8\u6539\u540D\u3002',
+					error: '\u6539\u540D\u672A\u751F\u6548\uFF08modifyBoardName \u8C0E\u62A5\u4E86\u6210\u529F\uFF09\u3002\u6700\u5E38\u89C1\u7684\u539F\u56E0\u662F**\u8FD9\u5757\u677F\u521A\u5EFA\u51FA\u6765\u3001'
+						+ '\u539F\u7406\u56FE\u6587\u6863\u8FD8\u6CA1\u843D\u76D8** \u2014\u2014 \u6B64\u65F6\u6539\u540D\u4E00\u5B9A\u5931\u8D25\u4E14\u8FD4\u56DE true\uFF0C\u7B49\u591A\u4E45\u3001\u91CD\u8BD5\u591A\u5C11\u6B21\u90FD\u6CA1\u7528\u3002'
+						+ '\u89E3\u6CD5\uFF1A\u5148\u7528 eda_open_document \u6253\u5F00\u8FD9\u5757\u677F\u7684\u539F\u7406\u56FE\u9875\uFF0C\u8DD1\u4E00\u6B21 eda_execute '
+						+ '"await eda.sch_Document.save()"\uFF0C\u518D\u56DE\u6765\u6539\u540D\u3002'
+						+ '\uFF08\u53E6\u4E00\u79CD\u53EF\u80FD\u662F\u65B0\u540D\u5B57\u4E0E\u73B0\u6709\u677F\u5B50\u91CD\u540D\uFF0C\u677F\u540D\u5728\u5DE5\u7A0B\u5185\u5FC5\u987B\u552F\u4E00\u3002\uFF09',
 					boards: names,
 				};
 			`,
@@ -19900,9 +20013,9 @@ function parseNetlist(text) {
   const components = [];
   for (const [id, c] of Object.entries(raw.components ?? {})) {
     const pins = [];
-    for (const [key, p] of Object.entries(c.pinInfoMap ?? {})) {
+    for (const [key2, p] of Object.entries(c.pinInfoMap ?? {})) {
       const pin = p;
-      pins.push({ key, name: pin.name ?? "", number: pin.number ?? "", net: pin.net ?? "" });
+      pins.push({ key: key2, name: pin.name ?? "", number: pin.number ?? "", net: pin.net ?? "" });
     }
     pins.sort((a, b) => naturalCompare(a.number, b.number));
     components.push({ id, props: c.props ?? {}, pins });
@@ -20082,6 +20195,952 @@ var datasheetTools = [
   }
 ];
 
+// src/layout/model.ts
+var GRID = 10;
+var FAN_BASE = 40;
+var FAN_STEP = 50;
+var FLAG_LONG = 45;
+var FLAG_WIDE = 40;
+var LABEL_SLOTS = [
+  { name: "\u4E0A", fx: 0, fy: 1 },
+  { name: "\u4E0B", fx: 0, fy: -1 },
+  { name: "\u53F3", fx: 1, fy: 0 },
+  { name: "\u5DE6", fx: -1, fy: 0 },
+  { name: "\u53F3\u4E0A", fx: 1, fy: 1 },
+  { name: "\u5DE6\u4E0A", fx: -1, fy: 1 },
+  { name: "\u53F3\u4E0B", fx: 1, fy: -1 },
+  { name: "\u5DE6\u4E0B", fx: -1, fy: -1 }
+];
+var LABEL_GAP = 12;
+function labelWorld(part, pl, index) {
+  const label = part.labels?.[index];
+  if (!label) return { x: pl.x, y: pl.y };
+  const slotIdx = pl.labelSlots?.[index];
+  if (slotIdx == null) {
+    return { x: pl.x + label.dx, y: pl.y + label.dy };
+  }
+  const slot = LABEL_SLOTS[slotIdx % LABEL_SLOTS.length];
+  const swap = pl.rot === 90 || pl.rot === 270;
+  const halfW = (swap ? part.h : part.w) / 2;
+  const halfH = (swap ? part.w : part.h) / 2;
+  return {
+    x: pl.x + slot.fx * (halfW + LABEL_GAP),
+    y: pl.y + slot.fy * (halfH + LABEL_GAP)
+  };
+}
+function pinWorld(part, pl, pin) {
+  const { dx, dy } = pin;
+  const rad = pl.rot * Math.PI / 180;
+  const cos = Math.round(Math.cos(rad));
+  const sin = Math.round(Math.sin(rad));
+  let rx = dx * cos - dy * sin;
+  const ry = dx * sin + dy * cos;
+  let dir = ((pin.dir + pl.rot) % 360 + 360) % 360;
+  if (pl.mirror) {
+    rx = -rx;
+    dir = (180 - dir + 360) % 360;
+  }
+  return { x: pl.x + rx, y: pl.y + ry, dir };
+}
+function partBox(part, pl) {
+  const swap = pl.rot === 90 || pl.rot === 270;
+  const w = swap ? part.h : part.w;
+  const h = swap ? part.w : part.h;
+  return { minX: pl.x - w / 2, minY: pl.y - h / 2, maxX: pl.x + w / 2, maxY: pl.y + h / 2 };
+}
+function effectiveBox(part, pl) {
+  const box = partBox(part, pl);
+  const stubs = part.stubPins ?? [];
+  if (!stubs.length) return box;
+  const groups = /* @__PURE__ */ new Map();
+  for (const pid of stubs) {
+    const pin = part.pins.find((q) => q.id === pid);
+    if (!pin) continue;
+    const w = pinWorld(part, pl, pin);
+    const [vx, vy] = dirVec(w.dir);
+    const k = `${vx},${vy}`;
+    groups.set(k, [...groups.get(k) ?? [], { x: w.x, y: w.y, vx, vy }]);
+  }
+  let { minX, minY, maxX, maxY } = box;
+  for (const list of groups.values()) {
+    const horizontal = (list[0]?.vx ?? 0) !== 0;
+    list.sort((a, b) => horizontal ? a.y - b.y : a.x - b.x);
+    list.forEach((g, idx) => {
+      const len = FAN_BASE + idx * FAN_STEP;
+      const ex = g.x + g.vx * len;
+      const ey = g.y + g.vy * len;
+      const along = FLAG_LONG;
+      const wide = FLAG_WIDE / 2;
+      const x0 = Math.min(g.x, ex + g.vx * along) - (horizontal ? 0 : wide);
+      const x1 = Math.max(g.x, ex + g.vx * along) + (horizontal ? 0 : wide);
+      const y0 = Math.min(g.y, ey + g.vy * along) - (horizontal ? wide : 0);
+      const y1 = Math.max(g.y, ey + g.vy * along) + (horizontal ? wide : 0);
+      minX = Math.min(minX, x0);
+      minY = Math.min(minY, y0);
+      maxX = Math.max(maxX, x1);
+      maxY = Math.max(maxY, y1);
+    });
+  }
+  return { minX, minY, maxX, maxY };
+}
+function overlapArea(a, b) {
+  const w = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
+  const h = Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+function dirVec(dir) {
+  if (dir === 0) return [1, 0];
+  if (dir === 90) return [0, 1];
+  if (dir === 180) return [-1, 0];
+  return [0, -1];
+}
+var snap = (v) => Math.round(v / GRID) * GRID;
+function pinLocal(pl, world, id) {
+  let rx = world.x - pl.x;
+  const ry = world.y - pl.y;
+  let dir = world.dir;
+  if (pl.mirror) {
+    rx = -rx;
+    dir = (180 - dir + 360) % 360;
+  }
+  const rad = -pl.rot * Math.PI / 180;
+  const cos = Math.round(Math.cos(rad));
+  const sin = Math.round(Math.sin(rad));
+  const dx = rx * cos - ry * sin;
+  const dy = rx * sin + ry * cos;
+  return { id, dx, dy, dir: ((dir - pl.rot) % 360 + 360) % 360 };
+}
+
+// src/layout/cost.ts
+var MIN_GAP = 60;
+var DEFAULT_WEIGHTS = {
+  partOverlap: 8,
+  // 文字压在一起比线长几个单位严重得多，权重要压过 wireLength
+  textOverlap: 20,
+  wireLength: 1,
+  crossing: 400,
+  pinFacing: 250,
+  netSpread: 0.3,
+  tooClose: 6,
+  // 「电源在上、地在下」是原理图最强的视觉约定，值得给个不低的权重，
+  // 让退火主动把器件转到地脚朝下的姿势，而不是事后硬掰符号方向。
+  supplyDir: 60,
+  // 占地面积。单位是「格数」，一个 600x400 的块约合 24 格，
+  // 权重 4 意味着多占一格约等于多走 4 个单位线长 —— 够把器件收拢，又不至于挤成一堆
+  // （挤过头会被 tooClose 拦住）。缺了这一项，组内网络少时器件会散得到处都是：
+  // 实测 3 个器件的电源区占到 749x629，组框直接顶出图纸。
+  spread: 4,
+  // 芯片朝向。要压得过「转一下能省点线长」的诱惑：一条线通常几十到几百
+  // 单位，而转 90° 只罚 2×150=300，足以让退火老实待着；真到了不转就摆不下
+  // 的地步，几百的收益仍然能翻盘 —— 这是软约束，不是禁令。
+  chipRotation: 150
+};
+function gapBetween(a, b) {
+  const gx = Math.max(a.minX - b.maxX, b.minX - a.maxX);
+  const gy = Math.max(a.minY - b.maxY, b.minY - a.maxY);
+  return Math.max(gx, gy);
+}
+function labelBox(text, x, y, fontSize = 7) {
+  let w = 0;
+  for (let i = 0; i < text.length; i++) w += text.charCodeAt(i) > 127 ? fontSize : fontSize * 0.6;
+  return { minX: x, minY: y - fontSize / 2, maxX: x + w, maxY: y + fontSize / 2 };
+}
+function segCross(a1, a2, b1, b2) {
+  const d = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const d1 = d(b1, b2, a1);
+  const d2 = d(b1, b2, a2);
+  const d3 = d(a1, a2, b1);
+  const d4 = d(a1, a2, b2);
+  return (d1 > 0 && d2 < 0 || d1 < 0 && d2 > 0) && (d3 > 0 && d4 < 0 || d3 < 0 && d4 > 0);
+}
+function evaluate(parts, nets, layout, weights = DEFAULT_WEIGHTS) {
+  const ids = [...parts.keys()];
+  const boxes = /* @__PURE__ */ new Map();
+  const bodies = /* @__PURE__ */ new Map();
+  for (const id of ids) {
+    const p = parts.get(id);
+    const pl = layout.get(id);
+    if (!p || !pl) continue;
+    boxes.set(id, effectiveBox(p, pl));
+    bodies.set(id, partBox(p, pl));
+  }
+  let partOverlap = 0;
+  let tooClose = 0;
+  for (let i = 0; i < ids.length; i++) {
+    const a = boxes.get(ids[i]);
+    if (!a) continue;
+    for (let j = i + 1; j < ids.length; j++) {
+      const b = boxes.get(ids[j]);
+      if (!b) continue;
+      partOverlap += overlapArea(a, b);
+      const gap = gapBetween(a, b);
+      if (gap >= 0 && gap < MIN_GAP) tooClose += MIN_GAP - gap;
+    }
+  }
+  const texts = [];
+  for (const id of ids) {
+    const p = parts.get(id);
+    const pl = layout.get(id);
+    if (!p || !pl) continue;
+    (p.labels ?? []).forEach((l, i) => {
+      const w = labelWorld(p, pl, i);
+      const b = labelBox(l.text, w.x, w.y);
+      const halfW = (b.maxX - b.minX) / 2;
+      texts.push({ minX: b.minX - halfW, maxX: b.maxX - halfW, minY: b.minY, maxY: b.maxY });
+    });
+  }
+  let textOverlap = 0;
+  for (let i = 0; i < texts.length; i++) {
+    const t = texts[i];
+    for (let j = i + 1; j < texts.length; j++) textOverlap += overlapArea(t, texts[j]);
+    for (const id of ids) {
+      const b = bodies.get(id);
+      if (b) textOverlap += overlapArea(t, b);
+    }
+  }
+  let spread = 0;
+  {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const b of boxes.values()) {
+      minX = Math.min(minX, b.minX);
+      minY = Math.min(minY, b.minY);
+      maxX = Math.max(maxX, b.maxX);
+      maxY = Math.max(maxY, b.maxY);
+    }
+    if (Number.isFinite(minX)) {
+      const w = maxX - minX;
+      const h = maxY - minY;
+      const area = w / 100 * (h / 100);
+      const aspectPenalty = Math.abs(w - h * 1.4) / 100;
+      spread = area + aspectPenalty * 3;
+    }
+  }
+  let supplyDir = 0;
+  for (const id of ids) {
+    const p = parts.get(id);
+    const pl = layout.get(id);
+    if (!p || !pl) continue;
+    for (const pid of p.stubPins ?? []) {
+      const pin = p.pins.find((q) => q.id === pid);
+      if (!pin) continue;
+      const w = pinWorld(p, pl, pin);
+      const want = (p.stubUp ?? []).includes(pid) ? 90 : 270;
+      if (w.dir !== want) supplyDir += w.dir === (want + 180) % 360 ? 2 : 1;
+    }
+  }
+  let chipRotation = 0;
+  for (const id of ids) {
+    const p = parts.get(id);
+    const pl = layout.get(id);
+    if (!p || !pl || p.pins.length < 3) continue;
+    if (pl.rot === 90 || pl.rot === 270) chipRotation += 2;
+    else if (pl.rot === 180) chipRotation += 1;
+    if (pl.mirror) chipRotation += 1;
+  }
+  const pinPos = (ref) => {
+    const dot = ref.lastIndexOf(".");
+    if (dot <= 0) return null;
+    const part = parts.get(ref.slice(0, dot));
+    const pl = layout.get(ref.slice(0, dot));
+    if (!part || !pl) return null;
+    const pin = part.pins.find((q) => q.id === ref.slice(dot + 1));
+    return pin ? pinWorld(part, pl, pin) : null;
+  };
+  let wireLength = 0;
+  let netSpread = 0;
+  let pinFacing = 0;
+  const segments = [];
+  for (const net of nets) {
+    const pts = net.pins.map(pinPos).filter((q) => q != null);
+    if (pts.length < 2) continue;
+    const used = [0];
+    const rest = pts.map((_, i) => i).slice(1);
+    while (rest.length) {
+      let best = Infinity;
+      let bi = 0;
+      let bu = 0;
+      for (const u of used) {
+        const pu2 = pts[u];
+        for (let k = 0; k < rest.length; k++) {
+          const pv2 = pts[rest[k]];
+          const d = Math.abs(pu2.x - pv2.x) + Math.abs(pu2.y - pv2.y);
+          if (d < best) {
+            best = d;
+            bi = k;
+            bu = u;
+          }
+        }
+      }
+      const v = rest[bi];
+      const pu = pts[bu];
+      const pv = pts[v];
+      wireLength += best;
+      segments.push([
+        [pu.x, pu.y],
+        [pv.x, pv.y]
+      ]);
+      for (const [from, to] of [
+        [pu, pv],
+        [pv, pu]
+      ]) {
+        const [vx, vy] = dirVec(from.dir);
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const len = Math.abs(dx) + Math.abs(dy) || 1;
+        const align = (vx * dx + vy * dy) / len;
+        if (align < 0) pinFacing += -align;
+      }
+      used.push(v);
+      rest.splice(bi, 1);
+    }
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    netSpread += Math.max(...xs) - Math.min(...xs) + (Math.max(...ys) - Math.min(...ys));
+  }
+  let crossing = 0;
+  for (let i = 0; i < segments.length; i++) {
+    const si = segments[i];
+    if (!si) continue;
+    for (let j = i + 1; j < segments.length; j++) {
+      const sj = segments[j];
+      if (sj && segCross(si[0], si[1], sj[0], sj[1])) crossing += 1;
+    }
+  }
+  const total = weights.partOverlap * partOverlap + weights.textOverlap * textOverlap + weights.wireLength * wireLength + weights.crossing * crossing + weights.pinFacing * pinFacing + weights.netSpread * netSpread + weights.tooClose * tooClose + weights.supplyDir * supplyDir + weights.chipRotation * chipRotation + weights.spread * spread;
+  return { total, partOverlap, textOverlap, wireLength, crossing, pinFacing, netSpread, tooClose, supplyDir, spread, chipRotation };
+}
+
+// src/layout/anneal.ts
+function makeRng(seed) {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13;
+    s >>>= 0;
+    s ^= s >> 17;
+    s ^= s << 5;
+    s >>>= 0;
+    return s / 4294967296;
+  };
+}
+var ROTS = [0, 90, 180, 270];
+function anneal(parts, nets, initial, opts = {}) {
+  const {
+    iterations = 2e4,
+    startTemp = 2e3,
+    endTemp = 1,
+    maxShiftGrids = 6,
+    weights = DEFAULT_WEIGHTS,
+    seed = 12345,
+    bounds,
+    onProgress
+  } = opts;
+  const rng = makeRng(seed);
+  const movable = [...parts.keys()].filter((id) => !parts.get(id)?.fixed);
+  if (!movable.length) {
+    const c = evaluate(parts, nets, initial, weights);
+    return { layout: initial, cost: c, initialCost: c, iterations: 0, accepted: 0 };
+  }
+  const cur = /* @__PURE__ */ new Map();
+  for (const [k, v] of initial) {
+    const p = parts.get(k);
+    const n = p?.labels?.length ?? 0;
+    cur.set(k, { ...v, labelSlots: v.labelSlots ? [...v.labelSlots] : new Array(n).fill(0) });
+  }
+  let curCost = evaluate(parts, nets, cur, weights);
+  const initialCost = curCost;
+  let best = new Map([...cur].map(([k, v]) => [k, { ...v }]));
+  let bestCost = curCost;
+  let accepted = 0;
+  const clamp = (pl) => {
+    if (!bounds) return pl;
+    return {
+      ...pl,
+      x: Math.min(Math.max(pl.x, bounds.minX), bounds.maxX),
+      y: Math.min(Math.max(pl.y, bounds.minY), bounds.maxY)
+    };
+  };
+  for (let i = 0; i < iterations; i++) {
+    const temp = startTemp * Math.pow(endTemp / startTemp, i / iterations);
+    const id = movable[Math.floor(rng() * movable.length)];
+    const old = cur.get(id);
+    if (!old) continue;
+    const before = { ...old };
+    const move = rng();
+    const labelCount = parts.get(id)?.labels?.length ?? 0;
+    if (labelCount && move < 0.15) {
+      const slots = [...before.labelSlots ?? new Array(labelCount).fill(0)];
+      const which = Math.floor(rng() * labelCount);
+      slots[which] = Math.floor(rng() * LABEL_SLOTS.length);
+      cur.set(id, { ...before, labelSlots: slots });
+    } else if (move < 0.6) {
+      const scale = Math.max(1, Math.round(maxShiftGrids * temp / startTemp));
+      const dx = (Math.floor(rng() * (2 * scale + 1)) - scale) * GRID;
+      const dy = (Math.floor(rng() * (2 * scale + 1)) - scale) * GRID;
+      cur.set(id, clamp({ ...before, x: snap(before.x + dx), y: snap(before.y + dy) }));
+    } else if (move < 0.82) {
+      cur.set(id, { ...before, rot: ROTS[Math.floor(rng() * 4)] });
+    } else if (move < 0.9) {
+      cur.set(id, { ...before, mirror: !before.mirror });
+    } else {
+      const other = movable[Math.floor(rng() * movable.length)];
+      const op = cur.get(other);
+      if (!op || other === id) continue;
+      cur.set(id, clamp({ ...before, x: op.x, y: op.y }));
+      cur.set(other, clamp({ ...op, x: before.x, y: before.y }));
+      const cost2 = evaluate(parts, nets, cur, weights);
+      const delta2 = cost2.total - curCost.total;
+      if (delta2 <= 0 || rng() < Math.exp(-delta2 / temp)) {
+        curCost = cost2;
+        accepted += 1;
+        if (cost2.total < bestCost.total) {
+          bestCost = cost2;
+          best = new Map([...cur].map(([k, v]) => [k, { ...v }]));
+        }
+      } else {
+        cur.set(id, before);
+        cur.set(other, op);
+      }
+      if (onProgress && i % 500 === 0) onProgress(i, curCost.total, temp);
+      continue;
+    }
+    const cost = evaluate(parts, nets, cur, weights);
+    const delta = cost.total - curCost.total;
+    if (delta <= 0 || rng() < Math.exp(-delta / temp)) {
+      curCost = cost;
+      accepted += 1;
+      if (cost.total < bestCost.total) {
+        bestCost = cost;
+        best = new Map([...cur].map(([k, v]) => [k, { ...v }]));
+      }
+    } else {
+      cur.set(id, before);
+    }
+    if (onProgress && i % 500 === 0) onProgress(i, curCost.total, temp);
+  }
+  return { layout: best, cost: bestCost, initialCost, iterations, accepted };
+}
+
+// src/layout/route.ts
+var key = (x, y) => x / GRID * 1e5 + y / GRID;
+var Heap = class {
+  a = [];
+  push(f, v) {
+    this.a.push({ f, v });
+    let i = this.a.length - 1;
+    while (i > 0) {
+      const p = i - 1 >> 1;
+      if (this.a[p].f <= f) break;
+      this.a[i] = this.a[p];
+      i = p;
+    }
+    this.a[i] = { f, v };
+  }
+  pop() {
+    const top = this.a[0];
+    const last = this.a.pop();
+    if (this.a.length && last) {
+      let i = 0;
+      for (; ; ) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let m = i;
+        if (l < this.a.length && this.a[l].f < (m === i ? last.f : this.a[m].f)) m = l;
+        if (r < this.a.length && this.a[r].f < (m === i ? last.f : this.a[m].f)) m = r;
+        if (m === i) break;
+        this.a[i] = this.a[m];
+        i = m;
+      }
+      this.a[i] = last;
+    }
+    return top;
+  }
+  get size() {
+    return this.a.length;
+  }
+};
+var DIRS = [
+  [GRID, 0],
+  [-GRID, 0],
+  [0, GRID],
+  [0, -GRID]
+];
+function route(parts, nets, layout, opts = {}) {
+  const { clearance = 10, maxExpand = 6e4, obstacles = [] } = opts;
+  let bMinX = Infinity;
+  let bMinY = Infinity;
+  let bMaxX = -Infinity;
+  let bMaxY = -Infinity;
+  for (const [id, pl] of layout) {
+    const p = parts.get(id);
+    if (!p) continue;
+    const b = partBox(p, pl);
+    bMinX = Math.min(bMinX, b.minX);
+    bMinY = Math.min(bMinY, b.minY);
+    bMaxX = Math.max(bMaxX, b.maxX);
+    bMaxY = Math.max(bMaxY, b.maxY);
+  }
+  const pad = 200;
+  const bounds = opts.bounds ?? {
+    minX: Math.floor((bMinX - pad) / GRID) * GRID,
+    minY: Math.floor((bMinY - pad) / GRID) * GRID,
+    maxX: Math.ceil((bMaxX + pad) / GRID) * GRID,
+    maxY: Math.ceil((bMaxY + pad) / GRID) * GRID
+  };
+  const blocked = /* @__PURE__ */ new Set();
+  for (const [id, pl] of layout) {
+    const p = parts.get(id);
+    if (!p) continue;
+    const b = partBox(p, pl);
+    const x0 = Math.floor((b.minX - clearance) / GRID) * GRID;
+    const x1 = Math.ceil((b.maxX + clearance) / GRID) * GRID;
+    const y0 = Math.floor((b.minY - clearance) / GRID) * GRID;
+    const y1 = Math.ceil((b.maxY + clearance) / GRID) * GRID;
+    for (let x = x0; x <= x1; x += GRID) for (let y = y0; y <= y1; y += GRID) blocked.add(key(x, y));
+  }
+  for (const o of obstacles) {
+    const x0 = Math.floor((o.minX - clearance) / GRID) * GRID;
+    const x1 = Math.ceil((o.maxX + clearance) / GRID) * GRID;
+    const y0 = Math.floor((o.minY - clearance) / GRID) * GRID;
+    const y1 = Math.ceil((o.maxY + clearance) / GRID) * GRID;
+    for (let x = x0; x <= x1; x += GRID) for (let y = y0; y <= y1; y += GRID) blocked.add(key(x, y));
+  }
+  const pinCells = /* @__PURE__ */ new Map();
+  const pinExact = /* @__PURE__ */ new Map();
+  const pinAt = /* @__PURE__ */ new Map();
+  for (const [id, pl] of layout) {
+    const p = parts.get(id);
+    if (!p) continue;
+    for (const pin of p.pins) {
+      const w = pinWorld(p, pl, pin);
+      const gx = Math.round(w.x / GRID) * GRID;
+      const gy = Math.round(w.y / GRID) * GRID;
+      const ref = `${id}.${pin.id}`;
+      pinCells.set(ref, { x: gx, y: gy, dir: w.dir });
+      pinExact.set(ref, { x: w.x, y: w.y });
+      pinAt.set(key(gx, gy), ref);
+      blocked.delete(key(gx, gy));
+      const [vx, vy] = dirVec(w.dir);
+      blocked.delete(key(gx + vx * GRID, gy + vy * GRID));
+    }
+  }
+  const occupied = /* @__PURE__ */ new Map();
+  const result = [];
+  let totalLength = 0;
+  let totalBends = 0;
+  let failedCount = 0;
+  for (const net of nets) {
+    const endpoints = net.pins.map((ref) => ({ ref, cell: pinCells.get(ref) })).filter((e) => e.cell != null);
+    if (endpoints.length < 2) continue;
+    const paths = [];
+    const failed = [];
+    const ownPins = new Set(net.pins);
+    const connected = /* @__PURE__ */ new Set([key(endpoints[0].cell.x, endpoints[0].cell.y)]);
+    for (let i = 1; i < endpoints.length; i++) {
+      const target = endpoints[i];
+      const goal = key(target.cell.x, target.cell.y);
+      if (connected.has(goal)) continue;
+      const open = new Heap();
+      const gScore = /* @__PURE__ */ new Map();
+      const cameFrom = /* @__PURE__ */ new Map();
+      const start = goal;
+      gScore.set(start, 0);
+      const conn = [...connected].map((k) => ({ x: Math.floor(k / 1e5) * GRID, y: k % 1e5 * GRID }));
+      const h = (x, y) => {
+        let m = Infinity;
+        for (const c of conn) m = Math.min(m, Math.abs(x - c.x) + Math.abs(y - c.y));
+        return m;
+      };
+      open.push(h(target.cell.x, target.cell.y), start);
+      let found = null;
+      let expanded = 0;
+      while (open.size && expanded < maxExpand) {
+        const cur2 = open.pop();
+        if (!cur2) break;
+        const cx = Math.floor(cur2.v / 1e5) * GRID;
+        const cy = cur2.v % 1e5 * GRID;
+        if (connected.has(cur2.v) && cur2.v !== start) {
+          found = cur2.v;
+          break;
+        }
+        expanded += 1;
+        const g = gScore.get(cur2.v) ?? Infinity;
+        const prev = cameFrom.get(cur2.v);
+        for (const [dx, dy] of DIRS) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < bounds.minX || nx > bounds.maxX || ny < bounds.minY || ny > bounds.maxY) continue;
+          const nk = key(nx, ny);
+          if (blocked.has(nk) && !connected.has(nk)) continue;
+          const pinHere = pinAt.get(nk);
+          if (pinHere && !ownPins.has(pinHere)) continue;
+          let step = GRID;
+          if (prev != null) {
+            const px = Math.floor(prev / 1e5) * GRID;
+            const py = prev % 1e5 * GRID;
+            if (px - cx === 0 !== (cx - nx === 0)) step += GRID * 2;
+          }
+          const owner = occupied.get(nk);
+          if (owner && owner !== net.id) step += GRID * 40;
+          const ng = g + step;
+          if (ng < (gScore.get(nk) ?? Infinity)) {
+            gScore.set(nk, ng);
+            cameFrom.set(nk, cur2.v);
+            open.push(ng + h(nx, ny), nk);
+          }
+        }
+      }
+      if (found == null) {
+        failed.push(target.ref);
+        failedCount += 1;
+        continue;
+      }
+      const cells = [];
+      let cur = found;
+      while (cur != null) {
+        cells.push(cur);
+        cur = cameFrom.get(cur);
+      }
+      const raw = cells.map((k) => [Math.floor(k / 1e5) * GRID, k % 1e5 * GRID]);
+      const poly = [];
+      for (let k = 0; k < raw.length; k++) {
+        const a = raw[k - 1];
+        const b = raw[k];
+        const c = raw[k + 1];
+        if (!a || !c) {
+          poly.push(b);
+          continue;
+        }
+        const collinear = a[0] === b[0] && b[0] === c[0] || a[1] === b[1] && b[1] === c[1];
+        if (!collinear) poly.push(b);
+      }
+      const stitch = (grid, ex) => {
+        const seg = [];
+        if (grid[0] !== ex.x && grid[1] !== ex.y) seg.push([ex.x, grid[1]]);
+        seg.push([ex.x, ex.y]);
+        return seg;
+      };
+      const tailExact = pinExact.get(target.ref);
+      const tail = poly[poly.length - 1];
+      if (tailExact && tail && (tail[0] !== tailExact.x || tail[1] !== tailExact.y)) {
+        poly.push(...stitch(tail, tailExact));
+      }
+      const headRef = pinAt.get(found);
+      const headExact = headRef && ownPins.has(headRef) ? pinExact.get(headRef) : void 0;
+      const head = poly[0];
+      if (headExact && head && (head[0] !== headExact.x || head[1] !== headExact.y)) {
+        poly.unshift(...stitch(head, headExact).reverse());
+      }
+      paths.push(poly);
+      totalBends += Math.max(0, poly.length - 2);
+      for (let k = 1; k < raw.length; k++) {
+        const a = raw[k - 1];
+        const b = raw[k];
+        totalLength += Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+      }
+      for (const k of cells) {
+        connected.add(k);
+        occupied.set(k, net.id);
+      }
+    }
+    result.push({ netId: net.id, paths, failed });
+  }
+  return { nets: result, totalLength, totalBends, failedCount };
+}
+
+// src/layout/optimize.ts
+function scoreOf(cost, routed) {
+  return routed.failedCount * 1e5 + cost.partOverlap * 8 + cost.textOverlap * 20 + cost.crossing * 400 + routed.totalLength * 1 + routed.totalBends * 30;
+}
+function optimize(parts, nets, initial, opts = {}) {
+  const {
+    rounds = 8,
+    patience = 3,
+    iterations = 3e4,
+    bounds,
+    weights = DEFAULT_WEIGHTS,
+    seed = 1,
+    onRound
+  } = opts;
+  let best = null;
+  let stale = 0;
+  const history = [];
+  for (let r = 0; r < rounds; r++) {
+    const w = { ...weights, tooClose: weights.tooClose * (1 + r * 0.25) };
+    const from = best ? best.layout : initial;
+    const a = anneal(parts, nets, from, { iterations, bounds, weights: w, seed: seed + r * 977 });
+    const routed = route(parts, nets, a.layout);
+    const cost = evaluate(parts, nets, a.layout, weights);
+    const score = scoreOf(cost, routed);
+    history.push({
+      round: r + 1,
+      score,
+      wireLength: routed.totalLength,
+      bends: routed.totalBends,
+      failed: routed.failedCount
+    });
+    if (onRound) {
+      onRound(r + 1, score, `\u7EBF\u957F ${routed.totalLength} \u62D0\u5F2F ${routed.totalBends} \u5931\u8D25 ${routed.failedCount}`);
+    }
+    if (!best || score < best.score) {
+      best = { layout: a.layout, routed, cost, score, rounds: r + 1, history };
+      stale = 0;
+    } else {
+      stale += 1;
+      if (stale >= patience) break;
+    }
+  }
+  if (!best) {
+    const routed = route(parts, nets, initial);
+    const cost = evaluate(parts, nets, initial, weights);
+    best = { layout: initial, routed, cost, score: scoreOf(cost, routed), rounds: 0, history };
+  }
+  best.history = history;
+  return best;
+}
+
+// src/tools/layout-tool.ts
+var ENSURE_SCH = `
+	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
+	if (!_page) return { error: 'NOT_SCH_EDITOR' };
+`;
+var layoutTools = [
+  {
+    name: "eda_optimize_layout",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u91CD\u65B0\u6446\u653E\u5668\u4EF6\u5E76\u91CD\u65B0\u8D70\u7EBF\uFF0C\u76EE\u6807\u662F**\u4EBA\u80FD\u770B\u61C2**\uFF1A\u5668\u4EF6\u4E0D\u91CD\u53E0\u3001\u6587\u5B57\u4E0D\u91CD\u53E0\u3001\u8FDE\u7EBF\u77ED\u3001\u4EA4\u53C9\u5C11\u3001\u62D0\u5F2F\u5C11\u3001\u8BE5\u7AD6\u653E\u7684\u7AD6\u653E\u3002\n\n\u8FD9\u662F\u81EA\u5EFA\u7684\u5E03\u5C40\u5668\uFF0C\u4E0D\u662F EDA \u81EA\u5E26\u7684 \u2014\u2014 EDA \u7684 autoLayout \u53EA\u6309\u8FDE\u63A5\u5173\u7CFB\u6392\uFF0C\u4ECE\u4E0D\u65CB\u8F6C\u5668\u4EF6\uFF08\u6240\u4EE5\u56FE\u4E0A\u6C38\u8FDC\u53EA\u6709\u6A2A\u6392\uFF09\uFF0C\u4E5F\u4E0D\u7BA1\u6587\u5B57\u91CD\u53E0\uFF1B\u5B83\u7684 autoRouting \u8FD8\u4F1A\u628A\u5BFC\u7EBF\u4ECE\u5F15\u811A\u4E0A\u626F\u6389\u3002\n\n\u505A\u6CD5\uFF1A\u6A21\u62DF\u9000\u706B\u51B3\u5B9A\u6BCF\u4E2A\u5668\u4EF6\u7684\u4F4D\u7F6E\u4E0E\u671D\u5411\uFF08\u5E73\u79FB\uFF0F\u8F6C\u89D2\uFF0F\u7FFB\u9762\uFF0F\u4EA4\u6362\uFF09\uFF0CA\\* \u5728\u7F51\u683C\u4E0A\u8D70\u6B63\u4EA4\u7EBF\uFF08\u62D0\u5F2F\u7F5A\u5206\u3001\u538B\u522B\u7684\u7F51\u7EDC\u91CD\u7F5A\u3001\u540C\u7F51\u7EDC\u7684\u7EBF\u53EF\u5171\u7528\u6210 T \u578B\u5206\u652F\uFF09\uFF0C\u4E24\u8005\u4EA4\u66FF\u8FED\u4EE3\u82E5\u5E72\u8F6E\uFF0C\u7528**\u771F\u5B9E\u5E03\u7EBF\u7ED3\u679C**\u6253\u5206\u7559\u6700\u597D\u7684\u4E00\u8F6E\u3002\n\n**\u4F60\u53EA\u9700\u8981\u7ED9\u51FA\u7F51\u7EDC\u8868**\uFF08\u54EA\u4E2A\u811A\u8FDE\u54EA\u4E2A\u811A\uFF09\u548C\u5927\u81F4\u7684\u6446\u653E\uFF0C\u4F4D\u7F6E\u548C\u89D2\u5EA6\u4EA4\u7ED9\u5B83\u3002\u628A\u63A5\u53E3\u8FDE\u63A5\u5668\u4E4B\u7C7B\u5FC5\u987B\u9489\u5728\u56FA\u5B9A\u4F4D\u7F6E\u7684\u5668\u4EF6\u586B\u8FDB keep_fixed\u3002\n\n\u6CE8\u610F\u5B83\u4F1A\u6E05\u6389\u5F53\u524D\u9875\u7684\u5BFC\u7EBF\u91CD\u753B\u3002\u7535\u6E90\u4E0E\u5730\u4E0D\u8981\u653E\u8FDB nets \u2014\u2014 \u90A3\u4E9B\u8BE5\u7528\u7B26\u53F7\uFF0C\u653E\u8FDB\u6765\u4F1A\u628A\u6240\u6709\u5668\u4EF6\u62C9\u5230\u4E00\u8D77\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nets: {
+          type: "object",
+          description: '{ \u7F51\u7EDC\u540D: ["\u4F4D\u53F7.\u5F15\u811A\u53F7", \u2026] }\uFF0C\u4E0E eda_arrange_block \u540C\u683C\u5F0F\u3002\u53EA\u653E\u4FE1\u53F7\u7F51\u3002',
+          additionalProperties: { type: "array", items: { type: "string" } }
+        },
+        power_nets: {
+          type: "object",
+          description: '\u7535\u6E90\u4E0E\u5730\u7F51\u7EDC\uFF1A{ "GND": ["U1.1","C1.1"], "+5V": ["U1.3"] }\u3002\u8FD9\u4E9B\u7F51\u7EDC\u4E0D\u53C2\u4E0E\u5E03\u7EBF\uFF08\u5B83\u4EEC\u8BE5\u7528\u7B26\u53F7\u8868\u8FBE\uFF09\uFF0C\u4F46\u5DE5\u5177\u4F1A\u4E3A\u6BCF\u4E2A\u5F15\u811A**\u9884\u7559\u7B26\u53F7\u4F4D\u7F6E**\uFF0C\u5E76\u5728\u5199\u56DE\u65F6\u81EA\u52A8\u628A\u7B26\u53F7\u653E\u4E0A\u53BB\u3002\u4E0D\u4F20\u7684\u8BDD\u5E03\u5C40\u4E00\u6536\u7D27\uFF0C\u7B26\u53F7\u5C31\u4F1A\u538B\u5728\u90BB\u8FD1\u5668\u4EF6\u4E0A \u2014\u2014 \u5B9E\u6D4B\u6F0F\u6389\u8FD9\u4E00\u6B65\uFF0C\u4E09\u4E2A\u7535\u5BB9\u5404\u88AB GND \u7B26\u53F7\u538B\u4F4F\u4E00\u5757\u3002',
+          additionalProperties: { type: "array", items: { type: "string" } }
+        },
+        keep_fixed: {
+          type: "array",
+          items: { type: "string" },
+          description: '\u4F4D\u7F6E\u9501\u6B7B\u3001\u4E0D\u53C2\u4E0E\u4F18\u5316\u7684\u4F4D\u53F7\uFF0C\u5982 ["RJ1","RF1"]'
+        },
+        bounds: {
+          type: "object",
+          description: "\u5141\u8BB8\u6446\u653E\u7684\u77E9\u5F62\u8303\u56F4\uFF080.01 inch\uFF09\uFF0C\u4E0D\u7ED9\u5219\u7528\u56FE\u7EB8\u5C3A\u5BF8\u7559\u8FB9",
+          properties: {
+            minX: { type: "number" },
+            minY: { type: "number" },
+            maxX: { type: "number" },
+            maxY: { type: "number" }
+          }
+        },
+        rounds: { type: "number", description: "\u8FED\u4EE3\u8F6E\u6570\uFF0C\u9ED8\u8BA4 8\u3002\u8D8A\u591A\u8D8A\u597D\u4F46\u8D8A\u6162" },
+        iterations: { type: "number", description: "\u6BCF\u8F6E\u9000\u706B\u8FED\u4EE3\u6B21\u6570\uFF0C\u9ED8\u8BA4 30000" },
+        dry_run: { type: "boolean", description: "\u53EA\u7B97\u4E0D\u5199\uFF0C\u7528\u6765\u5148\u770B\u770B\u80FD\u4F18\u5316\u5230\u4EC0\u4E48\u7A0B\u5EA6" }
+      },
+      required: ["nets"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const netsIn = args.nets && typeof args.nets === "object" ? args.nets : {};
+      const powerIn = args.power_nets && typeof args.power_nets === "object" ? args.power_nets : {};
+      const stubOf = /* @__PURE__ */ new Map();
+      const stubUpOf = /* @__PURE__ */ new Map();
+      const flagKind = /* @__PURE__ */ new Map();
+      const isGroundNet = (n) => {
+        const u = n.toUpperCase();
+        return ["GND", "AGND", "DGND", "PGND", "SGND", "VSS", "VEE", "GNDA", "GNDD", "EARTH"].includes(u);
+      };
+      for (const [net, refs] of Object.entries(powerIn)) {
+        for (const ref of Array.isArray(refs) ? refs : []) {
+          const dot = String(ref).lastIndexOf(".");
+          if (dot <= 0) continue;
+          const des = String(ref).slice(0, dot).toUpperCase();
+          const pin = String(ref).slice(dot + 1);
+          if (!stubOf.has(des)) stubOf.set(des, []);
+          stubOf.get(des)?.push(pin);
+          if (!isGroundNet(net)) {
+            if (!stubUpOf.has(des)) stubUpOf.set(des, []);
+            stubUpOf.get(des)?.push(pin);
+          }
+          flagKind.set(`${des}.${pin}`, net);
+        }
+      }
+      const fixed = new Set((Array.isArray(args.keep_fixed) ? args.keep_fixed : []).map((s) => String(s).toUpperCase()));
+      const dryRun = args.dry_run === true;
+      const rounds = typeof args.rounds === "number" ? args.rounds : 8;
+      const iterations = typeof args.iterations === "number" ? args.iterations : 3e4;
+      const snap2 = await ctx2.exec(
+        `
+				${ENSURE_SCH}
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const parts = [];
+				for (const c of all) {
+					if (c.componentType !== 'part') continue;
+					const b = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => null);
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					parts.push({
+						des: String(c.designator || ''),
+						id: c.primitiveId,
+						x: c.x, y: c.y,
+						rot: Number(c.rotation) || 0,
+						mirror: c.mirror === true,
+						w: b ? Math.max(10, b.maxX - b.minX) : 40,
+						h: b ? Math.max(10, b.maxY - b.minY) : 40,
+						pins: (pins || []).map((p) => ({
+							n: String(p.pinNumber != null ? p.pinNumber : p.number),
+							x: p.x, y: p.y, dir: Number(p.rotation) || 0,
+						})),
+						// \u4F4D\u53F7\u4E0E\u578B\u53F7\uFF1A\u4F4D\u7F6E\u6309 EDA \u9ED8\u8BA4\uFF08\u4F4D\u53F7\u5728\u4E0A\u3001\u578B\u53F7\u5728\u4E0B\uFF09\u4F30
+						labels: [
+							{ text: String(c.designator || ''), dx: -10, dy: (b ? (b.maxY - b.minY) / 2 : 20) + 8 },
+							{ text: String(c.name || '').slice(0, 16), dx: -10, dy: -((b ? (b.maxY - b.minY) / 2 : 20) + 8) },
+						].filter((l) => l.text),
+					});
+				}
+				const tb = _page.titleBlockData || {};
+				return {
+					parts,
+					sheet: {
+						w: tb.Width && tb.Width.value ? Number(tb.Width.value) : 1170,
+						h: tb.Height && tb.Height.value ? Number(tb.Height.value) : 825,
+					},
+				};
+			`,
+        12e4
+      );
+      if (snap2.error) return { error: "\u5F53\u524D\u7F16\u8F91\u5668\u91CC\u6CA1\u6709\u6253\u5F00\u539F\u7406\u56FE\u9875" };
+      const raw = snap2.parts ?? [];
+      if (!raw.length) return { error: "\u5F53\u524D\u9875\u6CA1\u6709\u5668\u4EF6" };
+      const parts = /* @__PURE__ */ new Map();
+      const initial = /* @__PURE__ */ new Map();
+      const idOf = /* @__PURE__ */ new Map();
+      for (const p of raw) {
+        const pl = { x: p.x, y: p.y, rot: (p.rot % 360 + 360) % 360, mirror: p.mirror };
+        parts.set(p.des, {
+          id: p.des,
+          w: p.w,
+          h: p.h,
+          fixed: fixed.has(p.des.toUpperCase()),
+          labels: p.labels,
+          stubPins: stubOf.get(p.des.toUpperCase()) ?? [],
+          stubUp: stubUpOf.get(p.des.toUpperCase()) ?? [],
+          pins: p.pins.map(
+            (q) => pinLocal(pl, { x: q.x, y: q.y, dir: (q.dir % 360 + 360) % 360 }, q.n)
+          )
+        });
+        initial.set(p.des, pl);
+        idOf.set(p.des, p.id);
+      }
+      const nets = Object.entries(netsIn).map(([id, refs]) => ({ id, pins: (Array.isArray(refs) ? refs : []).map(String) })).filter((n) => n.pins.length >= 2);
+      if (!nets.length) return { error: "nets \u91CC\u6CA1\u6709\u5305\u542B\u4E24\u4E2A\u53CA\u4EE5\u4E0A\u5F15\u811A\u7684\u7F51\u7EDC" };
+      const sheet = snap2.sheet ?? { w: 1170, h: 825 };
+      const margin = 120;
+      const bounds = args.bounds ?? {
+        minX: margin,
+        minY: margin,
+        maxX: sheet.w - margin,
+        maxY: sheet.h - margin
+      };
+      const t0 = Date.now();
+      const r = optimize(parts, nets, initial, { rounds, iterations, bounds });
+      const elapsed = Date.now() - t0;
+      const moves = [...r.layout].filter(([des]) => !fixed.has(des.toUpperCase())).map(([des, pl]) => ({ id: idOf.get(des), des, x: pl.x, y: pl.y, rotation: pl.rot, mirror: pl.mirror })).filter((m) => m.id);
+      const wires = r.routed.nets.flatMap(
+        (n) => n.paths.map((p) => ({ net: n.netId, points: p.flat() }))
+      );
+      const flags = [];
+      for (const [ref, net] of flagKind) {
+        const dot = ref.lastIndexOf(".");
+        const des = ref.slice(0, dot);
+        const part = parts.get(des);
+        const pl = r.layout.get(des);
+        if (!part || !pl) continue;
+        const pin = part.pins.find((q) => q.id === ref.slice(dot + 1));
+        if (!pin) continue;
+        const w = pinWorld(part, pl, pin);
+        const [vx, vy] = dirVec(w.dir);
+        const L = 40;
+        const ex = w.x + vx * L;
+        const ey = w.y + vy * L;
+        const rot = 0;
+        flags.push({ net, x: w.x, y: w.y, ex, ey, rot });
+      }
+      const KIND = {};
+      for (const net of Object.keys(powerIn)) {
+        const u = net.toUpperCase();
+        KIND[net] = u === "AGND" || u === "GNDA" ? "AnalogGround" : u === "PGND" || u === "EARTH" ? "ProtectGround" : ["GND", "DGND", "SGND", "VSS", "VEE", "GNDD"].includes(u) ? "Ground" : "Power";
+      }
+      const summary = {
+        parts: parts.size,
+        nets: nets.length,
+        rounds: r.rounds,
+        elapsed_ms: elapsed,
+        wire_length: r.routed.totalLength,
+        bends: r.routed.totalBends,
+        unrouted: r.routed.failedCount,
+        part_overlap: Math.round(r.cost.partOverlap),
+        text_overlap: Math.round(r.cost.textOverlap),
+        crossings: r.cost.crossing,
+        rotated: [...r.layout.values()].filter((p) => p.rot === 90 || p.rot === 270).length,
+        history: r.history
+      };
+      if (dryRun) {
+        return { ...summary, dry_run: true, note: "\u53EA\u7B97\u4E86\u6CA1\u5199\u3002\u53BB\u6389 dry_run \u624D\u4F1A\u771F\u6B63\u843D\u5230\u56FE\u4E0A\u3002" };
+      }
+      const applied = await ctx2.exec(
+        `
+				${ENSURE_SCH}
+				const MOVES = ${JSON.stringify(moves)};
+				const WIRES = ${JSON.stringify(wires)};
+				const olds = (await eda.sch_PrimitiveWire.getAll()).map(function (w) { return w.primitiveId; });
+				if (olds.length) await eda.sch_PrimitiveWire.delete(olds);
+				const removed = olds.length;
+				// \u65E7\u7684\u7535\u6E90\u5730\u7B26\u53F7\u4E00\u5E76\u6E05\u6389\uFF0C\u7A0D\u540E\u6309\u65B0\u4F4D\u7F6E\u91CD\u653E\uFF1B\u7559\u7740\u5C31\u662F\u4E00\u5806\u5B64\u513F
+				const staleFlags = (await eda.sch_PrimitiveComponent.getAll())
+					.filter(function (c) { return c.componentType === 'netflag'; })
+					.map(function (c) { return c.primitiveId; });
+				if (staleFlags.length) await eda.sch_PrimitiveComponent.delete(staleFlags);
+				const flagsRemoved = staleFlags.length;
+				let moved = 0;
+				for (const m of MOVES) {
+					const r = await eda.sch_PrimitiveComponent.modify(m.id, {
+						x: m.x, y: m.y, rotation: m.rotation, mirror: m.mirror,
+					});
+					if (r !== false) moved += 1;
+				}
+				let drawn = 0;
+				for (const w of WIRES) {
+					const ok = await eda.sch_PrimitiveWire.create(w.points, w.net);
+					if (ok) drawn += 1;
+				}
+				// \u7535\u6E90\u5730\u7B26\u53F7\uFF1A\u5F15\u4E00\u5C0F\u6BB5\u7EBF\uFF0C\u672B\u7AEF\u653E\u7B26\u53F7\u3002\u7EBF\u4E0D\u5E26\u7F51\u7EDC\u540D \u2014\u2014 \u5426\u5219\u5BFC\u7EBF\u7684
+				// NET \u6807\u7B7E\u548C\u7B26\u53F7\u540D\u4F1A\u628A\u540C\u4E00\u4E2A\u7F51\u7EDC\u540D\u753B\u4E24\u904D\uFF0C\u6324\u5728\u4E00\u8D77\u3002
+				const FLAGS = ${JSON.stringify(flags)};
+				const KINDS = ${JSON.stringify(KIND)};
+				let flagsDrawn = 0;
+				for (const f of FLAGS) {
+					await eda.sch_PrimitiveWire.create([f.x, f.y, f.ex, f.ey]).catch(() => {});
+					const ok = await eda.sch_PrimitiveComponent.createNetFlag(KINDS[f.net] || 'Ground', f.net, f.ex, f.ey, f.rot);
+					if (ok) flagsDrawn += 1;
+				}
+				return { wires_removed: removed, parts_moved: moved, wires_drawn: drawn, flags_removed: flagsRemoved, flags_drawn: flagsDrawn };
+			`,
+        18e4
+      );
+      return {
+        ...summary,
+        ...applied,
+        note: r.routed.failedCount > 0 ? `\u6709 ${r.routed.failedCount} \u6761\u8FDE\u63A5\u6CA1\u8D70\u901A \u2014\u2014 \u591A\u534A\u662F\u5668\u4EF6\u6324\u5F97\u6CA1\u901A\u9053\u4E86\uFF0C\u52A0\u5927 rounds \u6216\u653E\u5BBD bounds \u518D\u8BD5\u3002` : "\u6446\u653E\u4E0E\u8D70\u7EBF\u90FD\u5DF2\u66F4\u65B0\u3002\u7535\u6E90\u5730\u7B26\u53F7\u9700\u8981\u53E6\u5916\u7528 eda_label_nets \u8865\uFF0C\u5B83\u4EEC\u4E0D\u53C2\u4E0E\u5E03\u5C40\u3002"
+      };
+    }
+  }
+];
+
 // src/tools/library.ts
 var SEARCH_TIMEOUT_MS = 6e4;
 var NOISE_PROPS = /* @__PURE__ */ new Set([
@@ -20197,6 +21256,2146 @@ var libraryTools = [
         symbol_uuid: assoc.symbolUuid || void 0,
         footprint_uuid: assoc.footprintUuid || void 0,
         sub_parts: raw.subPartNames
+      };
+    }
+  }
+];
+
+// src/layout/group.ts
+var GROUP_PADDING = 60;
+var GROUP_GAP = 140;
+var groupOf = (partId, assign) => assign.get(partId) ?? "_default";
+function netGroups(net, assign) {
+  const gs = /* @__PURE__ */ new Set();
+  for (const ref of net.pins) {
+    const dot = ref.lastIndexOf(".");
+    if (dot > 0) gs.add(groupOf(ref.slice(0, dot), assign));
+  }
+  return gs;
+}
+function layoutByGroups(parts, nets, assign, titles, opts = {}) {
+  const {
+    iterations = 2e4,
+    weights = DEFAULT_WEIGHTS,
+    seed = 7,
+    sheet = { w: 1655, h: 1170 },
+    margin = 120,
+    anchors,
+    obstacles = []
+  } = opts;
+  const members = /* @__PURE__ */ new Map();
+  for (const id of parts.keys()) {
+    const g = groupOf(id, assign);
+    if (!members.has(g)) members.set(g, []);
+    members.get(g)?.push(id);
+  }
+  const groupIds = [...members.keys()];
+  const innerNets = /* @__PURE__ */ new Map();
+  const crossGroupNets = [];
+  for (const n of nets) {
+    const gs = netGroups(n, assign);
+    if (gs.size === 1) {
+      const g = [...gs][0];
+      if (!innerNets.has(g)) innerNets.set(g, []);
+      innerNets.get(g)?.push(n);
+    } else {
+      crossGroupNets.push(n.id);
+    }
+  }
+  const localLayout = /* @__PURE__ */ new Map();
+  const localSize = /* @__PURE__ */ new Map();
+  const perGroup = [];
+  for (const g of groupIds) {
+    const ids = members.get(g) ?? [];
+    const sub = /* @__PURE__ */ new Map();
+    for (const id of ids) {
+      const p = parts.get(id);
+      if (p) sub.set(id, p);
+    }
+    const init = /* @__PURE__ */ new Map();
+    const cols = Math.max(1, Math.ceil(Math.sqrt(ids.length)));
+    let step = 0;
+    for (const id of ids) {
+      const p = sub.get(id);
+      if (p) step = Math.max(step, Math.max(p.w, p.h));
+    }
+    step = snap(Math.max(90, step + 60));
+    ids.forEach((id, i) => {
+      init.set(id, {
+        x: snap(i % cols * step),
+        y: snap(Math.floor(i / cols) * step),
+        rot: 0,
+        mirror: false
+      });
+    });
+    const innerWeights = { ...weights, spread: weights.spread * 8 };
+    const inner = innerNets.get(g) ?? [];
+    const a = sub.size > 1 ? anneal(sub, inner, init, { iterations, weights: innerWeights, seed: seed + g.length * 31 }) : {
+      layout: init,
+      cost: evaluate(sub, inner, init, innerWeights),
+      initialCost: evaluate(sub, inner, init, innerWeights),
+      iterations: 0,
+      accepted: 0
+    };
+    const r = route(sub, inner, a.layout);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [id, pl] of a.layout) {
+      const p = sub.get(id);
+      if (!p) continue;
+      const swap = pl.rot === 90 || pl.rot === 270;
+      const w = swap ? p.h : p.w;
+      const h = swap ? p.w : p.h;
+      minX = Math.min(minX, pl.x - w / 2);
+      minY = Math.min(minY, pl.y - h / 2);
+      maxX = Math.max(maxX, pl.x + w / 2);
+      maxY = Math.max(maxY, pl.y + h / 2);
+    }
+    for (const rn of r.nets) {
+      for (const path of rn.paths) {
+        for (const [x, y] of path) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    if (!Number.isFinite(minX)) {
+      minX = 0;
+      minY = 0;
+      maxX = 0;
+      maxY = 0;
+    }
+    localLayout.set(g, a.layout);
+    localSize.set(g, {
+      w: maxX - minX + 2 * GROUP_PADDING,
+      h: maxY - minY + 2 * GROUP_PADDING,
+      minX,
+      minY
+    });
+    perGroup.push({
+      id: g,
+      parts: ids.length,
+      w: Math.round(maxX - minX),
+      h: Math.round(maxY - minY),
+      wireLength: r.totalLength,
+      bends: r.totalBends
+    });
+  }
+  const affinity = /* @__PURE__ */ new Map();
+  for (const n of nets) {
+    const gs = [...netGroups(n, assign)];
+    for (let i = 0; i < gs.length; i++) {
+      for (let j = i + 1; j < gs.length; j++) {
+        const k = [gs[i], gs[j]].sort().join("|");
+        affinity.set(k, (affinity.get(k) ?? 0) + 1);
+      }
+    }
+  }
+  const dodgeObstacles = (x, y, w, h) => {
+    let cx = x;
+    let cy = y;
+    for (let guard = 0; guard < 60; guard += 1) {
+      const box = { minX: cx - w / 2, minY: cy - h / 2, maxX: cx + w / 2, maxY: cy + h / 2 };
+      const hit = obstacles.find(
+        (o) => box.minX < o.maxX && o.minX < box.maxX && box.minY < o.maxY && o.minY < box.maxY
+      );
+      if (!hit) break;
+      cx = hit.maxX + w / 2 + GROUP_GAP;
+      if (cx + w / 2 > sheet.w - margin) {
+        cx = margin + w / 2;
+        cy = hit.maxY + h / 2 + GROUP_GAP;
+      }
+    }
+    return { x: snap(cx), y: snap(cy) };
+  };
+  const gParts = /* @__PURE__ */ new Map();
+  const gInit = /* @__PURE__ */ new Map();
+  let cursorX = margin;
+  let cursorY = margin;
+  let rowH = 0;
+  for (const g of groupIds) {
+    const s = localSize.get(g);
+    if (!s) continue;
+    const pinned = anchors?.get(g);
+    gParts.set(g, {
+      id: g,
+      w: s.w + GROUP_GAP,
+      h: s.h + GROUP_GAP,
+      pins: [{ id: "c", dx: 0, dy: 0, dir: 0 }],
+      // anchor 是**软**约束：拿它当起点，但仍参与退火。
+      // 原来这里按 `fixed: pinned != null` 锁死，结果 AI 随手给的三个
+      // 等距 anchor 一旦装不下（某个组比间距还宽），组框就直接叠在一起，
+      // 算法明明有重叠代价却动不了它们。MapGroup.anchor 的语义本来就是
+      // 「期望位置，算法在附近安排」—— 实现跟设计对齐。
+      fixed: false
+    });
+    if (pinned) {
+      const safe2 = dodgeObstacles(pinned.x, pinned.y, s.w, s.h);
+      gInit.set(g, { x: safe2.x, y: safe2.y, rot: 0, mirror: false });
+      continue;
+    }
+    if (cursorX + s.w > sheet.w - margin && rowH > 0) {
+      cursorX = margin;
+      cursorY += rowH + GROUP_GAP;
+      rowH = 0;
+    }
+    const safe = dodgeObstacles(cursorX + s.w / 2, cursorY + s.h / 2, s.w, s.h);
+    gInit.set(g, { x: safe.x, y: safe.y, rot: 0, mirror: false });
+    cursorX += s.w + GROUP_GAP;
+    rowH = Math.max(rowH, s.h);
+  }
+  const obstacleIds = /* @__PURE__ */ new Set();
+  obstacles.forEach((o, i) => {
+    const id = `__obstacle_${i}`;
+    obstacleIds.add(id);
+    gParts.set(id, {
+      id,
+      w: Math.max(GRID, o.maxX - o.minX),
+      h: Math.max(GRID, o.maxY - o.minY),
+      pins: [],
+      fixed: true
+    });
+    gInit.set(id, { x: snap((o.minX + o.maxX) / 2), y: snap((o.minY + o.maxY) / 2), rot: 0, mirror: false });
+  });
+  const gNets = [...affinity.entries()].map(([k, cnt]) => ({
+    id: `aff:${k}`,
+    // 耦合越强，重复越多次，等价于加权
+    pins: k.split("|").flatMap((g) => Array.from({ length: Math.min(3, cnt) }, () => `${g}.c`))
+  }));
+  const gWeights = { ...weights, pinFacing: 0, supplyDir: 0 };
+  const gRes = gParts.size > 1 ? anneal(gParts, gNets, gInit, {
+    // 组间摆放看着简单（只有几个矩形），但解空间是离散的、代价面很崎岖：
+    // 三个区排成一行、一列、还是 2x2，差别巨大。迭代给足才找得到能塞进图纸的排布。
+    iterations: Math.max(2e4, iterations),
+    weights: gWeights,
+    seed: seed + 101,
+    bounds: { minX: margin, minY: margin, maxX: sheet.w - margin, maxY: sheet.h - margin }
+  }) : { layout: gInit, cost: evaluate(gParts, gNets, gInit, gWeights), initialCost: evaluate(gParts, gNets, gInit, gWeights), iterations: 0, accepted: 0 };
+  const layout = /* @__PURE__ */ new Map();
+  const groups = [];
+  for (const g of groupIds) {
+    if (obstacleIds.has(g)) continue;
+    const size = localSize.get(g);
+    const gp = gRes.layout.get(g);
+    const local = localLayout.get(g);
+    if (!size || !gp || !local) continue;
+    const originX = snap(gp.x - size.w / 2 + GROUP_PADDING - size.minX);
+    const originY = snap(gp.y - size.h / 2 + GROUP_PADDING - size.minY);
+    for (const [id, pl] of local) {
+      layout.set(id, { ...pl, x: snap(pl.x + originX), y: snap(pl.y + originY) });
+    }
+    const t = titles.get(g) ?? {};
+    groups.push({
+      id: g,
+      title: t.title,
+      note: t.note,
+      minX: snap(gp.x - size.w / 2),
+      minY: snap(gp.y - size.h / 2),
+      maxX: snap(gp.x + size.w / 2),
+      maxY: snap(gp.y + size.h / 2)
+    });
+  }
+  const warnings = [];
+  if (groups.length) {
+    const allMinX = Math.min(...groups.map((g) => g.minX));
+    const allMinY = Math.min(...groups.map((g) => g.minY));
+    const allMaxX = Math.max(...groups.map((g) => g.maxX));
+    const allMaxY = Math.max(...groups.map((g) => g.maxY));
+    const needW = allMaxX - allMinX;
+    const needH = allMaxY - allMinY;
+    const availW = sheet.w - 2 * margin;
+    const availH = sheet.h - 2 * margin;
+    let dx = 0;
+    let dy = 0;
+    if (needW <= availW) dx = snap(margin - allMinX);
+    else warnings.push(`\u6240\u6709\u5206\u533A\u6A2A\u5411\u5171\u9700 ${Math.round(needW)}\uFF0C\u56FE\u7EB8\u53EA\u6709 ${Math.round(availW)} \u53EF\u7528 \u2014\u2014 \u6362\u66F4\u5927\u7684\u56FE\u7EB8\uFF0C\u6216\u628A\u5206\u533A\u62C6\u7EC6`);
+    if (needH <= availH) dy = snap(margin - allMinY);
+    else warnings.push(`\u6240\u6709\u5206\u533A\u7EB5\u5411\u5171\u9700 ${Math.round(needH)}\uFF0C\u56FE\u7EB8\u53EA\u6709 ${Math.round(availH)} \u53EF\u7528 \u2014\u2014 \u6362\u66F4\u5927\u7684\u56FE\u7EB8\uFF0C\u6216\u628A\u5206\u533A\u62C6\u7EC6`);
+    if (obstacles.length && (dx !== 0 || dy !== 0)) {
+      const wouldHit = groups.some(
+        (g) => obstacles.some(
+          (o) => g.minX + dx < o.maxX && o.minX < g.maxX + dx && g.minY + dy < o.maxY && o.minY < g.maxY + dy
+        )
+      );
+      if (wouldHit) {
+        dx = 0;
+        dy = 0;
+      }
+    }
+    if (dx !== 0 || dy !== 0) {
+      for (const [id, pl] of layout) layout.set(id, { ...pl, x: pl.x + dx, y: pl.y + dy });
+      for (const g of groups) {
+        g.minX += dx;
+        g.maxX += dx;
+        g.minY += dy;
+        g.maxY += dy;
+      }
+    }
+    for (const g of groups) {
+      if (g.minX < 0 || g.minY < 0 || g.maxX > sheet.w || g.maxY > sheet.h) {
+        const pinned = anchors?.get(g.id);
+        warnings.push(
+          pinned ? `\u5206\u533A ${g.id} \u8D8A\u51FA\u56FE\u7EB8 \u2014\u2014 \u5B83\u7684\u4F4D\u7F6E\u662F\u6307\u5B9A\u7684 (${pinned.x},${pinned.y})\uFF0C\u800C\u8BE5\u533A\u5B9E\u9645\u5360 ${Math.round(g.maxX - g.minX)}\xD7${Math.round(g.maxY - g.minY)}\uFF0C\u632A\u4E00\u4E0B anchor` : `\u5206\u533A ${g.id} \u8D8A\u51FA\u56FE\u7EB8`
+        );
+      }
+    }
+  }
+  const routed = route(parts, nets, layout, { obstacles });
+  if (routed.failedCount) warnings.push(`${routed.failedCount} \u6761\u8FDE\u63A5\u6CA1\u8D70\u901A\uFF0C\u591A\u534A\u662F\u5206\u533A\u4E4B\u95F4\u6CA1\u7559\u591F\u901A\u9053`);
+  return { layout, groups, routed, crossGroupNets, perGroup, warnings };
+}
+
+// src/layout/map.ts
+var EMPTY_MAP = {
+  version: 1,
+  meta: { sheet: { w: 1170, h: 825 }, grid: 10 },
+  groups: [],
+  parts: [],
+  nets: []
+};
+function guessNetKind(name) {
+  const u = name.toUpperCase();
+  if (u === "AGND" || u === "GNDA") return "analog_ground";
+  if (u === "PGND" || u === "EARTH" || u === "FGND") return "protect_ground";
+  if (["GND", "DGND", "SGND", "VSS", "VEE", "GNDD"].includes(u)) return "ground";
+  if (u.startsWith("VCC") || u.startsWith("VDD") || u.startsWith("VBAT") || u === "V+") return "power";
+  const c0 = u.charCodeAt(0);
+  if ((c0 >= 48 && c0 <= 57 || u.charAt(0) === "+") && u.includes("V")) return "power";
+  return "signal";
+}
+function defaultStyle(kind) {
+  return kind === "signal" ? "wire" : "symbol";
+}
+function validateMap(m) {
+  const errs = [];
+  const ids = /* @__PURE__ */ new Set();
+  for (const p of m.parts) {
+    if (ids.has(p.id)) errs.push(`\u4F4D\u53F7\u91CD\u590D: ${p.id}`);
+    ids.add(p.id);
+    if (!p.pins.length) errs.push(`${p.id} \u6CA1\u6709\u5F15\u811A`);
+    if (p.group && !m.groups.some((g) => g.id === p.group)) errs.push(`${p.id} \u5F52\u5C5E\u7684\u5206\u533A\u4E0D\u5B58\u5728: ${p.group}`);
+  }
+  for (const n of m.nets) {
+    if (n.pins.length < 2 && n.style === "wire") {
+      errs.push(`\u7F51\u7EDC ${n.id} \u53EA\u6709 ${n.pins.length} \u4E2A\u5F15\u811A\uFF0C\u753B\u4E0D\u6210\u7EBF`);
+    }
+    for (const ref of n.pins) {
+      const dot = ref.lastIndexOf(".");
+      const part = dot > 0 ? m.parts.find((p) => p.id === ref.slice(0, dot)) : void 0;
+      if (!part) {
+        errs.push(`\u7F51\u7EDC ${n.id} \u5F15\u7528\u4E86\u4E0D\u5B58\u5728\u7684\u4F4D\u53F7: ${ref}`);
+      } else if (!part.pins.some((q) => q.id === ref.slice(dot + 1))) {
+        errs.push(`\u7F51\u7EDC ${n.id} \u5F15\u7528\u4E86\u4E0D\u5B58\u5728\u7684\u5F15\u811A: ${ref}`);
+      }
+    }
+  }
+  return errs;
+}
+var MAP_MARK = "EDAMCP_MAP_V1:";
+function packMap(map) {
+  return `${MAP_MARK}
+${JSON.stringify(map, null, 1)}`;
+}
+function unpackMap(rawAfterMark) {
+  try {
+    return JSON.parse(rawAfterMark);
+  } catch {
+    return JSON.parse(rawAfterMark.replace(/[\r\n]+/g, ""));
+  }
+}
+
+// src/layout/trace.ts
+var Trace = class {
+  entries = [];
+  step = "(\u672A\u547D\u540D)";
+  enabled;
+  constructor(enabled = true) {
+    this.enabled = enabled;
+  }
+  /** 切换当前步骤名，之后的记录都归到它名下 */
+  at(step) {
+    this.step = step;
+    return this;
+  }
+  log(msg, data) {
+    this.push("info", msg, data);
+  }
+  warn(msg, data) {
+    this.push("warn", msg, data);
+  }
+  error(msg, data) {
+    this.push("error", msg, data);
+  }
+  push(level, msg, data) {
+    if (!this.enabled) return;
+    this.entries.push({ step: this.step, level, msg, ...data ? { data } : {} });
+  }
+  /** 只有 warn / error —— 出问题时先看这个 */
+  issues() {
+    return this.entries.filter((e) => e.level !== "info");
+  }
+  all() {
+    return this.entries;
+  }
+  /** 给返回值用的紧凑形态：正常时只回统计，有问题时把问题列出来 */
+  summary() {
+    const bad = this.issues();
+    return {
+      steps: new Set(this.entries.map((e) => e.step)).size,
+      issues: bad.length,
+      lines: bad.map((e) => `[${e.step}] ${e.msg}${e.data ? " " + JSON.stringify(e.data) : ""}`)
+    };
+  }
+  /** 人读的完整流水，问题行前面加标记 */
+  format() {
+    return this.entries.map((e) => {
+      const mark = e.level === "error" ? "!! " : e.level === "warn" ? " ! " : "   ";
+      return `${mark}[${e.step}] ${e.msg}${e.data ? " " + JSON.stringify(e.data) : ""}`;
+    });
+  }
+};
+function checkRouteEndpoints(trace, nets, pinXY, tol = 1) {
+  trace.at("\u8D70\u7EBF\u81EA\u68C0");
+  let bad = 0;
+  for (const net of nets) {
+    const pts = [];
+    for (const path of net.paths) for (const p of path) pts.push(p);
+    if (!pts.length) {
+      trace.error(`\u7F51\u7EDC ${net.id} \u4E00\u4E2A\u70B9\u90FD\u6CA1\u6709 \u2014\u2014 \u7EBF\u6CA1\u753B\u51FA\u6765`, { pins: net.pins });
+      bad += net.pins.length;
+      continue;
+    }
+    for (const ref of net.pins) {
+      const xy = pinXY.get(ref);
+      if (!xy) {
+        trace.warn(`\u7F51\u7EDC ${net.id} \u7684\u5F15\u811A ${ref} \u5728\u5E03\u5C40\u91CC\u627E\u4E0D\u5230`, {});
+        bad += 1;
+        continue;
+      }
+      let best = Infinity;
+      for (const [px, py] of pts) {
+        const d = Math.abs(px - xy.x) + Math.abs(py - xy.y);
+        if (d < best) best = d;
+      }
+      if (best > tol) {
+        trace.error(`\u5F15\u811A ${ref} \u6CA1\u843D\u5728 ${net.id} \u7684\u7EBF\u4E0A`, {
+          \u5F15\u811A: [xy.x, xy.y],
+          \u6700\u8FD1\u70B9\u5DEE: best
+        });
+        bad += 1;
+      }
+    }
+  }
+  if (bad === 0) trace.log(`${nets.length} \u6761\u7F51\u7EDC\u7684\u5F15\u811A\u7AEF\u70B9\u5168\u90E8\u5BF9\u9F50`, {});
+  return bad;
+}
+
+// src/tools/verify.ts
+var READBACK_DELAY_MS = 1200;
+var COORD_TOLERANCE = 10;
+var DEFAULT_ATTEMPTS = 6;
+var HASH_FN = `
+	const __hash = async function (text) {
+		const s = String(text);
+		if (typeof crypto !== 'undefined' && crypto.subtle && crypto.subtle.digest) {
+			try {
+				const buf = new TextEncoder().encode(s);
+				const out = await crypto.subtle.digest('SHA-256', buf);
+				const bytes = Array.from(new Uint8Array(out));
+				return 'sha256:' + bytes.map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+			} catch (e) { /* \u843D\u5230\u4E0B\u9762\u7684 FNV-1a */ }
+		}
+		let h = 2166136261;
+		for (let i = 0; i < s.length; i += 1) {
+			h = h ^ s.charCodeAt(i);
+			h = Math.imul(h, 16777619);
+		}
+		return 'fnv1a:' + (h >>> 0).toString(16) + ':' + s.length;
+	};
+`;
+async function hashLocal(text, algo) {
+  if (algo.startsWith("sha256")) {
+    const { createHash } = await import("node:crypto");
+    return "sha256:" + createHash("sha256").update(text, "utf8").digest("hex");
+  }
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h = h ^ text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return "fnv1a:" + (h >>> 0).toString(16) + ":" + text.length;
+}
+async function stableRead(ctx2, code, opts = {}) {
+  const attempts = opts.attempts ?? DEFAULT_ATTEMPTS;
+  const timeoutMs = opts.timeoutMs ?? 12e4;
+  const settleMs = opts.settleMs ?? 0;
+  const notes = [];
+  const wrapped = `
+		${HASH_FN}
+		const __run = async function () { ${code}
+		};
+		const __value = await __run();
+		const __text = JSON.stringify(__value === undefined ? null : __value);
+		return { __text: __text, __hash: await __hash(__text) };
+	`;
+  let prev = null;
+  let reads = 0;
+  let lastErr = "";
+  for (let i = 0; i < attempts; i += 1) {
+    if (settleMs > 0 || i > 0) {
+      await sleep(i === 0 ? settleMs : settleMs + 300 * i);
+    }
+    const clientId = ctx2.bridge.activeClient()?.id;
+    let got;
+    try {
+      got = await ctx2.exec(wrapped, timeoutMs);
+      reads += 1;
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      notes.push(`\u7B2C ${i + 1} \u6B21\u8BFB\u53D6\u629B\u9519\uFF1A${lastErr}`);
+      prev = null;
+      continue;
+    }
+    if (typeof got?.__text !== "string" || typeof got?.__hash !== "string") {
+      notes.push(`\u7B2C ${i + 1} \u6B21\u8FD4\u56DE\u7ED3\u6784\u4E0D\u5BF9\uFF08__text/__hash \u4E0D\u662F\u5B57\u7B26\u4E32\uFF09\uFF0C\u4E22\u5F03`);
+      prev = null;
+      continue;
+    }
+    const text = got.__text;
+    const hash = got.__hash;
+    const mine = await hashLocal(text, hash);
+    if (mine !== hash) {
+      notes.push(`\u7B2C ${i + 1} \u6B21\u4F20\u8F93\u6821\u9A8C\u4E0D\u7B26\uFF08EDA=${hash.slice(0, 24)} \u672C\u4FA7=${mine.slice(0, 24)}\uFF09\uFF0C\u4E22\u5F03`);
+      prev = null;
+      continue;
+    }
+    if (prev && prev.client !== clientId) {
+      notes.push(
+        `\u7B2C ${i + 1} \u6B21\u6362\u4E86\u6807\u7B7E\u9875\u56DE\u7B54\uFF08${prev.client ?? "?"} \u2192 ${clientId ?? "?"}\uFF09\u2014\u2014 \u591A\u5F00 EDA \u9875\u9762\u65F6\u8C03\u7528\u76EE\u6807\u4F1A\u6F02\u79FB\uFF0C\u91CD\u65B0\u8BFB`
+      );
+      prev = { text, hash, client: clientId };
+      continue;
+    }
+    if (prev && prev.hash === hash) {
+      try {
+        return { value: JSON.parse(text), reads, hash, notes };
+      } catch (e) {
+        notes.push(`\u4E24\u6B21\u4E00\u81F4\u4F46 JSON \u89E3\u6790\u5931\u8D25\uFF1A${e instanceof Error ? e.message : String(e)}`);
+        prev = null;
+        continue;
+      }
+    }
+    if (prev && prev.hash !== hash) {
+      notes.push(`\u7B2C ${i + 1} \u6B21\u4E0E\u4E0A\u4E00\u6B21\u4E0D\u4E00\u81F4\uFF08\u7F13\u5B58\u6216\u72B6\u6001\u672A\u7A33\uFF09\uFF0C\u7EE7\u7EED\u8BFB`);
+    }
+    prev = { text, hash, client: clientId };
+  }
+  throw new Error(
+    `\u8BFB\u4E86 ${reads} \u6B21\u4ECD\u62FF\u4E0D\u5230\u53EF\u4FE1\u6570\u636E\uFF08\u8981\u6C42\u8FDE\u7EED\u4E24\u6B21\u4E00\u81F4\u4E14\u4F20\u8F93\u6821\u9A8C\u901A\u8FC7\uFF09\u3002` + (lastErr ? `\u6700\u540E\u4E00\u6B21\u9519\u8BEF\uFF1A${lastErr}\u3002` : "") + `\u8FC7\u7A0B\uFF1A${notes.join("\uFF1B") || "\u65E0"}`
+  );
+}
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+async function currentPage(ctx2, attempts = DEFAULT_ATTEMPTS) {
+  const { value } = await stableRead(
+    ctx2,
+    `
+		const proj = await eda.dmt_Project.getCurrentProjectInfo().catch(function () { return null; });
+		const board = await eda.dmt_Board.getCurrentBoardInfo().catch(function () { return null; });
+		const sch = await eda.dmt_Schematic.getCurrentSchematicInfo().catch(function () { return null; });
+		const page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(function () { return null; });
+		const pcb = await eda.dmt_Pcb.getCurrentPcbInfo().catch(function () { return null; });
+		const editor = page ? 'schematic' : (pcb ? 'pcb' : 'other');
+
+		// \u7126\u70B9\u5728 PCB \u6216\u522B\u5904\u65F6\uFF0C\u300C\u67E5\u4E0D\u5230\u539F\u7406\u56FE\u9875\u300D\u662F\u6B63\u5E38\u72B6\u6001\u800C\u4E0D\u662F\u9519\u8BEF \u2014\u2014
+		// \u53EA\u6709\u5F53\u81EA\u5DF1\u58F0\u79F0\u5728\u539F\u7406\u56FE\u7F16\u8F91\u5668\u91CC\uFF0C\u5404\u9879\u624D\u5FC5\u987B\u9F50\u5907\u4E14\u4E92\u76F8\u5BF9\u5F97\u4E0A\u3002
+		const problems = [];
+		if (editor === 'schematic' && !sch) problems.push('\u5728\u539F\u7406\u56FE\u7F16\u8F91\u5668\u91CC\u5374\u67E5\u4E0D\u5230\u5F53\u524D\u539F\u7406\u56FE');
+		if (page && sch && page.parentSchematicUuid !== sch.uuid) {
+			problems.push('\u56FE\u9875\u58F0\u660E\u7684\u6240\u5C5E\u539F\u7406\u56FE(' + page.parentSchematicUuid +
+				') \u4E0E\u5F53\u524D\u539F\u7406\u56FE(' + sch.uuid + ') \u4E0D\u4E00\u81F4');
+		}
+		if (board && sch && board.schematic && board.schematic.uuid !== sch.uuid) {
+			problems.push('\u5F53\u524D\u677F\u4E0B\u7684\u539F\u7406\u56FE(' + board.schematic.uuid +
+				') \u4E0E\u5F53\u524D\u539F\u7406\u56FE(' + sch.uuid + ') \u4E0D\u4E00\u81F4');
+		}
+		if (sch && sch.page && page && !sch.page.some(function (p) { return p.uuid === page.uuid; })) {
+			problems.push('\u5F53\u524D\u56FE\u9875\u4E0D\u5728\u5F53\u524D\u539F\u7406\u56FE\u7684\u56FE\u9875\u5217\u8868\u91CC');
+		}
+
+		return {
+			boardName: board ? board.name : undefined,
+			pageUuid: page ? page.uuid : undefined,
+			pageName: page ? page.name : undefined,
+			schematicUuid: sch ? sch.uuid : undefined,
+			schematicName: sch ? sch.name : undefined,
+			pcbUuid: pcb ? pcb.uuid : undefined,
+			pcbName: pcb ? pcb.name : undefined,
+			editor: editor,
+			projectUuid: proj ? proj.uuid : undefined,
+			projectName: proj ? (proj.friendlyName || proj.name) : undefined,
+			consistent: problems.length === 0,
+			inconsistency: problems.length ? problems.join('\uFF1B') : undefined,
+		};
+	`,
+    { attempts }
+  );
+  return value;
+}
+var CENSUS_CODE = `
+	const kinds = {
+		component: eda.sch_PrimitiveComponent,
+		wire: eda.sch_PrimitiveWire,
+		text: eda.sch_PrimitiveText,
+		rectangle: eda.sch_PrimitiveRectangle,
+	};
+	const counts = {};
+	const parts = [];
+	for (const name of Object.keys(kinds)) {
+		const api = kinds[name];
+		if (!api || !api.getAll) { counts[name] = -1; continue; }
+		const list = (await api.getAll()) || [];
+		counts[name] = list.length;
+		// \u6458\u8981\u53EA\u53D6\u4F4D\u7F6E\u4E0E\u8EAB\u4EFD\uFF0C\u4E0D\u53D6\u6837\u5F0F \u2014\u2014 \u6837\u5F0F\u53D8\u52A8\u4E0D\u8BE5\u88AB\u5F53\u6210\u56FE\u7EB8\u53D8\u4E86
+		for (const it of list) {
+			parts.push(name + ':' + (it.designator || it.net || it.content || '') +
+				'@' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0));
+		}
+	}
+	parts.sort();
+	let total = 0;
+	for (const k of Object.keys(counts)) { if (counts[k] > 0) total += counts[k]; }
+	return { counts: counts, total: total, digest: await __hash(parts.join('|')) };
+`;
+async function census(ctx2, opts = {}) {
+  const { value } = await stableRead(ctx2, CENSUS_CODE, {
+    attempts: opts.attempts ?? DEFAULT_ATTEMPTS,
+    settleMs: opts.settleMs ?? 0
+  });
+  return value;
+}
+function diffCensus(before, after, expect) {
+  const delta = {};
+  const keys = /* @__PURE__ */ new Set([...Object.keys(before.counts), ...Object.keys(after.counts)]);
+  for (const k of keys) {
+    const d = (after.counts[k] ?? 0) - (before.counts[k] ?? 0);
+    if (d !== 0) delta[k] = d;
+  }
+  const changed = before.digest !== after.digest;
+  let matchesExpectation;
+  const bad = [];
+  if (expect) {
+    matchesExpectation = true;
+    for (const [k, want] of Object.entries(expect)) {
+      const got = delta[k] ?? 0;
+      if (got !== want) {
+        matchesExpectation = false;
+        bad.push(`${k} \u9884\u671F ${want >= 0 ? "+" : ""}${want}\u3001\u5B9E\u9645 ${got >= 0 ? "+" : ""}${got}`);
+      }
+    }
+  }
+  const parts = [];
+  parts.push(
+    Object.keys(delta).length ? "\u53D8\u5316\uFF1A" + Object.entries(delta).map(([k, v]) => `${k} ${v >= 0 ? "+" : ""}${v}`).join("\uFF0C") : "\u5404\u7C7B\u56FE\u5143\u6570\u91CF\u6CA1\u53D8"
+  );
+  if (!changed) parts.push("\u5185\u5BB9\u6458\u8981\u4E5F\u6CA1\u53D8 \u2014\u2014 \u8FD9\u4E00\u6B65\u5F88\u53EF\u80FD\u538B\u6839\u6CA1\u751F\u6548");
+  if (bad.length) parts.push("\u4E0E\u9884\u671F\u4E0D\u7B26\uFF1A" + bad.join("\uFF1B"));
+  return { delta, changed, matchesExpectation, summary: parts.join("\u3002") };
+}
+async function verifyPlaced(ctx2, want, opts = {}) {
+  const { value } = await stableRead(
+    ctx2,
+    `
+		const out = [];
+		for (const c of (await eda.sch_PrimitiveComponent.getAll()) || []) {
+			if (c.componentType !== 'part') continue;
+			out.push({ designator: String(c.designator || ''), x: c.x, y: c.y, rotation: c.rotation || 0 });
+		}
+		return out;
+	`,
+    { attempts: opts.attempts ?? DEFAULT_ATTEMPTS, settleMs: opts.settleMs ?? READBACK_DELAY_MS }
+  );
+  const byDes = new Map(value.map((c) => [c.designator.toUpperCase(), c]));
+  const checks = want.map((w) => {
+    const got = byDes.get(w.designator.toUpperCase());
+    if (!got) return { ...w, found: false, ok: false, note: "\u56DE\u8BFB\u65F6\u627E\u4E0D\u5230\u8FD9\u4E2A\u4F4D\u53F7" };
+    const dx = Math.abs(got.x - w.x);
+    const dy = Math.abs(got.y - w.y);
+    const posOk = dx <= COORD_TOLERANCE && dy <= COORD_TOLERANCE;
+    const rotOk = w.rotation == null || ((got.rotation - w.rotation) % 360 + 360) % 360 === 0;
+    const notes = [];
+    if (!posOk) notes.push(`\u4F4D\u7F6E\u504F\u4E86 (${dx.toFixed(0)}, ${dy.toFixed(0)})`);
+    if (!rotOk) notes.push(`\u89D2\u5EA6\u662F ${got.rotation}\u3001\u8981\u6C42 ${w.rotation}`);
+    return {
+      ...w,
+      found: true,
+      actualX: got.x,
+      actualY: got.y,
+      actualRotation: got.rotation,
+      ok: posOk && rotOk,
+      note: notes.join("\uFF1B") || void 0
+    };
+  });
+  const bad = checks.filter((c) => !c.ok);
+  return {
+    checks,
+    allOk: bad.length === 0,
+    summary: bad.length ? `${bad.length}/${checks.length} \u4E2A\u5668\u4EF6\u6CA1\u5230\u4F4D\uFF1A` + bad.map((b) => `${b.designator}(${b.note})`).join("\uFF0C") : `${checks.length} \u4E2A\u5668\u4EF6\u4F4D\u7F6E\u89D2\u5EA6\u90FD\u5DF2\u56DE\u8BFB\u786E\u8BA4`
+  };
+}
+var verifyTools = [
+  {
+    name: "eda_current_context",
+    description: "\u5F53\u524D\u6B63\u5728\u7F16\u8F91\u7684\u5BF9\u8C61\uFF1A\u54EA\u5757\u677F\u3001\u54EA\u4E00\u9875\u539F\u7406\u56FE\u3001\u54EA\u4E2A PCB\u3002\n\n\u7528\u6237\u8BF4\u300C\u8FD9\u4E2A\u539F\u7406\u56FE\u300D\u300C\u5F53\u524D\u8FD9\u5757\u677F\u300D\u65F6\uFF0C\u7528\u672C\u5DE5\u5177\u628A\u6307\u4EE3\u89E3\u6790\u6210\u5177\u4F53 uuid\u3002\n\u6CE8\u610F\uFF1A\u6253\u5F00\u539F\u7406\u56FE\u65F6 pcb \u4E3A null\uFF0C\u53CD\u4E4B\u4EA6\u7136 \u2014\u2014 \u7531\u6B64\u53EF\u5224\u65AD\u7528\u6237\u6B64\u523B\u5728\u54EA\u4E2A\u7F16\u8F91\u5668\u91CC\u3002\n**\u677F\u5B50\u6CA1\u6709 uuid**\uFF1AEDA \u91CC\u677F\u540D\u5C31\u662F\u5B83\u5728\u5DE5\u7A0B\u5185\u7684\u552F\u4E00\u6807\u8BC6\u3002\n\n**\u5199\u56FE\u7EB8\u4E4B\u524D\u5148\u8C03\u5B83**\uFF1A\u6240\u6709\u539F\u7406\u56FE\u5DE5\u5177\u90FD\u4F5C\u7528\u5728\u9690\u5F0F\u7684\u300C\u5F53\u524D\u9875\u300D\u4E0A\uFF0C\u7126\u70B9\u4E0D\u5BF9\u5C31\u4F1A\u628A\u56FE\u753B\u8FDB\u522B\u7684\u677F\u5B50\u3002\n\n\u6570\u636E\u7ECF\u8FC7\u4E09\u9053\u6821\u9A8C\u624D\u8FD4\u56DE\uFF1A\u7ED3\u6784\u68C0\u67E5\u3001\u4F20\u8F93\u54C8\u5E0C\u6BD4\u5BF9\u3001\u540C\u4E00\u8BFB\u53D6\u8FDE\u505A\u4E24\u904D\u53D6\u4E00\u81F4\u503C\uFF1B\u677F\uFF0F\u539F\u7406\u56FE\uFF0F\u56FE\u9875\u8FD8\u4F1A\u4E92\u76F8\u5370\u8BC1\uFF08\u56FE\u9875\u58F0\u660E\u7684\u7236\u539F\u7406\u56FE\u5FC5\u987B\u5C31\u662F\u5F53\u524D\u539F\u7406\u56FE\uFF09\u3002\u4EFB\u4F55\u4E00\u9053\u8FC7\u4E0D\u4E86\u5C31\u5982\u5B9E\u62A5\u9519\uFF0C**\u4E0D\u4F1A\u8FD4\u56DE\u53EF\u80FD\u662F\u810F\u7684\u6570\u636E** \u2014\u2014 \u6162\u4E00\u70B9\u6CA1\u5173\u7CFB\uFF0C\u4FE1\u606F\u5FC5\u987B\u786E\u5B9A\u3002\n\ncensus=true \u65F6\u989D\u5916\u666E\u67E5\u56FE\u4E0A\u5404\u7C7B\u56FE\u5143\u7684\u6570\u91CF\u4E0E\u5185\u5BB9\u6458\u8981\uFF0C\u53EF\u7528\u4E8E\u5728\u5199\u64CD\u4F5C\u524D\u540E\u6BD4\u5BF9\u300C\u56FE\u7EB8\u5230\u5E95\u53D8\u4E86\u6CA1\u6709\u300D\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        census: {
+          type: "boolean",
+          description: "\u662F\u5426\u540C\u65F6\u666E\u67E5\u56FE\u5143\u6570\u91CF\u4E0E\u5185\u5BB9\u6458\u8981\uFF0C\u9ED8\u8BA4 false"
+        }
+      }
+    },
+    handler: async (args, ctx2) => {
+      const id = await currentPage(ctx2);
+      const tabs = ctx2.bridge.authedClients();
+      const activeId = ctx2.bridge.activeClient()?.id;
+      const out = {
+        answered_by_tab: activeId,
+        open_tabs: tabs.length,
+        board: id.boardName ? { name: id.boardName } : null,
+        schematic: id.schematicUuid ? { uuid: id.schematicUuid, name: id.schematicName } : null,
+        schematic_page: id.pageUuid ? { uuid: id.pageUuid, name: id.pageName } : null,
+        pcb: id.pcbUuid ? { uuid: id.pcbUuid, name: id.pcbName } : null,
+        editor: id.editor,
+        project: id.projectUuid ? { uuid: id.projectUuid, name: id.projectName } : null,
+        verified: id.consistent,
+        inconsistency: id.inconsistency
+      };
+      if (!id.consistent) {
+        out.note = `\u8EAB\u4EFD\u81EA\u76F8\u77DB\u76FE\uFF0C\u4E0D\u8981\u5728\u8FD9\u4E2A\u72B6\u6001\u4E0B\u5199\u56FE\u7EB8\uFF1A${id.inconsistency}`;
+        return out;
+      }
+      if (args.census === true && id.editor === "schematic") {
+        const c = await census(ctx2);
+        out.census = { counts: c.counts, total: c.total, digest: c.digest };
+      }
+      const notes = [];
+      notes.push(
+        id.editor === "schematic" ? "\u8EAB\u4EFD\u5DF2\u786E\u8BA4\uFF0C\u53EF\u4EE5\u5B89\u5168\u5730\u5728\u8FD9\u4E00\u9875\u4E0A\u64CD\u4F5C\u3002" : `\u5F53\u524D\u5728 ${id.editor} \u7F16\u8F91\u5668\u91CC\uFF0C\u6CA1\u6709\u6253\u5F00\u539F\u7406\u56FE\u9875 \u2014\u2014 \u539F\u7406\u56FE\u7C7B\u5DE5\u5177\u6B64\u65F6\u4E0D\u8BE5\u8C03\u7528\u3002`
+      );
+      if (tabs.length > 1) {
+        notes.push(
+          `**\u6CE8\u610F\u6709 ${tabs.length} \u4E2A EDA \u6807\u7B7E\u9875\u8FDE\u7740**\uFF08${tabs.map((c) => c.id).join("\u3001")}\uFF09\uFF0C\u5F53\u524D\u5E94\u7B54\u7684\u662F ${activeId}\u3002\u8C03\u7528\u9ED8\u8BA4\u53D1\u7ED9\u6700\u540E\u4E00\u4E2A\u8FDE\u4E0A\u7684\u9875\u9762\uFF0C\u65B0\u5F00\u9875\u9762\u6216\u67D0\u9875\u5237\u65B0\u91CD\u8FDE\u90FD\u4F1A\u8BA9\u76EE\u6807\u9759\u9ED8\u6F02\u79FB\u5230\u53E6\u4E00\u4E2A\u6587\u6863\u4E0A \u2014\u2014 \u8FDE\u7EED\u64CD\u4F5C\u524D\u8BF7\u7528 eda_use_tab \u9489\u4F4F\u4E00\u4E2A\uFF0C\u6216\u53EA\u7559\u4E00\u4E2A EDA \u9875\u9762\u3002`
+        );
+      }
+      out.note = notes.join(" ");
+      return out;
+    }
+  },
+  {
+    name: "eda_use_tab",
+    description: "\u3010\u53EA\u8BFB\u3011\u628A\u540E\u7EED\u6240\u6709\u8C03\u7528\u9489\u5728\u6307\u5B9A\u7684 EDA \u6807\u7B7E\u9875\u4E0A\u3002\n\n**\u591A\u5F00 EDA \u9875\u9762\u65F6\u5FC5\u987B\u5148\u9489**\uFF1A\u6BCF\u4E2A\u6D4F\u89C8\u5668\u6807\u7B7E\u9875\u90FD\u662F\u4E00\u4E2A\u72EC\u7ACB\u7684\u6269\u5C55\u5B9E\u4F8B\uFF0C\u8C03\u7528\u9ED8\u8BA4\u53D1\u7ED9\u300C\u6700\u540E\u4E00\u4E2A\u8FDE\u4E0A\u7684\u300D\uFF0C\u65B0\u5F00\u9875\u9762\u6216\u67D0\u9875\u5237\u65B0\u91CD\u8FDE\u90FD\u4F1A\u8BA9\u76EE\u6807\u9759\u9ED8\u6F02\u79FB \u2014\u2014 \u8868\u73B0\u51FA\u6765\u5C31\u662F\u300C\u5DE5\u7A0B\u600E\u4E48\u81EA\u5DF1\u53D8\u4E86\u300D\u300C\u8BFB\u5230\u7684\u662F\u522B\u7684\u677F\u5B50\u7684\u6570\u636E\u300D\u3002\n\n\u6807\u7B7E\u9875 id \u4ECE eda_status \u7684 connected_clients \u6216 eda_current_context \u7684 answered_by_tab \u62FF\u3002\u4E0D\u7ED9 tab_id \u5219\u53EA\u5217\u51FA\u5F53\u524D\u6709\u54EA\u4E9B\u9875\u9762\u8FDE\u7740\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tab_id: { type: "string", description: "\u8981\u9489\u4F4F\u7684\u6807\u7B7E\u9875 id\uFF1B\u4E0D\u7ED9\u5219\u53EA\u5217\u51FA\u53EF\u9009\u9879" }
+      }
+    },
+    handler: async (args, ctx2) => {
+      const tabs = ctx2.bridge.authedClients();
+      const listing = tabs.map((c) => ({
+        id: c.id,
+        host: c.info?.host,
+        connected_seconds: Math.round((Date.now() - c.connectedAt) / 1e3),
+        active: c.id === ctx2.bridge.activeClient()?.id
+      }));
+      const wanted = typeof args.tab_id === "string" ? args.tab_id.trim() : "";
+      if (!wanted) {
+        return {
+          tabs: listing,
+          note: tabs.length > 1 ? "\u6709\u591A\u4E2A\u9875\u9762\u8FDE\u7740 \u2014\u2014 \u4F20 tab_id \u9489\u4F4F\u4E00\u4E2A\uFF0C\u5426\u5219\u8C03\u7528\u76EE\u6807\u4F1A\u968F\u91CD\u8FDE\u6F02\u79FB\u3002" : "\u53EA\u6709\u4E00\u4E2A\u9875\u9762\u8FDE\u7740\uFF0C\u6682\u65F6\u4E0D\u7528\u9489\u3002"
+        };
+      }
+      if (!ctx2.bridge.setActiveClient(wanted)) {
+        return {
+          ok: false,
+          error: `\u6CA1\u6709\u5DF2\u8BA4\u8BC1\u7684\u6807\u7B7E\u9875 ${wanted}`,
+          tabs: listing
+        };
+      }
+      const id = await currentPage(ctx2);
+      return {
+        ok: true,
+        pinned_tab: wanted,
+        context: {
+          project: id.projectName,
+          board: id.boardName,
+          schematic_page: id.pageName,
+          editor: id.editor
+        },
+        note: "\u540E\u7EED\u8C03\u7528\u90FD\u4F1A\u53D1\u5230\u8FD9\u4E2A\u9875\u9762\u3002\u5B83\u82E5\u88AB\u5173\u95ED\u6216\u5237\u65B0\u91CD\u8FDE\uFF0C\u9700\u8981\u91CD\u65B0\u9489\u3002"
+      };
+    }
+  }
+];
+
+// src/tools/map-apply.ts
+var ENSURE_SCH2 = `
+	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
+	if (!_page) return { error: 'NOT_SCH_EDITOR' };
+`;
+var MARK = MAP_MARK;
+var FLAG_OF = {
+  signal: null,
+  power: "Power",
+  ground: "Ground",
+  analog_ground: "AnalogGround",
+  protect_ground: "ProtectGround"
+};
+var mapApplyTools = [
+  {
+    name: "eda_map_apply",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u6309\u5730\u56FE\u91CD\u65B0\u5E03\u5C40\u5E76\u91CD\u753B\u6574\u5F20\u539F\u7406\u56FE\u3002\n\n\u6D41\u7A0B\uFF1A\u5206\u7EC4\u5E03\u5C40\uFF08\u6BCF\u7EC4\u5148\u5728\u4E00\u7247\u7A7A\u5730\u4E0A\u72EC\u7ACB\u4F18\u5316\uFF0C\u518D\u4F5C\u4E3A\u6574\u4F53\u62FC\u63A5\uFF09\u2192 A\\* \u6B63\u4EA4\u5E03\u7EBF \u2192 \u6E32\u67D3\u5668\u4EF6\u3001\u5BFC\u7EBF\u3001\u7535\u6E90\u5730\u7B26\u53F7\u3001\u8DE8\u533A\u7AEF\u53E3\u3001\u5206\u533A\u6846\u4E0E\u6807\u9898 \u2192 \u628A\u7ED3\u679C\u5199\u56DE\u5730\u56FE\u3002\n\n**AI \u53EA\u9700\u8981\u628A\u8BED\u4E49\u5199\u5BF9**\uFF1A\u8C01\u8FDE\u8C01\u3001\u8C01\u5C5E\u4E8E\u54EA\u4E2A\u533A\u3001\u6BCF\u6761\u7F51\u7EDC\u662F\u4FE1\u53F7\u8FD8\u662F\u7535\u6E90\u5730\u3002\u4F4D\u7F6E\u3001\u89D2\u5EA6\u3001\u8D70\u7EBF\u3001\u6587\u5B57\u6446\u653E\u90FD\u7531\u7B97\u6CD5\u51B3\u5B9A\u3002\n\n\u60F3\u6309\u9605\u8BFB\u4E60\u60EF\u5E72\u9884\u5206\u533A\u4F4D\u7F6E\uFF08\u4FE1\u53F7\u4ECE\u5DE6\u5F80\u53F3\u3001\u7535\u6E90\u5728\u5DE6\u4E0A\u3001\u63A5\u53E3\u8D34\u8FB9\u7F18\uFF09\uFF0C\u5728\u5730\u56FE\u7684 group \u4E0A\u7ED9 anchor \u2014\u2014 \u7ED9\u4E86 anchor \u7684\u533A\u4F1A\u88AB\u9501\u6B7B\uFF0C\u6CA1\u7ED9\u7684\u7B97\u6CD5\u81EA\u5DF1\u5B89\u6392\u3002\u7EC4\u5185\u5E03\u5C40\u4E0D\u63A5\u53D7\u5E72\u9884\uFF0C\u90A3\u662F\u7EAF\u51E0\u4F55\uFF0C\u7B97\u6CD5\u6BD4\u624B\u7B97\u51C6\u3002\n\n\u4F1A\u6E05\u6389\u5F53\u524D\u9875\u7684\u5BFC\u7EBF\u4E0E\u7535\u6E90\u5730\u7B26\u53F7\u91CD\u753B\u3002\u5148\u7528 dry_run \u770B\u6307\u6807\u518D\u51B3\u5B9A\u662F\u5426\u843D\u5730\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        map: { type: "object", description: "\u5730\u56FE\uFF1B\u4E0D\u4F20\u5219\u8BFB\u56FE\u7EB8\u91CC\u5B58\u7684\u90A3\u4EFD" },
+        iterations: { type: "number", description: "\u6BCF\u7EC4\u9000\u706B\u8FED\u4EE3\u6B21\u6570\uFF0C\u9ED8\u8BA4 20000" },
+        dry_run: { type: "boolean", description: "\u53EA\u7B97\u4E0D\u753B\uFF0C\u5148\u770B\u80FD\u4F18\u5316\u5230\u4EC0\u4E48\u7A0B\u5EA6" },
+        trace: {
+          type: "boolean",
+          description: "\u8FC7\u7A0B\u65E5\u5FD7\uFF0C**\u9ED8\u8BA4\u5F00**\u3002\u8FD4\u56DE\u91CC\u7684 trace.issues \u4F1A\u76F4\u63A5\u6307\u51FA\u662F\u54EA\u4E00\u6B65\u51FA\u7684\u95EE\u9898\uFF08\u5F15\u811A\u7AEF\u70B9\u6CA1\u5BF9\u4E0A\u3001\u7F51\u7EDC\u88AB\u8DF3\u8FC7\u3001\u67D0\u6B65\u5199\u5931\u8D25\uFF09\uFF0C\u4E0D\u7528\u56DE\u5934\u7FFB\u4EE3\u7801\u731C\u3002trace_full=true \u65F6\u8FDE\u6B63\u5E38\u6D41\u6C34\u4E00\u8D77\u8FD4\u56DE\u3002"
+        },
+        trace_full: { type: "boolean", description: "\u8FD4\u56DE\u5B8C\u6574\u6D41\u6C34\u800C\u4E0D\u53EA\u662F\u95EE\u9898\u884C\uFF0C\u9ED8\u8BA4 false" },
+        layer: {
+          type: "number",
+          description: "\u53EA\u6E32\u67D3\u7B2C N \u5C42\uFF08\u9010\u5C42\u9012\u8FDB\uFF0C\u89C1 design.md \xA74.11\uFF09\u3002**\u524D\u9762\u6240\u6709\u5C42\u5DF2\u5360\u7684\u5730\u76D8\u4F1A\u4F5C\u4E3A\u969C\u788D**\u4F20\u7ED9\u5E03\u5C40\u4E0E\u5E03\u7EBF \u2014\u2014 \u8FD9\u4E00\u5C42\u7684\u5668\u4EF6\u88AB\u7B97\u6CD5\u6321\u5728\u5916\u9762\uFF0C\u4E0D\u4F1A\u538B\u5230\u5DF2\u7ECF\u753B\u597D\u7684\u90E8\u5206\u3002\u5668\u4EF6\u7684\u5C42\u53F7\u5199\u5728\u5730\u56FE\u7684 part.layer \u4E0A\uFF0C\u4E0D\u5199\u5C31\u662F\u7B2C 1 \u5C42\u3002\n\n\u914D\u5408 incremental \u4F7F\u7528\uFF1A\u7B2C 1 \u5C42\u5168\u91CF\u6E32\u67D3\uFF0C\u4E4B\u540E\u6BCF\u5C42\u90FD\u52A0 incremental \u4FDD\u4F4F\u524D\u9762\u7684\u6210\u679C\u3002\u4E0D\u4F20 layer \u5C31\u662F\u8001\u884C\u4E3A\uFF0C\u4E00\u6B21\u753B\u5B8C\u6240\u6709\u5668\u4EF6\u3002"
+        },
+        incremental: {
+          type: "boolean",
+          description: "\u589E\u91CF\u6E32\u67D3\uFF1A**\u4E0D\u6E05\u573A**\uFF0C\u53EA\u628A\u8FD9\u4E00\u6B21\u7B97\u51FA\u6765\u7684\u4E1C\u897F\u753B\u4E0A\u53BB\uFF0C\u4FDD\u7559\u56FE\u4E0A\u5DF2\u6709\u7684\u56FE\u5143\u3002\u9010\u5C42\u9012\u8FDB\u65F6\u5FC5\u987B\u5F00\uFF08\u5426\u5219\u7B2C\u4E8C\u5C42\u4F1A\u628A\u7B2C\u4E00\u5C42\u62B9\u6389\uFF09\uFF1B\u9ED8\u8BA4 false\uFF0C\u5373\u7167\u65E7\u6E05\u7A7A\u91CD\u753B\u3002"
+        },
+        save_map: { type: "boolean", description: "\u662F\u5426\u628A\u4F18\u5316\u7ED3\u679C\u5199\u56DE\u5730\u56FE\uFF0C\u9ED8\u8BA4 true" }
+      }
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const iterations = typeof args.iterations === "number" ? args.iterations : 2e4;
+      const dryRun = args.dry_run === true;
+      const trace = new Trace(args.trace !== false);
+      const traceFull = args.trace_full === true;
+      const incremental = args.incremental === true;
+      const layer = typeof args.layer === "number" ? args.layer : null;
+      const saveMap = args.save_map !== false;
+      let map = args.map;
+      if (!map) {
+        const loaded = await ctx2.exec(
+          `
+					${ENSURE_SCH2}
+					const MARK = ${JSON.stringify(MARK)};
+					const all = await eda.sch_PrimitiveText.getAll();
+					for (const t of all) {
+						const c = String(t.content || '');
+						if (c.indexOf(MARK) === 0) return { raw: c.slice(MARK.length) };
+					}
+					return { raw: null };
+				`,
+          6e4
+        );
+        if (loaded.error) return { error: "\u5F53\u524D\u7F16\u8F91\u5668\u91CC\u6CA1\u6709\u6253\u5F00\u539F\u7406\u56FE\u9875" };
+        if (!loaded.raw) return { error: "\u6CA1\u4F20 map\uFF0C\u56FE\u7EB8\u91CC\u4E5F\u6CA1\u6709\u5730\u56FE\u3002\u5148\u8DD1 eda_map_import \u751F\u6210\u4E00\u4EFD\u3002" };
+        map = unpackMap(loaded.raw);
+      }
+      const layerOf = (p) => p.layer ?? 1;
+      const thisLayer = layer == null ? map.parts : map.parts.filter((p) => layerOf(p) === layer);
+      const priorLayers = layer == null ? [] : map.parts.filter((p) => layerOf(p) < layer);
+      if (layer != null && !thisLayer.length) {
+        return { error: `\u7B2C ${layer} \u5C42\u6CA1\u6709\u4EFB\u4F55\u5668\u4EF6\u3002\u5730\u56FE\u91CC\u7684 part.layer \u662F\u591A\u5C11\uFF1F\u4E0D\u5199\u9ED8\u8BA4\u662F 1\u3002` };
+      }
+      const parts = /* @__PURE__ */ new Map();
+      const assign = /* @__PURE__ */ new Map();
+      const titles = /* @__PURE__ */ new Map();
+      const idToPrimitive = /* @__PURE__ */ new Map();
+      for (const p of thisLayer) {
+        if (!p.id.trim()) continue;
+        parts.set(p.id, {
+          id: p.id,
+          w: p.w,
+          h: p.h,
+          fixed: p.fixed === true,
+          pins: p.pins.map((q) => ({ id: q.id, dx: q.dx, dy: q.dy, dir: q.dir })),
+          labels: (p.labels ?? []).filter((l) => l.text).map((l) => ({ text: l.text, dx: l.dx, dy: l.dy }))
+        });
+        if (p.group) assign.set(p.id, p.group);
+        if (p.primitiveId) idToPrimitive.set(p.id, p.primitiveId);
+      }
+      for (const g of map.groups) titles.set(g.id, { title: g.title, note: g.note });
+      const anchors = /* @__PURE__ */ new Map();
+      for (const g of map.groups) if (g.anchor) anchors.set(g.id, g.anchor);
+      const layoutNets = map.nets.filter((n) => n.kind === "signal" && n.pins.length >= 2).map((n) => ({ id: n.id, pins: n.pins }));
+      const styleOf = (n) => n.style ?? defaultStyle(n.kind);
+      const wireNetIds = new Set(map.nets.filter((n) => styleOf(n) === "wire").map((n) => n.id));
+      const wireNets = layoutNets.filter((n) => wireNetIds.has(n.id));
+      const symbolNets = map.nets.filter((n) => styleOf(n) === "symbol");
+      const portNets = map.nets.filter((n) => styleOf(n) === "port");
+      const stubNets = [...symbolNets, ...portNets];
+      for (const n of stubNets) {
+        const up = n.kind === "power";
+        for (const ref of n.pins) {
+          const dot = ref.lastIndexOf(".");
+          if (dot <= 0) continue;
+          const part = parts.get(ref.slice(0, dot));
+          if (!part) continue;
+          const pinId = ref.slice(dot + 1);
+          part.stubPins = [...part.stubPins ?? [], pinId];
+          if (up) part.stubUp = [...part.stubUp ?? [], pinId];
+        }
+      }
+      const stubOf = (p) => {
+        const pins = [];
+        const up = [];
+        for (const n of stubNets) {
+          for (const ref of n.pins) {
+            const dot = ref.lastIndexOf(".");
+            if (dot <= 0 || ref.slice(0, dot) !== p.id) continue;
+            const pid = ref.slice(dot + 1);
+            pins.push(pid);
+            if (n.kind === "power") up.push(pid);
+          }
+        }
+        return { pins, up };
+      };
+      const obstacles = priorLayers.filter((p) => p.id.trim()).map((p) => {
+        const st = stubOf(p);
+        const part = {
+          id: p.id,
+          w: p.w,
+          h: p.h,
+          pins: p.pins.map((q) => ({ id: q.id, dx: q.dx, dy: q.dy, dir: q.dir })),
+          stubPins: st.pins.length ? st.pins : void 0,
+          stubUp: st.up.length ? st.up : void 0
+        };
+        return effectiveBox(part, {
+          x: p.place.x,
+          y: p.place.y,
+          rot: p.place.rot,
+          mirror: p.place.mirror
+        });
+      });
+      if (obstacles.length) {
+        trace.at("\u5206\u5C42");
+        trace.log(`\u7B2C ${layer} \u5C42\uFF1A\u672C\u5C42 ${thisLayer.length} \u4E2A\u5668\u4EF6\uFF0C\u524D\u9762\u5C42 ${obstacles.length} \u5757\u5730\u76D8\u4F5C\u4E3A\u969C\u788D`, {});
+      }
+      const t0 = Date.now();
+      const res = layoutByGroups(parts, layoutNets, assign, titles, {
+        iterations,
+        sheet: map.meta.sheet,
+        anchors: anchors.size ? anchors : void 0,
+        obstacles: obstacles.length ? obstacles : void 0
+      });
+      const elapsed = Date.now() - t0;
+      const moves = [];
+      for (const [des, pl] of res.layout) {
+        const pid = idToPrimitive.get(des);
+        if (pid) moves.push({ id: pid, x: pl.x, y: pl.y, rotation: pl.rot, mirror: pl.mirror });
+      }
+      const wires = res.routed.nets.filter((n) => wireNetIds.has(n.netId)).flatMap((n) => n.paths.map((p) => ({ net: n.netId, points: p.flat() })));
+      trace.at("\u5730\u56FE");
+      trace.log(`\u5668\u4EF6 ${parts.size}\uFF0C\u7F51\u7EDC ${map.nets.length}`, {
+        \u753B\u7EBF: wireNets.length,
+        \u7B26\u53F7: symbolNets.length,
+        \u8DE8\u533A\u7AEF\u53E3: res.crossGroupNets.length
+      });
+      for (const n of map.nets) {
+        const style = n.style ?? defaultStyle(n.kind);
+        if (style !== "wire" && n.kind === "signal") {
+          trace.log(`\u7F51\u7EDC ${n.id} \u4E0D\u753B\u5BFC\u7EBF\uFF08style=${style}\uFF09`, { \u5F15\u811A: n.pins });
+        }
+        if (n.pins.length < 2) trace.warn(`\u7F51\u7EDC ${n.id} \u53EA\u6709 ${n.pins.length} \u4E2A\u5F15\u811A\uFF0C\u8FDE\u4E0D\u6210`, {});
+      }
+      trace.at("\u5206\u7EC4\u5E03\u5C40");
+      for (const g of res.groups) {
+        trace.log(`\u533A ${g.id}`, {
+          \u5C3A\u5BF8: `${g.maxX - g.minX}\xD7${g.maxY - g.minY}`,
+          \u6846: [g.minX, g.minY, g.maxX, g.maxY]
+        });
+      }
+      for (const a of res.groups) {
+        for (const b of res.groups) {
+          if (a.id >= b.id) continue;
+          const hit = a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
+          if (hit) trace.error(`\u5206\u533A\u6846 ${a.id} \u4E0E ${b.id} \u91CD\u53E0`, { a: [a.minX, a.minY, a.maxX, a.maxY], b: [b.minX, b.minY, b.maxX, b.maxY] });
+        }
+      }
+      for (const w of res.warnings) trace.warn(w, {});
+      const pinXY = /* @__PURE__ */ new Map();
+      for (const [des, pl] of res.layout) {
+        const part = parts.get(des);
+        if (!part) continue;
+        for (const pin of part.pins) {
+          const w = pinWorld(part, pl, pin);
+          pinXY.set(`${des}.${pin.id}`, { x: w.x, y: w.y });
+        }
+      }
+      const endpointBad = checkRouteEndpoints(
+        trace,
+        res.routed.nets.filter((n) => wireNetIds.has(n.netId)).map((n) => ({
+          id: n.netId,
+          pins: wireNets.find((w) => w.id === n.netId)?.pins ?? [],
+          paths: n.paths
+        })),
+        pinXY
+      );
+      const q5 = (v) => Math.round(v / 5) * 5;
+      const clusters = /* @__PURE__ */ new Map();
+      for (const n of [...symbolNets, ...portNets]) {
+        const isPort = (n.style ?? defaultStyle(n.kind)) === "port";
+        const kind = isPort ? "BI" : FLAG_OF[n.kind];
+        if (!kind) continue;
+        for (const ref of n.pins) {
+          const dot = ref.lastIndexOf(".");
+          if (dot <= 0) continue;
+          const des = ref.slice(0, dot);
+          const part = parts.get(des);
+          const pl = res.layout.get(des);
+          if (!part || !pl) continue;
+          const pin = part.pins.find((q) => q.id === ref.slice(dot + 1));
+          if (!pin) continue;
+          const w = pinWorld(part, pl, pin);
+          const [vx, vy] = dirVec(w.dir);
+          const key2 = `${des}|${vx},${vy}`;
+          clusters.set(key2, [
+            ...clusters.get(key2) ?? [],
+            { what: isPort ? "port" : "flag", kind, net: n.id, x: w.x, y: w.y, vx, vy, pinCount: part.pins.length }
+          ]);
+        }
+      }
+      const flags = [];
+      const ports = [];
+      const takenSpots = /* @__PURE__ */ new Set();
+      const spotKey = (x, y) => `${Math.round(x / 45)},${Math.round(y / 45)}`;
+      const flagRotOf = (g) => {
+        if (g.what === "port") {
+          if (g.vx < 0) return 90;
+          if (g.vx > 0) return 270;
+          if (g.vy > 0) return 180;
+          return 0;
+        }
+        if (g.kind === "Power") return 180;
+        return 0;
+      };
+      const occupiedCells = /* @__PURE__ */ new Map();
+      const cellsAlong = (x1, y1, x2, y2) => {
+        const out = [];
+        const ax = q5(x1);
+        const ay = q5(y1);
+        const bx = q5(x2);
+        const by = q5(y2);
+        const steps2 = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) / 5;
+        const sx = Math.sign(bx - ax);
+        const sy = Math.sign(by - ay);
+        for (let i = 0; i <= steps2; i += 1) out.push(`${ax + sx * i * 5},${ay + sy * i * 5}`);
+        return out;
+      };
+      const flagCells = (x, y, rot) => {
+        const half = FLAG_WIDE / 2;
+        let x0 = x;
+        let x1 = x;
+        let y0 = y;
+        let y1 = y;
+        if (rot === 0) {
+          x0 = x - half;
+          x1 = x + half;
+          y0 = y - FLAG_LONG;
+          y1 = y;
+        } else if (rot === 180) {
+          x0 = x - half;
+          x1 = x + half;
+          y0 = y;
+          y1 = y + FLAG_LONG;
+        } else if (rot === 90) {
+          x0 = x - FLAG_LONG;
+          x1 = x;
+          y0 = y - half;
+          y1 = y + half;
+        } else {
+          x0 = x;
+          x1 = x + FLAG_LONG;
+          y0 = y - half;
+          y1 = y + half;
+        }
+        const out = [];
+        for (let px = q5(x0); px <= q5(x1); px += 5) {
+          for (let py = q5(y0); py <= q5(y1); py += 5) out.push(`${px},${py}`);
+        }
+        return out;
+      };
+      for (const group of clusters.values()) {
+        const horizontal = group[0]?.vx !== 0;
+        group.sort((a, b) => horizontal ? a.y - b.y : a.x - b.x);
+        const mid = (group.length - 1) / 2;
+        group.forEach((g, idx) => {
+          const rot = flagRotOf(g);
+          const maxLen = FAN_BASE + (idx + 3) * FAN_STEP;
+          let len = FAN_BASE + idx * FAN_STEP;
+          let ex = g.x;
+          let ey = g.y;
+          let cells = [];
+          let placedOut = false;
+          while (len <= maxLen) {
+            const tx = q5(g.x + g.vx * len);
+            const ty = q5(g.y + g.vy * len);
+            const path = [...cellsAlong(g.x, g.y, tx, ty), ...flagCells(tx, ty, rot)];
+            const clash = takenSpots.has(spotKey(tx, ty)) || path.some((c) => {
+              const owner = occupiedCells.get(c);
+              return owner != null && owner !== g.net;
+            });
+            if (!clash) {
+              ex = tx;
+              ey = ty;
+              cells = path;
+              placedOut = true;
+              break;
+            }
+            len += FAN_STEP;
+          }
+          if (!placedOut) {
+            ex = q5(g.x);
+            ey = q5(g.y);
+            cells = flagCells(ex, ey, rot);
+          }
+          takenSpots.add(spotKey(ex, ey));
+          for (const c of cells) occupiedCells.set(c, g.net);
+          const placed = { kind: g.kind, net: g.net, x: g.x, y: g.y, ex, ey, rot };
+          if (g.what === "port") ports.push({ ...placed, dir: "BI" });
+          else flags.push(placed);
+        });
+      }
+      const summary = {
+        parts: parts.size,
+        wire_nets: wireNets.length,
+        symbol_nets: symbolNets.length,
+        cross_group_nets: res.crossGroupNets,
+        groups: res.groups.map((g) => ({
+          id: g.id,
+          title: g.title,
+          box: [g.minX, g.minY, g.maxX, g.maxY],
+          size: `${g.maxX - g.minX}\xD7${g.maxY - g.minY}`
+        })),
+        per_group: res.perGroup,
+        wire_length: res.routed.totalLength,
+        bends: res.routed.totalBends,
+        unrouted: res.routed.failedCount,
+        elapsed_ms: elapsed,
+        rotated: [...res.layout.values()].filter((p) => p.rot === 90 || p.rot === 270).length,
+        warnings: res.warnings
+      };
+      const traceOut = () => ({
+        trace: trace.enabled ? { ...trace.summary(), ...traceFull ? { full: trace.format() } : {} } : void 0
+      });
+      if (dryRun) {
+        return {
+          ...summary,
+          ...traceOut(),
+          endpoint_mismatches: endpointBad,
+          dry_run: true,
+          note: endpointBad > 0 ? `\u53EA\u7B97\u4E86\u6CA1\u753B\u3002**\u4F46\u6709 ${endpointBad} \u4E2A\u5F15\u811A\u7AEF\u70B9\u6CA1\u843D\u5728\u81EA\u5DF1\u7684\u7EBF\u4E0A** \u2014\u2014 \u770B trace.lines\uFF0C\u753B\u4E0A\u53BB\u4E5F\u662F\u65AD\u7684\u3002` : "\u53EA\u7B97\u4E86\u6CA1\u753B\u3002\u53BB\u6389 dry_run \u624D\u4F1A\u843D\u5230\u56FE\u4E0A\u3002"
+        };
+      }
+      const steps = {};
+      const runStep = async (name, code, timeout = 12e4) => {
+        trace.at(`\u6E32\u67D3:${name}`);
+        try {
+          const r = await ctx2.exec(`${ENSURE_SCH2}${code}`, timeout);
+          steps[name] = r;
+          if (r && typeof r === "object" && "error" in r) trace.error(`\u8FD9\u4E00\u6B65\u8FD4\u56DE\u4E86\u9519\u8BEF`, r);
+          else trace.log("\u5B8C\u6210", r);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          steps[name] = { failed: msg };
+          trace.error(`\u8FD9\u4E00\u6B65\u629B\u9519\uFF0C\u540E\u9762\u7684\u6B65\u9AA4\u4F1A\u5728\u6B8B\u56FE\u4E0A\u7EE7\u7EED`, { error: msg });
+        }
+      };
+      const before = await census(ctx2).catch(() => null);
+      if (incremental) {
+        trace.at("\u6E05\u573A");
+        trace.log("\u589E\u91CF\u6A21\u5F0F\uFF0C\u8DF3\u8FC7\u6E05\u573A", {});
+      } else {
+        await runStep(
+          "\u6E05\u5BFC\u7EBF",
+          `
+					const ids = (await eda.sch_PrimitiveWire.getAll()).map(function (w) { return w.primitiveId; });
+					if (ids.length) await eda.sch_PrimitiveWire.delete(ids);
+					return { removed: ids.length };
+				`
+        );
+        await runStep(
+          "\u6E05\u7B26\u53F7\u4E0E\u7AEF\u53E3",
+          `
+					const ids = (await eda.sch_PrimitiveComponent.getAll())
+						.filter(function (c) { return c.componentType === 'netflag' || c.componentType === 'netport'; })
+						.map(function (c) { return c.primitiveId; });
+					if (ids.length) await eda.sch_PrimitiveComponent.delete(ids);
+					return { removed: ids.length };
+				`
+        );
+        await runStep(
+          "\u6E05\u65E7\u533A\u6846\u4E0E\u6587\u5B57",
+          `
+					const MARKTXT = ${JSON.stringify(MARK)};
+					const rects = (await eda.sch_PrimitiveRectangle.getAll()).map(function (x) { return x.primitiveId; });
+					if (rects.length) await eda.sch_PrimitiveRectangle.delete(rects);
+					// \u5730\u56FE\u90A3\u6761\u6587\u5B57\u8981\u7559\u7740\uFF0C\u9760\u6807\u8BB0\u8BA4\u51FA\u6765
+					const texts = (await eda.sch_PrimitiveText.getAll())
+						.filter(function (x) { return String(x.content || '').indexOf(MARKTXT) !== 0; })
+						.map(function (x) { return x.primitiveId; });
+					if (texts.length) await eda.sch_PrimitiveText.delete(texts);
+					return { rects: rects.length, texts: texts.length };
+				`
+        );
+      }
+      await runStep(
+        "\u6446\u5668\u4EF6",
+        `
+				const MOVES = ${JSON.stringify(moves)};
+				let n = 0;
+				for (const m of MOVES) {
+					const r = await eda.sch_PrimitiveComponent.modify(m.id, {
+						x: m.x, y: m.y, rotation: m.rotation, mirror: m.mirror,
+					});
+					if (r !== false) n += 1;
+				}
+				return { moved: n, total: MOVES.length };
+			`,
+        18e4
+      );
+      trace.at("\u6446\u5668\u4EF6\u56DE\u8BFB");
+      const wantPlaced = [...res.layout.entries()].filter(([des]) => idToPrimitive.has(des)).map(([des, pl]) => ({ designator: des, x: pl.x, y: pl.y, rotation: pl.rot }));
+      const placedCheck = await verifyPlaced(ctx2, wantPlaced).catch((e) => {
+        trace.error("\u56DE\u8BFB\u5668\u4EF6\u4F4D\u7F6E\u5931\u8D25", { error: e instanceof Error ? e.message : String(e) });
+        return null;
+      });
+      if (placedCheck) {
+        if (placedCheck.allOk) {
+          trace.log(`${wantPlaced.length} \u4E2A\u5668\u4EF6\u7684\u4F4D\u7F6E\u4E0E\u89D2\u5EA6\u5DF2\u56DE\u8BFB\u786E\u8BA4`, {});
+        } else {
+          trace.error("\u5668\u4EF6\u6CA1\u6446\u5230\u7B97\u6CD5\u8981\u6C42\u7684\u4F4D\u7F6E \u2014\u2014 \u540E\u9762\u7684\u8D70\u7EBF\u4F1A\u6210\u7247\u5BF9\u4E0D\u4E0A\u5F15\u811A", {
+            \u6982\u51B5: placedCheck.summary,
+            \u660E\u7EC6: placedCheck.checks.filter((c) => !c.ok).slice(0, 8)
+          });
+        }
+      }
+      await runStep(
+        "\u753B\u5BFC\u7EBF",
+        `
+				const WIRES = ${JSON.stringify(wires)};
+				let n = 0;
+				for (const w of WIRES) {
+					if (await eda.sch_PrimitiveWire.create(w.points, w.net)) n += 1;
+				}
+				return { drawn: n, total: WIRES.length };
+			`,
+        18e4
+      );
+      await runStep(
+        "\u653E\u7535\u6E90\u5730\u7B26\u53F7",
+        `
+				const FLAGS = ${JSON.stringify(flags)};
+				let n = 0;
+				for (const f of FLAGS) {
+					// \u5F15\u51FA\u7EBF\u4E0D\u5E26\u7F51\u7EDC\u540D \u2014\u2014 \u5E26\u4E86\u4F1A\u8BA9\u5BFC\u7EBF\u7684 NET \u6807\u7B7E\u548C\u7B26\u53F7\u540D\u628A\u540C\u4E00\u4E2A
+					// \u7F51\u7EDC\u540D\u753B\u4E24\u904D\u3002\u6CBF\u5F15\u811A\u65B9\u5411\u4E00\u6761\u76F4\u7EBF\uFF0C\u4E0D\u8F6C\u5411\u3002
+					// \u9000\u5316\u6210\u8D34\u5F15\u811A\u65F6 ex/ey \u5C31\u662F\u5F15\u811A\u672C\u8EAB\uFF0C\u4E0D\u5FC5\u753B\u96F6\u957F\u5EA6\u7684\u7EBF
+					if (f.ex !== f.x || f.ey !== f.y) {
+						await eda.sch_PrimitiveWire.create([f.x, f.y, f.ex, f.ey]).catch(() => {});
+					}
+					if (await eda.sch_PrimitiveComponent.createNetFlag(f.kind, f.net, f.ex, f.ey, f.rot)) n += 1;
+				}
+				return { drawn: n, total: FLAGS.length };
+			`,
+        18e4
+      );
+      await runStep(
+        "\u653E\u8DE8\u533A\u7AEF\u53E3",
+        `
+				const PORTS = ${JSON.stringify(ports)};
+				let n = 0;
+				for (const p of PORTS) {
+					if (p.ex !== p.x || p.ey !== p.y) {
+						await eda.sch_PrimitiveWire.create([p.x, p.y, p.ex, p.ey]).catch(() => {});
+					}
+					if (await eda.sch_PrimitiveComponent.createNetPort(p.dir, p.net, p.ex, p.ey, p.rot)) n += 1;
+				}
+				return { drawn: n, total: PORTS.length };
+			`,
+        18e4
+      );
+      await runStep(
+        "\u753B\u533A\u6846\u4E0E\u6807\u9898",
+        `
+				const GROUPS = ${JSON.stringify(res.groups)};
+				let n = 0;
+				for (const g of GROUPS) {
+					// create(topLeftX, topLeftY, width, height)\uFF0Cy \u8F74\u5411\u4E0A\u6240\u4EE5 topLeft \u53D6\u8F83\u5927\u7684 y
+					const rc = await eda.sch_PrimitiveRectangle.create(g.minX, g.maxY, g.maxX - g.minX, g.maxY - g.minY);
+					if (rc) {
+						await eda.sch_PrimitiveRectangle.modify(rc.primitiveId, { color: '#5B7FA6', lineWidth: 2, lineType: 1 }).catch(() => {});
+						n += 1;
+					}
+					// create(x, y, text)\uFF0C\u5750\u6807\u5728\u524D\u3002\u6807\u9898\u5199\u6846\u5185\uFF0C\u5199\u6846\u5916\u4F1A\u6389\u51FA\u56FE\u7EB8
+					if (g.title) await eda.sch_PrimitiveText.create(g.minX + 15, g.maxY - 25, g.title).catch(() => {});
+					if (g.note) await eda.sch_PrimitiveText.create(g.minX + 15, g.maxY - 45, g.note).catch(() => {});
+				}
+				return { drawn: n };
+			`,
+        18e4
+      );
+      const applied = { steps };
+      let mapSaved = null;
+      if (saveMap) {
+        for (const p of map.parts) {
+          const pl = res.layout.get(p.id);
+          if (pl) {
+            p.place = { x: pl.x, y: pl.y, rot: pl.rot, mirror: pl.mirror };
+            if (pl.labelSlots && p.labels) {
+              const swap = pl.rot === 90 || pl.rot === 270;
+              const halfW = (swap ? p.h : p.w) / 2;
+              const halfH = (swap ? p.w : p.h) / 2;
+              p.labels.forEach((l, i) => {
+                const s = LABEL_SLOTS[(pl.labelSlots?.[i] ?? 0) % LABEL_SLOTS.length];
+                if (s) {
+                  l.dx = s.fx * (halfW + 12);
+                  l.dy = s.fy * (halfH + 12);
+                }
+              });
+            }
+          }
+        }
+        for (const g of map.groups) {
+          const box = res.groups.find((x) => x.id === g.id);
+          if (box) g.box = { minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY };
+        }
+        for (const n of map.nets) {
+          const r = res.routed.nets.find((x) => x.netId === n.id);
+          if (r) n.routes = r.paths;
+        }
+        map.meta.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+        const payload = packMap(map);
+        mapSaved = await ctx2.exec(
+          `
+					${ENSURE_SCH2}
+					const PAYLOAD = ${JSON.stringify(payload)};
+					const MARK = ${JSON.stringify(MARK)};
+					const stale = (await eda.sch_PrimitiveText.getAll())
+						.filter(function (t) { return String(t.content || '').indexOf(MARK) === 0; })
+						.map(function (t) { return t.primitiveId; });
+					if (stale.length) await eda.sch_PrimitiveText.delete(stale);
+					const t = await eda.sch_PrimitiveText.create(-400, -400, PAYLOAD);
+					return { ok: !!t, bytes: PAYLOAD.length };
+				`,
+          12e4
+        );
+      }
+      const after = before ? await census(ctx2).catch(() => null) : null;
+      const diff = before && after ? diffCensus(before, after) : null;
+      const notes = [];
+      if (res.routed.failedCount > 0) {
+        notes.push(
+          `${res.routed.failedCount} \u6761\u8FDE\u63A5\u6CA1\u8D70\u901A\uFF0C\u591A\u534A\u662F\u5206\u533A\u4E4B\u95F4\u6CA1\u7559\u591F\u901A\u9053 \u2014\u2014 \u52A0\u5927 iterations\uFF0C\u6216\u7ED9\u5206\u533A\u6362\u4E2A anchor\u3002`
+        );
+      } else {
+        notes.push("\u5E03\u5C40\u3001\u8D70\u7EBF\u3001\u7B26\u53F7\u3001\u5206\u533A\u6846\u90FD\u5DF2\u91CD\u753B\uFF0C\u7ED3\u679C\u5DF2\u5199\u56DE\u5730\u56FE\u3002\u6587\u5B57\u4F4D\u7F6E\u7B97\u8FC7\u4F46\u843D\u4E0D\u5230\u56FE\u4E0A\uFF08EDA \u4E0D\u5F00\u653E\u5C5E\u6027\u6587\u5B57\u7684\u4F4D\u7F6E\u4FEE\u6539\uFF09\u3002");
+      }
+      if (diff && !diff.changed) {
+        notes.push("**\u56FE\u7EB8\u5185\u5BB9\u6458\u8981\u524D\u540E\u6CA1\u53D8 \u2014\u2014 \u8FD9\u4E00\u8D9F\u5F88\u53EF\u80FD\u4E00\u6B65\u90FD\u6CA1\u751F\u6548**\uFF0C\u9010\u6761\u770B steps \u91CC\u6709\u6CA1\u6709 failed\u3002");
+      }
+      if (endpointBad > 0) {
+        notes.push(`**${endpointBad} \u4E2A\u5F15\u811A\u7AEF\u70B9\u6CA1\u843D\u5728\u81EA\u5DF1\u7684\u7EBF\u4E0A**\uFF0C\u56FE\u4E0A\u770B\u7740\u8FDE\u4E86\u5B9E\u9645\u662F\u65AD\u7684 \u2014\u2014 \u770B trace.lines\u3002`);
+      }
+      return {
+        ...summary,
+        ...applied,
+        ...traceOut(),
+        endpoint_mismatches: endpointBad,
+        parts_placed_verified: placedCheck ? placedCheck.allOk : null,
+        map_saved: mapSaved,
+        census_diff: diff ? { delta: diff.delta, changed: diff.changed, summary: diff.summary } : void 0,
+        note: notes.join(" ")
+      };
+    }
+  }
+];
+
+// src/tools/map-tool.ts
+var ENSURE_SCH3 = `
+	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
+	if (!_page) return { error: 'NOT_SCH_EDITOR' };
+`;
+var MARK2 = MAP_MARK;
+var MAP_X = -400;
+var MAP_Y = -400;
+var mapTools = [
+  {
+    name: "eda_map_save",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u628A\u539F\u7406\u56FE\u5730\u56FE\u5B58\u8FDB\u5F53\u524D\u9875\u3002\n\n\u5730\u56FE\u662F\u8FD9\u5F20\u56FE\u7684\u771F\u76F8\u6E90\uFF1A\u5668\u4EF6\u51E0\u4F55\u3001\u5F15\u811A\u3001\u8FDE\u63A5\u3001\u5206\u533A\u3001\u7F51\u7EDC\u6027\u8D28\u5168\u5728\u91CC\u9762\u3002\u5B58\u8FDB\u56FE\u7EB8\u800C\u4E0D\u662F\u672C\u5730\u6587\u4EF6\uFF0C\u6362\u53F0\u673A\u5668\u3001\u522B\u4EBA\u6253\u5F00\u5DE5\u7A0B\u90FD\u8FD8\u5728\uFF0C\u624D\u8C08\u5F97\u4E0A\u4E0B\u6B21\u63A5\u7740\u4F18\u5316\u3002\n\n\u5199\u5165\u524D\u4F1A\u505A\u5F15\u7528\u6821\u9A8C\uFF08\u4F4D\u53F7\u662F\u5426\u91CD\u590D\u3001\u7F51\u7EDC\u5F15\u7528\u7684\u5F15\u811A\u662F\u5426\u5B58\u5728\u3001\u5206\u533A\u662F\u5426\u6709\u5B9A\u4E49\uFF09\uFF0C\u6709\u95EE\u9898\u76F4\u63A5\u62A5\u9519\u4E0D\u5199 \u2014\u2014 \u5B58\u8FDB\u53BB\u4E00\u4EFD\u81EA\u76F8\u77DB\u76FE\u7684\u5730\u56FE\uFF0C\u540E\u9762\u6BCF\u4E00\u6B65\u90FD\u4F1A\u8DDF\u7740\u9519\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        map: { type: "object", description: "\u5B8C\u6574\u7684\u5730\u56FE\u5BF9\u8C61\uFF0C\u7ED3\u6784\u89C1 src/layout/map.ts \u7684 SchematicMap" }
+      },
+      required: ["map"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const map = args.map;
+      if (!map || typeof map !== "object") throw new Error("map \u5FC5\u987B\u662F\u5BF9\u8C61");
+      const errs = validateMap(map);
+      if (errs.length) return { ok: false, errors: errs, note: "\u5730\u56FE\u81EA\u8EAB\u6709\u77DB\u76FE\uFF0C\u6CA1\u6709\u5199\u5165\u3002\u9010\u6761\u4FEE\u6389\u518D\u5B58\u3002" };
+      map.version = 1;
+      map.meta = { ...map.meta ?? { sheet: { w: 1170, h: 825 }, grid: 10 }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+      const payload = packMap(map);
+      const r = await ctx2.exec(
+        `
+				${ENSURE_SCH3}
+				const PAYLOAD = ${JSON.stringify(payload)};
+				const MARK = ${JSON.stringify(MARK2)};
+				// \u5148\u6E05\u6389\u65E7\u5730\u56FE\uFF0C\u907F\u514D\u8BFB\u7684\u65F6\u5019\u649E\u89C1\u4E24\u4EFD
+				const olds = (await eda.sch_PrimitiveText.getAll())
+					.filter(function (t) { return String(t.content || '').indexOf(MARK) === 0; })
+					.map(function (t) { return t.primitiveId; });
+				if (olds.length) await eda.sch_PrimitiveText.delete(olds);
+				const removed = olds.length;
+				// \u7B7E\u540D\u662F create(x, y, text)\uFF0C\u5750\u6807\u5728\u524D
+				const t = await eda.sch_PrimitiveText.create(${MAP_X}, ${MAP_Y}, PAYLOAD);
+				if (!t) return { ok: false, error: '\u5730\u56FE\u5199\u5165\u5931\u8D25' };
+				await new Promise((r) => setTimeout(r, 400));
+				const back = await eda.sch_PrimitiveText.getAll();
+				const got = back.filter((x) => x.primitiveId === t.primitiveId)[0];
+				const len = got ? String(got.content || '').length : 0;
+				return { ok: len === PAYLOAD.length, removed_old: removed, bytes: PAYLOAD.length, read_back: len };
+			`,
+        12e4
+      );
+      return {
+        ...r,
+        parts: map.parts.length,
+        nets: map.nets.length,
+        groups: map.groups.length,
+        note: r.ok ? "\u5730\u56FE\u5DF2\u968F\u56FE\u7EB8\u4FDD\u5B58\u3002" : "\u5199\u56DE\u540E\u957F\u5EA6\u5BF9\u4E0D\u4E0A\uFF0C\u5730\u56FE\u53EF\u80FD\u88AB\u622A\u65AD\u4E86\u3002"
+      };
+    }
+  },
+  {
+    name: "eda_map_load",
+    description: "\u3010\u53EA\u8BFB\u3011\u8BFB\u56DE\u5B58\u5728\u5F53\u524D\u9875\u91CC\u7684\u539F\u7406\u56FE\u5730\u56FE\u3002\u6CA1\u6709\u5730\u56FE\u65F6\u8FD4\u56DE exists:false\uFF0C\u4E0D\u5F53\u4F5C\u9519\u8BEF \u2014\u2014 \u9996\u6B21\u4F7F\u7528\u6216\u4ECE\u522B\u5904\u5BFC\u5165\u7684\u56FE\u672C\u6765\u5C31\u6CA1\u6709\u3002",
+    inputSchema: { type: "object", properties: {} },
+    handler: async (_args, ctx2) => {
+      const r = await ctx2.exec(
+        `
+				${ENSURE_SCH3}
+				const MARK = ${JSON.stringify(MARK2)};
+				const all = await eda.sch_PrimitiveText.getAll();
+				for (const t of all) {
+					const c = String(t.content || '');
+					if (c.indexOf(MARK) === 0) return { raw: c.slice(MARK.length) };
+				}
+				return { raw: null };
+			`,
+        6e4
+      );
+      if (r.error) return { error: "\u5F53\u524D\u7F16\u8F91\u5668\u91CC\u6CA1\u6709\u6253\u5F00\u539F\u7406\u56FE\u9875" };
+      if (!r.raw) return { exists: false, map: EMPTY_MAP, note: "\u8FD9\u5F20\u56FE\u8FD8\u6CA1\u6709\u5730\u56FE\u3002\u7528 eda_map_import \u4ECE\u73B0\u6709\u56FE\u751F\u6210\u4E00\u4EFD\u3002" };
+      try {
+        const map = unpackMap(r.raw);
+        return {
+          exists: true,
+          map,
+          parts: map.parts?.length ?? 0,
+          nets: map.nets?.length ?? 0,
+          groups: map.groups?.length ?? 0
+        };
+      } catch (e) {
+        return { exists: true, error: `\u5730\u56FE\u89E3\u6790\u5931\u8D25\uFF1A${e instanceof Error ? e.message : String(e)}`, raw_length: r.raw.length };
+      }
+    }
+  },
+  {
+    name: "eda_map_import",
+    description: "\u3010\u53EA\u8BFB\u3011\u4ECE\u5F53\u524D\u5DF2\u753B\u597D\u7684\u539F\u7406\u56FE\u53CD\u5411\u751F\u6210\u4E00\u4EFD\u5730\u56FE\uFF0C\u4E0D\u5FC5\u91CD\u753B\u3002\n\n\u5668\u4EF6\u51E0\u4F55\u3001\u5F15\u811A\u3001\u4F4D\u7F6E\u4ECE EDA \u8BFB\uFF08\u90A3\u662F\u5BA2\u89C2\u4E8B\u5B9E\uFF09\uFF1B\u5BFC\u7EBF\u4E0E\u7F51\u7EDC\u5F52\u5C5E\u4ECE\u6587\u6863\u6E90\u7801\u89E3\u6790 \u2014\u2014 `sch_Net.getAllNets()` \u5728\u6269\u5C55\u4E0A\u4E0B\u6587\u91CC\u8FD4\u56DE\u7A7A\uFF0C\u53EA\u80FD\u8D70 getDocumentSource\u3002\n\n**\u7F51\u7EDC\u6027\u8D28\uFF08\u4FE1\u53F7\uFF0F\u7535\u6E90\uFF0F\u5730\uFF09\u53EA\u6309\u540D\u5B57\u7ED9\u4E86\u4E2A\u731C\u6D4B**\uFF0CAI \u5FC5\u987B\u9010\u6761\u8FC7\u76EE\uFF1AAVDD_1V8 / VBAT_SW \u65E2\u50CF\u7535\u6E90\u53C8\u50CF\u4FE1\u53F7\uFF0CPWR_EN \u542C\u7740\u50CF\u7535\u6E90\u5176\u5B9E\u662F\u666E\u901A IO\u3002\u6539\u597D\u4E4B\u540E\u7528 eda_map_save \u5B58\u56DE\u53BB\u3002",
+    inputSchema: { type: "object", properties: {} },
+    handler: async (_args, ctx2) => {
+      const r = await ctx2.exec(
+        `
+				${ENSURE_SCH3}
+				await new Promise((r) => setTimeout(r, 800));
+				const src = await eda.sys_FileManager.getDocumentSource();
+				const lines = String(src).split(String.fromCharCode(10));
+
+				// \u5BFC\u7EBF\u7684\u7F51\u7EDC\u540D\u6302\u5728 ATTR(key=NET) \u4E0A\uFF0CparentId \u6307\u5411 WIRE
+				const wireNet = {};
+				for (const ln of lines) {
+					if (ln.indexOf('"type":"ATTR"') < 0) continue;
+					const q = ln.indexOf('||');
+					if (q < 0) continue;
+					let b = ln.slice(q + 2);
+					const l = b.lastIndexOf('|');
+					if (l >= 0) b = b.slice(0, l);
+					let o = null;
+					try { o = JSON.parse(b); } catch (e) { continue; }
+					if (String(o.key) === 'NET') wireNet[String(o.parentId)] = String(o.value);
+				}
+				// LINE \u901A\u8FC7 lineGroup \u5F52\u5C5E\u5230 WIRE\uFF0C\u4E8E\u662F\u6BCF\u6BB5\u7EBF\u90FD\u77E5\u9053\u81EA\u5DF1\u5C5E\u4E8E\u54EA\u6761\u7F51\u7EDC
+				const segs = [];
+				for (const ln of lines) {
+					if (ln.indexOf('"type":"LINE"') < 0) continue;
+					const q = ln.indexOf('||');
+					if (q < 0) continue;
+					let b = ln.slice(q + 2);
+					const l = b.lastIndexOf('|');
+					if (l >= 0) b = b.slice(0, l);
+					let o = null;
+					try { o = JSON.parse(b); } catch (e) { continue; }
+					if (o.startX == null) continue;
+					const net = wireNet[String(o.lineGroup)];
+					if (net) segs.push({ net: net, x1: o.startX, y1: -o.startY, x2: o.endX, y2: -o.endY });
+				}
+
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const parts = [];
+				const pinRefs = [];
+				for (const c of all) {
+					if (c.componentType !== 'part') continue;
+					const bb = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => null);
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					const des = String(c.designator || '');
+					parts.push({
+						id: des,
+						primitiveId: c.primitiveId,
+						name: String(c.name || ''),
+						x: c.x, y: c.y,
+						rot: ((Number(c.rotation) || 0) % 360 + 360) % 360,
+						mirror: c.mirror === true,
+						w: bb ? Math.max(10, bb.maxX - bb.minX) : 40,
+						h: bb ? Math.max(10, bb.maxY - bb.minY) : 40,
+						pins: (pins || []).map((p) => ({
+							n: String(p.pinNumber != null ? p.pinNumber : p.number),
+							name: String(p.pinName || ''),
+							x: p.x, y: p.y,
+							dir: ((Number(p.rotation) || 0) % 360 + 360) % 360,
+						})),
+					});
+					for (const p of (pins || [])) {
+						pinRefs.push({ ref: des + '.' + String(p.pinNumber != null ? p.pinNumber : p.number), x: p.x, y: p.y });
+					}
+				}
+
+				// \u5F15\u811A\u843D\u5728\u54EA\u6761\u7EBF\u6BB5\u4E0A\uFF0C\u5C31\u5C5E\u4E8E\u54EA\u6761\u7F51\u7EDC\uFF08\u70B9\u5230\u7EBF\u6BB5\u8DDD\u79BB\uFF0CT \u578B\u5206\u652F\u4E5F\u7B97\uFF09
+				const d2 = (px, py, s) => {
+					const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
+					const len2 = dx * dx + dy * dy;
+					let t = len2 === 0 ? 0 : ((px - s.x1) * dx + (py - s.y1) * dy) / len2;
+					t = t < 0 ? 0 : t > 1 ? 1 : t;
+					const qx = s.x1 + t * dx, qy = s.y1 + t * dy;
+					return Math.sqrt((px - qx) * (px - qx) + (py - qy) * (py - qy));
+				};
+				const nets = {};
+				for (const pr of pinRefs) {
+					for (const s of segs) {
+						if (d2(pr.x, pr.y, s) < 2) {
+							if (!nets[s.net]) nets[s.net] = [];
+							if (nets[s.net].indexOf(pr.ref) < 0) nets[s.net].push(pr.ref);
+							break;
+						}
+					}
+				}
+				// \u7535\u6E90\u5730\u548C\u7AEF\u53E3\u8981**\u4ECE\u7B26\u53F7\u53CD\u63A8**\uFF0C\u4E0D\u80FD\u9760\u5BFC\u7EBF\u7684\u7F51\u7EDC\u540D\u3002
+				// \u7B26\u53F7\u7684\u5F15\u51FA\u7EBF\u662F\u523B\u610F\u4E0D\u5E26\u7F51\u7EDC\u540D\u7684\uFF08\u5E26\u4E86\u4F1A\u8BA9\u540C\u4E00\u4E2A\u7F51\u7EDC\u540D\u753B\u4E24\u904D\uFF0C
+				// \u6324\u5728\u4E00\u5C0F\u6BB5\u7EBF\u7684\u4E24\u7AEF\uFF09\uFF0C\u6240\u4EE5\u90A3\u4E9B\u7EBF\u6BB5\u5728 wireNet \u91CC\u67E5\u4E0D\u5230\u5F52\u5C5E\u3002
+				// \u505A\u6CD5\uFF1A\u628A\u6240\u6709\u7EBF\u6BB5\u5F53\u6210\u56FE\uFF0C\u4ECE\u7B26\u53F7\u5F15\u811A\u51FA\u53D1\u505A\u8FDE\u901A\u641C\u7D22\uFF0C
+				// \u6CBF\u9014\u78B0\u5230\u7684\u5668\u4EF6\u5F15\u811A\u5C31\u5F52\u8FD9\u4E2A\u7B26\u53F7\u7684\u7F51\u7EDC\u3002
+				// \u53EA\u6536**\u6CA1\u6709\u7F51\u7EDC\u540D**\u7684\u7EBF\u6BB5\u3002\u5E26\u540D\u5B57\u7684\u7EBF\u6BB5\u5DF2\u7ECF\u5C5E\u4E8E\u67D0\u6761\u5177\u4F53\u7F51\u7EDC\uFF0C
+				// \u987A\u7740\u5B83\u7EE7\u7EED\u8D70\u5C31\u4F1A\u628A\u4E24\u6761\u65E0\u5173\u7F51\u7EDC\u4E32\u6210\u4E00\u6761 \u2014\u2014 \u5B9E\u6D4B +3V3 \u56E0\u6B64\u541E\u6389\u4E86
+				// \u6574\u4E2A RESET \u7F51\u7EDC\u7684\u6210\u5458\u3002\u7B26\u53F7\u7684\u5F15\u51FA\u7EBF\u6070\u6070\u90FD\u662F\u4E0D\u5E26\u540D\u5B57\u7684\uFF0C\u591F\u7528\u3002
+				const allSegs = [];
+				for (const ln of lines) {
+					if (ln.indexOf('"type":"LINE"') < 0) continue;
+					const q = ln.indexOf('||');
+					if (q < 0) continue;
+					let b = ln.slice(q + 2);
+					const l = b.lastIndexOf('|');
+					if (l >= 0) b = b.slice(0, l);
+					let o = null;
+					try { o = JSON.parse(b); } catch (e) { continue; }
+					if (o.startX == null) continue;
+					if (wireNet[String(o.lineGroup)]) continue;
+					allSegs.push({ x1: o.startX, y1: -o.startY, x2: o.endX, y2: -o.endY });
+				}
+				const near = (ax, ay, bx, by) => Math.abs(ax - bx) + Math.abs(ay - by) < 3;
+				for (const c of all) {
+					if (c.componentType !== 'netflag' && c.componentType !== 'netport') continue;
+					const nm = String(c.name || '');
+					if (!nm) continue;
+					if (!nets[nm]) nets[nm] = [];
+					const symPins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					// \u4ECE\u7B26\u53F7\u7684\u6BCF\u4E2A\u5F15\u811A\u51FA\u53D1\uFF0C\u987A\u7740\u7EBF\u6BB5\u4E00\u8DEF\u8D70
+					const frontier = (symPins || []).map((p) => ({ x: p.x, y: p.y }));
+					const seen = [];
+					const usedSeg = {};
+					let guard = 0;
+					while (frontier.length && guard < 400) {
+						guard += 1;
+						const cur = frontier.pop();
+						if (seen.some((s) => near(s.x, s.y, cur.x, cur.y))) continue;
+						seen.push(cur);
+						// \u843D\u5728\u8FD9\u4E2A\u70B9\u4E0A\u7684\u5668\u4EF6\u5F15\u811A
+						for (const pr of pinRefs) {
+							if (near(pr.x, pr.y, cur.x, cur.y) && nets[nm].indexOf(pr.ref) < 0) nets[nm].push(pr.ref);
+						}
+						// \u987A\u7740\u5171\u7AEF\u70B9\u7684\u7EBF\u6BB5\u7EE7\u7EED\u8D70
+						for (let si = 0; si < allSegs.length; si++) {
+							if (usedSeg[si]) continue;
+							const s2 = allSegs[si];
+							if (near(s2.x1, s2.y1, cur.x, cur.y)) {
+								usedSeg[si] = 1;
+								frontier.push({ x: s2.x2, y: s2.y2 });
+							} else if (near(s2.x2, s2.y2, cur.x, cur.y)) {
+								usedSeg[si] = 1;
+								frontier.push({ x: s2.x1, y: s2.y1 });
+							}
+						}
+					}
+				}
+
+				const tb = _page.titleBlockData || {};
+				return {
+					sheet: {
+						w: tb.Width && tb.Width.value ? Number(tb.Width.value) : 1170,
+						h: tb.Height && tb.Height.value ? Number(tb.Height.value) : 825,
+					},
+					parts: parts,
+					nets: nets,
+					wire_segments: segs.length,
+				};
+			`,
+        18e4
+      );
+      if (r.error) return { error: "\u5F53\u524D\u7F16\u8F91\u5668\u91CC\u6CA1\u6709\u6253\u5F00\u539F\u7406\u56FE\u9875" };
+      const rawParts = r.parts ?? [];
+      const rawNets = r.nets ?? {};
+      const sheet = r.sheet ?? { w: 1170, h: 825 };
+      const map = {
+        version: 1,
+        meta: { sheet, grid: 10, updatedAt: (/* @__PURE__ */ new Date()).toISOString() },
+        groups: [],
+        parts: rawParts.map((p) => {
+          const rot = p.rot;
+          const mirror = p.mirror;
+          const cx = p.x;
+          const cy = p.y;
+          return {
+            id: p.id,
+            primitiveId: p.primitiveId,
+            w: p.w,
+            h: p.h,
+            place: { x: cx, y: cy, rot, mirror },
+            // 引脚存本地定义：世界坐标减去摆放，再逆转回去
+            pins: p.pins.map((q) => {
+              const rx = q.x - cx;
+              const ry = q.y - cy;
+              const rad = -rot * Math.PI / 180;
+              const cos = Math.round(Math.cos(rad));
+              const sin = Math.round(Math.sin(rad));
+              let dx = rx * cos - ry * sin;
+              const dy = rx * sin + ry * cos;
+              let dir = (q.dir - rot + 360) % 360;
+              if (mirror) {
+                dx = -dx;
+                dir = (180 - dir + 360) % 360;
+              }
+              return { id: q.n, name: q.name, dx, dy, dir };
+            }),
+            labels: [
+              { key: "Designator", text: p.id, dx: -10, dy: p.h / 2 + 12 },
+              { key: "Name", text: String(p.name ?? "").slice(0, 20), dx: -10, dy: -(p.h / 2 + 12) }
+            ].filter((l) => l.text)
+          };
+        }),
+        nets: Object.entries(rawNets).map(([id, pins]) => {
+          const kind = guessNetKind(id);
+          return { id, kind, style: defaultStyle(kind), pins };
+        })
+      };
+      const guessed = map.nets.filter((n) => n.kind !== "signal").map((n) => `${n.id}=${n.kind}`);
+      const lonely = map.nets.filter((n) => n.pins.length < 2).map((n) => n.id);
+      return {
+        map,
+        parts: map.parts.length,
+        nets: map.nets.length,
+        wire_segments: r.wire_segments,
+        guessed_kinds: guessed,
+        single_pin_nets: lonely,
+        note: "**\u8FD9\u53EA\u662F\u521D\u7A3F**\u3002\u7F51\u7EDC\u6027\u8D28\u662F\u6309\u540D\u5B57\u731C\u7684\uFF0C\u8BF7\u9010\u6761\u6838\u5BF9 guessed_kinds \u2014\u2014 \u540D\u5B57\u5224\u65AD\u4E0D\u4E86 AVDD_1V8 \u662F\u7535\u6E90\u8FD8\u662F\u4FE1\u53F7\u3001PWR_EN \u662F\u4E0D\u662F\u666E\u901A IO\u3002\u5206\u533A\u4E5F\u662F\u7A7A\u7684\uFF0C\u9700\u8981\u4F60\u6309\u529F\u80FD\u5212\u3002\u6539\u597D\u540E\u7528 eda_map_save \u5B58\u56DE\u56FE\u7EB8\u3002"
+      };
+    }
+  },
+  {
+    name: "eda_map_verify",
+    description: "\u3010\u53EA\u8BFB\u3011\u62FF\u5730\u56FE\u91CC\u7684\u5668\u4EF6\u51E0\u4F55\u8DDF EDA \u91CC\u7684\u771F\u5B9E\u7B26\u53F7\u6BD4\u5BF9\u3002\n\n**AI \u624B\u5199\u5730\u56FE\u540E\u5FC5\u8DD1**\u3002\u5F15\u811A\u6570\u91CF\u3001\u5F15\u811A\u53F7\u3001\u5F15\u811A\u5750\u6807\u3001\u7B26\u53F7\u5C3A\u5BF8\u90FD\u662F\u5E93\u91CC\u7684\u5BA2\u89C2\u4E8B\u5B9E\uFF0C\u51ED\u8BB0\u5FC6\u586B\u5FC5\u7136\u51FA\u9519\uFF1B\u800C\u9519\u7684\u5F15\u811A\u53F7\u4F1A\u4E00\u8DEF\u5E26\u5230\u6E32\u67D3\uFF0C\u8868\u73B0\u4E3A\u300C\u7EBF\u8FDE\u5230\u4E86\u4E0D\u5B58\u5728\u7684\u811A\u4E0A\u300D\uFF0C\u5230\u90A3\u65F6\u5F88\u96BE\u8FFD\u662F\u54EA\u4E00\u6B65\u7F16\u9519\u7684\u3002\n\n\u6743\u8D23\u5206\u660E\uFF1A\u51E0\u4F55\u4EE5 EDA \u4E3A\u51C6\uFF08\u5BA2\u89C2\u4E8B\u5B9E\uFF09\uFF0C\u8FDE\u63A5\u4E0E\u5206\u533A\u4EE5\u5730\u56FE\u4E3A\u51C6\uFF08\u8BBE\u8BA1\u610F\u56FE\uFF09\u3002\u6240\u4EE5\u8FD9\u91CC\u53EA\u62A5\u51E0\u4F55\u5DEE\u5F02\uFF0C\u4E0D\u78B0\u7F51\u7EDC\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        map: { type: "object", description: "\u8981\u6821\u9A8C\u7684\u5730\u56FE\uFF1B\u4E0D\u4F20\u5219\u8BFB\u56FE\u7EB8\u91CC\u5B58\u7684\u90A3\u4EFD" }
+      }
+    },
+    handler: async (args, ctx2) => {
+      let map = args.map;
+      if (!map) {
+        const loaded = await ctx2.exec(
+          `
+					${ENSURE_SCH3}
+					const MARK = ${JSON.stringify(MARK2)};
+					const all = await eda.sch_PrimitiveText.getAll();
+					for (const t of all) {
+						const c = String(t.content || '');
+						if (c.indexOf(MARK) === 0) return { raw: c.slice(MARK.length) };
+					}
+					return { raw: null };
+				`,
+          6e4
+        );
+        if (!loaded.raw) return { error: "\u6CA1\u4F20 map\uFF0C\u56FE\u7EB8\u91CC\u4E5F\u6CA1\u6709\u5B58\u5730\u56FE" };
+        map = unpackMap(loaded.raw);
+      }
+      const real = await ctx2.exec(
+        `
+				${ENSURE_SCH3}
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const out = {};
+				for (const c of all) {
+					if (c.componentType !== 'part') continue;
+					const bb = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => null);
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					out[String(c.designator || '')] = {
+						w: bb ? Math.round(bb.maxX - bb.minX) : null,
+						h: bb ? Math.round(bb.maxY - bb.minY) : null,
+						pins: (pins || []).map((p) => String(p.pinNumber != null ? p.pinNumber : p.number)).sort(),
+					};
+				}
+				return { parts: out };
+			`,
+        12e4
+      );
+      if (real.error) return { error: "\u5F53\u524D\u7F16\u8F91\u5668\u91CC\u6CA1\u6709\u6253\u5F00\u539F\u7406\u56FE\u9875" };
+      const actual = real.parts ?? {};
+      const issues = [];
+      for (const p of map.parts) {
+        const a = actual[p.id];
+        if (!a) {
+          issues.push({ part: p.id, problem: "\u56FE\u4E0A\u6CA1\u6709\u8FD9\u4E2A\u5668\u4EF6", map: `${p.pins.length} \u4E2A\u5F15\u811A`, eda: "\u4E0D\u5B58\u5728" });
+          continue;
+        }
+        const mapPins = p.pins.map((q) => q.id).sort();
+        if (mapPins.join(",") !== a.pins.join(",")) {
+          issues.push({ part: p.id, problem: "\u5F15\u811A\u53F7\u5BF9\u4E0D\u4E0A", map: mapPins.join(","), eda: a.pins.join(",") });
+        }
+        if (a.w != null && Math.abs(a.w - p.w) > 2) {
+          issues.push({ part: p.id, problem: "\u7B26\u53F7\u5BBD\u5EA6\u5BF9\u4E0D\u4E0A", map: String(p.w), eda: String(a.w) });
+        }
+        if (a.h != null && Math.abs(a.h - p.h) > 2) {
+          issues.push({ part: p.id, problem: "\u7B26\u53F7\u9AD8\u5EA6\u5BF9\u4E0D\u4E0A", map: String(p.h), eda: String(a.h) });
+        }
+      }
+      const extra = Object.keys(actual).filter((d) => d && !map.parts.some((p) => p.id === d));
+      return {
+        checked: map.parts.length,
+        issues,
+        not_in_map: extra,
+        verdict: issues.length === 0 && extra.length === 0 ? "\u4E00\u81F4" : `${issues.length + extra.length} \u5904\u5BF9\u4E0D\u4E0A`,
+        note: issues.length || extra.length ? "\u51E0\u4F55\u4EE5 EDA \u4E3A\u51C6 \u2014\u2014 \u6309 eda \u90A3\u4E00\u5217\u6539\u5730\u56FE\uFF0C\u522B\u53CD\u8FC7\u6765\u3002not_in_map \u662F\u56FE\u4E0A\u6709\u3001\u5730\u56FE\u91CC\u6F0F\u6389\u7684\u5668\u4EF6\u3002" : "\u5730\u56FE\u4E0E\u56FE\u7EB8\u4E00\u81F4\uFF0C\u53EF\u4EE5\u5F80\u4E0B\u8D70\u3002"
+      };
+    }
+  }
+];
+
+// src/layout/connectivity.ts
+var CONNECT_TOL = 1;
+function dist2ToSegment(px, py, s) {
+  const dx = s.x2 - s.x1;
+  const dy = s.y2 - s.y1;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 === 0 ? 0 : ((px - s.x1) * dx + (py - s.y1) * dy) / len2;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const qx = s.x1 + t * dx;
+  const qy = s.y1 + t * dy;
+  return Math.abs(px - qx) + Math.abs(py - qy);
+}
+function segmentsTouch(a, b, tol) {
+  return dist2ToSegment(a.x1, a.y1, b) <= tol || dist2ToSegment(a.x2, a.y2, b) <= tol || dist2ToSegment(b.x1, b.y1, a) <= tol || dist2ToSegment(b.x2, b.y2, a) <= tol;
+}
+var DSU = class {
+  p;
+  constructor(n) {
+    this.p = Array.from({ length: n }, (_, i) => i);
+  }
+  find(x) {
+    while (this.p[x] !== x) {
+      const parent = this.p[x];
+      this.p[x] = this.p[parent];
+      x = this.p[x];
+    }
+    return x;
+  }
+  union(a, b) {
+    const ra = this.find(a);
+    const rb = this.find(b);
+    if (ra !== rb) this.p[ra] = rb;
+  }
+};
+function buildConnectivity(segs, terms, tol = CONNECT_TOL) {
+  const nSeg = segs.length;
+  const dsu = new DSU(nSeg + terms.length);
+  for (let i = 0; i < nSeg; i++) {
+    for (let j = i + 1; j < nSeg; j++) {
+      if (segmentsTouch(segs[i], segs[j], tol)) dsu.union(i, j);
+    }
+  }
+  const touched = /* @__PURE__ */ new Set();
+  terms.forEach((t, k) => {
+    for (let i = 0; i < nSeg; i++) {
+      if (dist2ToSegment(t.x, t.y, segs[i]) <= tol) {
+        dsu.union(nSeg + k, i);
+        touched.add(k);
+      }
+    }
+  });
+  for (let a = 0; a < terms.length; a++) {
+    for (let b = a + 1; b < terms.length; b++) {
+      const ta = terms[a];
+      const tb = terms[b];
+      if (Math.abs(ta.x - tb.x) + Math.abs(ta.y - tb.y) <= tol) {
+        dsu.union(nSeg + a, nSeg + b);
+        touched.add(a);
+        touched.add(b);
+      }
+    }
+  }
+  const byName = /* @__PURE__ */ new Map();
+  terms.forEach((t, k) => {
+    if (t.kind === "pin" || !t.net) return;
+    const list = byName.get(t.net) ?? [];
+    list.push(k);
+    byName.set(t.net, list);
+  });
+  for (const list of byName.values()) {
+    for (let i = 1; i < list.length; i++) {
+      dsu.union(nSeg + list[0], nSeg + list[i]);
+      touched.add(list[0]);
+      touched.add(list[i]);
+    }
+  }
+  const buckets = /* @__PURE__ */ new Map();
+  for (let i = 0; i < nSeg; i++) {
+    const r = dsu.find(i);
+    const b = buckets.get(r) ?? { pins: [], names: /* @__PURE__ */ new Set(), segs: 0 };
+    b.segs += 1;
+    buckets.set(r, b);
+  }
+  terms.forEach((t, k) => {
+    if (!touched.has(k)) return;
+    const r = dsu.find(nSeg + k);
+    const b = buckets.get(r) ?? { pins: [], names: /* @__PURE__ */ new Set(), segs: 0 };
+    if (t.kind === "pin") b.pins.push(t.id);
+    else if (t.net) b.names.add(t.net);
+    buckets.set(r, b);
+  });
+  const groups = [];
+  const rootToIndex = /* @__PURE__ */ new Map();
+  for (const [root, b] of buckets) {
+    rootToIndex.set(root, groups.length);
+    groups.push({
+      index: groups.length,
+      pins: b.pins.sort(),
+      names: [...b.names].sort(),
+      segments: b.segs
+    });
+  }
+  const of = /* @__PURE__ */ new Map();
+  terms.forEach((t, k) => {
+    if (!touched.has(k)) return;
+    const gi = rootToIndex.get(dsu.find(nSeg + k));
+    if (gi != null) of.set(t.id, gi);
+  });
+  const isolated = terms.filter((_, k) => !touched.has(k)).map((t) => t.id);
+  return { groups, of, isolated };
+}
+function diffConnectivity(conn, declared, terms) {
+  const broken = [];
+  const shorts = [];
+  for (const net of declared) {
+    if (net.pins.length < 2) continue;
+    const buckets = /* @__PURE__ */ new Map();
+    for (const ref of net.pins) {
+      const gi = conn.of.get(ref);
+      const key2 = gi == null ? "none" : String(gi);
+      buckets.set(key2, [...buckets.get(key2) ?? [], ref]);
+    }
+    if (buckets.size > 1) {
+      const actual = [...buckets.values()];
+      broken.push({
+        net: net.id,
+        expected: net.pins,
+        actual,
+        note: `\u58F0\u660E\u4E3A\u540C\u4E00\u7F51\u7EDC\uFF0C\u5B9E\u9645\u5374\u5206\u6210\u4E86 ${buckets.size} \u7EC4\uFF1A` + actual.map((g) => `[${g.join(" ")}]`).join(" \u4E0E ") + "\uFF08\u5176\u4E2D none \u8868\u793A\u538B\u6839\u6CA1\u63A5\u5230\u4EFB\u4F55\u5BFC\u7EBF\uFF09"
+      });
+    }
+  }
+  const netOfPin = /* @__PURE__ */ new Map();
+  for (const net of declared) for (const ref of net.pins) netOfPin.set(ref, net.id);
+  for (const g of conn.groups) {
+    const names = /* @__PURE__ */ new Set();
+    for (const ref of g.pins) {
+      const n = netOfPin.get(ref);
+      if (n) names.add(n);
+    }
+    for (const n of g.names) names.add(n);
+    if (names.size > 1) {
+      shorts.push({
+        nets: [...names].sort(),
+        pins: g.pins,
+        note: `\u8FD9\u4E9B\u5F15\u811A\u5728\u56FE\u4E0A\u8FDE\u6210\u4E86\u4E00\u7247\uFF0C\u4F46\u5B83\u4EEC\u5206\u5C5E ${names.size} \u6761\u4E0D\u540C\u7684\u7F51\u7EDC \u2014\u2014 \u77ED\u8DEF`
+      });
+    }
+  }
+  const ncSet = new Set(terms.filter((t) => t.nc).map((t) => t.id));
+  const orphans = conn.isolated.filter((id) => !ncSet.has(id));
+  return { broken, shorts, orphans, ok: broken.length === 0 && shorts.length === 0 && orphans.length === 0 };
+}
+function findCrossings(segs, boxes, shrink = 6) {
+  const out = [];
+  for (const b of boxes) {
+    const x0 = b.minX + shrink;
+    const y0 = b.minY + shrink;
+    const x1 = b.maxX - shrink;
+    const y1 = b.maxY - shrink;
+    if (x1 <= x0 || y1 <= y0) continue;
+    for (const s of segs) {
+      if (segmentHitsBox(s, x0, y0, x1, y1)) {
+        out.push({
+          part: b.id,
+          seg: s,
+          note: `\u7F51\u7EDC ${s.net || "(\u65E0\u540D)"} \u7684\u5BFC\u7EBF\u4ECE ${b.id} \u8EAB\u4E0A\u538B\u8FC7\u53BB\u4E86`
+        });
+      }
+    }
+  }
+  return out;
+}
+function segmentHitsBox(s, x0, y0, x1, y1) {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = s.x2 - s.x1;
+  const dy = s.y2 - s.y1;
+  const tests = [
+    [-dx, s.x1 - x0],
+    [dx, x1 - s.x1],
+    [-dy, s.y1 - y0],
+    [dy, y1 - s.y1]
+  ];
+  for (const [p, q] of tests) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+  }
+  return t0 < t1;
+}
+
+// src/tools/netcheck.ts
+var ENSURE_SCH4 = `
+	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
+	if (!_page) return { error: 'NOT_SCH_EDITOR' };
+`;
+var COLLECT = `
+	${ENSURE_SCH4}
+	const flat = function (L) {
+		const o = [];
+		if (!L) return o;
+		if (Array.isArray(L[0])) { for (const s of L) for (const v of s) o.push(v); }
+		else { for (const v of L) o.push(v); }
+		return o;
+	};
+
+	// line \u662F**\u6BB5\u5217\u8868**\uFF0C\u6BCF 4 \u4E2A\u6570\u4E00\u6BB5 (x1,y1,x2,y2) \u2014\u2014 \u4E0D\u662F\u70B9\u5E8F\u5217\u3002
+	// \u6309\u70B9\u5E8F\u5217\uFF08\u6B65\u957F 2\uFF09\u89E3\u6790\u4F1A\u628A\u4E0A\u4E00\u6BB5\u7684\u7EC8\u70B9\u548C\u4E0B\u4E00\u6BB5\u7684\u8D77\u70B9\u8FDE\u6210\u4E00\u6761\u865A\u5047\u7684
+	// \u659C\u7EBF\uFF0C\u51ED\u7A7A\u9020\u51FA\u8DE8\u7F51\u7EDC\u7684\u8FDE\u63A5\uFF1A\u5B9E\u6D4B RESET \u56E0\u6B64\u88AB\u5E76\u8FDB GND\uFF0C\u62A5\u51FA\u6839\u672C
+	// \u4E0D\u5B58\u5728\u7684\u77ED\u8DEF\u3002\u6BB5\u5185\u5FC5\u7136\u6B63\u4EA4\uFF0C\u53EF\u4EE5\u62FF\u8FD9\u4E2A\u81EA\u68C0\u89E3\u6790\u5BF9\u4E0D\u5BF9\u3002
+	const segs = [];
+	for (const w of (await eda.sch_PrimitiveWire.getAll()) || []) {
+		const p = flat(w.line);
+		for (let i = 0; i + 3 < p.length; i += 4) {
+			segs.push({ x1: p[i], y1: p[i + 1], x2: p[i + 2], y2: p[i + 3], net: String(w.net || '') });
+		}
+	}
+	// \u89E3\u6790\u81EA\u68C0\uFF1A\u539F\u7406\u56FE\u5BFC\u7EBF\u4E00\u5F8B\u6B63\u4EA4\uFF0C\u51FA\u73B0\u659C\u6BB5\u5C31\u8BF4\u660E\u6B65\u957F\u9519\u4E86
+	let skew = 0;
+	for (const s of segs) { if (s.x1 !== s.x2 && s.y1 !== s.y2) skew += 1; }
+
+	const terms = [];
+	const parts = [];
+	const decorations = [];
+	for (const c of (await eda.sch_PrimitiveComponent.getAll()) || []) {
+		const pins = (await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(function () { return []; })) || [];
+		const t = String(c.componentType || '');
+		if (t === 'part') {
+			const des = String(c.designator || '');
+			// \u56FE\u7EB8\u6807\u9898\u680F\u4E5F\u662F part\uFF0C\u4F46\u5B83\u6CA1\u6709\u5F15\u811A \u2014\u2014 \u8FD9\u662F\u552F\u4E00\u7A33\u7684\u5224\u636E
+			if (!pins.length) { decorations.push({ id: c.primitiveId, xy: [c.x, c.y] }); continue; }
+			const bb = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(function () { return null; });
+			parts.push({
+				des: des,
+				xy: [c.x, c.y],
+				pins: pins.length,
+				box: bb ? { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY } : null,
+			});
+			for (const p of pins) {
+				const n = String(p.pinNumber != null ? p.pinNumber : p.number);
+				terms.push({ id: des + '.' + n, x: p.x, y: p.y, kind: 'pin', nc: p.noConnected === true });
+			}
+		} else if (t === 'netflag' || t === 'netport') {
+			// \u8FDE\u63A5\u70B9\u662F\u7B26\u53F7\u7684\u5F15\u811A\uFF0C\u4E0D\u662F\u7B26\u53F7\u672C\u4F53
+			const a = pins[0];
+			terms.push({
+				id: String(c.primitiveId),
+				x: a ? a.x : c.x,
+				y: a ? a.y : c.y,
+				kind: t === 'netflag' ? 'flag' : 'port',
+				net: String(c.net || c.name || ''),
+			});
+		}
+	}
+
+	// \u56FE\u7EB8\u5C3A\u5BF8\uFF1AWidth / Height \u624D\u662F\u771F\u7684\uFF08Size \u5B57\u6BB5\u662F\u5C55\u793A\u7528\u7684\uFF0C\u5E38\u5E74\u505C\u5728 A4\uFF09\u3002
+	// \u53D6\u4E0D\u5230\u5C31**\u660E\u8BF4\u53D6\u4E0D\u5230**\uFF0C\u7EDD\u4E0D\u62FF A4 \u515C\u5E95 \u2014\u2014 \u5B9E\u6D4B titleBlockData \u6709\u65F6\u6574\u4E2A
+	// \u8BFB\u56DE\u6765\u662F\u7A7A\u7684\uFF0C\u4E00\u515C\u5E95\u5C31\u628A A3 \u56FE\u7EB8\u4E0A\u6240\u6709 x>1170 \u7684\u5668\u4EF6\u5168\u62A5\u6210\u51FA\u6846\uFF0C
+	// \u4E00\u5C4F\u5047\u8B66\u62A5\u3002\u5B81\u53EF\u4E0D\u67E5\u8FD9\u4E00\u9879\u3002
+	const tb = _page.titleBlockData || {};
+	const num = function (k) {
+		const v = tb[k] && tb[k].value;
+		const n = Number(v);
+		return isFinite(n) && n > 0 ? n : null;
+	};
+	const sw = num('Width');
+	const sh = num('Height');
+	const sheet = sw && sh ? { w: sw, h: sh } : null;
+
+	// \u5730\u56FE\uFF1A\u62FF\u5B83\u5F53\u58F0\u660E\u7684\u771F\u76F8\u6E90
+	let mapRaw = null;
+	const MARKTXT = ${JSON.stringify(MAP_MARK)};
+	const texts = [];
+	for (const t of (await eda.sch_PrimitiveText.getAll()) || []) {
+		const c = String(t.content || '');
+		if (c.indexOf(MARKTXT) === 0) { mapRaw = c.slice(MARKTXT.length); continue; }
+		texts.push({ x: t.x, y: t.y, s: c.slice(0, 40) });
+	}
+
+	return { skew: skew, segs: segs, terms: terms, parts: parts, decorations: decorations, sheet: sheet, mapRaw: mapRaw, texts: texts };
+`;
+var netcheckTools = [
+  {
+    name: "eda_check_schematic",
+    description: "\u3010\u53EA\u8BFB\u3011\u539F\u7406\u56FE\u4F53\u68C0 \u2014\u2014 \u5EFA\u7ACB\u8FDE\u901A\u6027\u6A21\u578B\uFF0C\u62FF\u56FE\u4E0A**\u5B9E\u9645**\u5F62\u6210\u7684\u7F51\u7EDC\u53BB\u5426\u8BC1\u5730\u56FE\u91CC**\u58F0\u660E**\u7684\u7F51\u7EDC\u3002\n\n**\u753B\u5B8C\u5FC5\u8DD1**\u3002DRC \u67E5\u7684\u662F\u5DF2\u6709\u7F51\u7EDC\u4E4B\u95F4\u7684\u51B2\u7A81\uFF0C\u67E5\u4E0D\u51FA\u300C\u5F15\u811A\u538B\u6839\u6CA1\u8FDB\u7F51\u7EDC\u300D\uFF1A\u5B9E\u6D4B\u4E00\u6B21\u5E03\u7EBF\u540E 148 \u4E2A\u5F15\u811A\u53EA\u5269 60 \u4E2A\u8FD8\u8FDE\u7740\uFF0CDRC \u4F9D\u65E7\u62A5 errors 0\u3002\n\n\u5224\u636E\u4E0D\u662F\u300C\u5F15\u811A\u9644\u8FD1\u6709\u6CA1\u6709\u7EBF\u300D\uFF0C\u800C\u662F\u8FDE\u901A\u5206\u91CF\uFF1A\u8282\u70B9\u662F\u5F15\u811A\uFF0F\u5BFC\u7EBF\u6BB5\uFF0F\u7535\u6E90\u5730\u7B26\u53F7\uFF0F\u7AEF\u53E3\uFF0C\u8FB9\u662F\u51E0\u4F55\u91CD\u5408\u52A0**\u540C\u540D\u7B26\u53F7\u7AEF\u53E3\u7684\u865A\u62DF\u8FB9**\u3002\u56E0\u6B64\u7528\u7AEF\u53E3\u8DE8\u533A\u76F8\u8FDE\u3001\u7528\u7B26\u53F7\u8FDE\u7535\u6E90\u5730\uFF0C\u90FD\u80FD\u6B63\u786E\u5224\u4E3A\u8FDE\u901A \u2014\u2014 \u8FD9\u662F\u65E7\u5224\u636E\u505A\u4E0D\u5230\u7684\u3002\n\n\u67E5\u51FA\u4E09\u7C7B\u9519\uFF1A\n\xB7 **broken** \u58F0\u660E\u5728\u540C\u4E00\u7F51\u7EDC\u3001\u5B9E\u9645\u65AD\u6210\u51E0\u6BB5\uFF08\u6BCF\u6BB5\u5217\u51FA\u5177\u4F53\u5F15\u811A\uFF09\n\xB7 **shorts** \u5206\u5C5E\u4E0D\u540C\u7F51\u7EDC\u7684\u5F15\u811A\u8FDE\u6210\u4E86\u4E00\u7247 \u2014\u2014 \u77ED\u8DEF\uFF0CDRC \u901A\u5E38\u4E0D\u62A5\uFF0C\u8089\u773C\u4E5F\u770B\u4E0D\u51FA\n\xB7 **orphans** \u4E0D\u5C5E\u4E8E\u4EFB\u4F55\u7F51\u7EDC\u53C8\u6CA1\u6253 NC \u7684\u5F15\u811A\n\n\u6CA1\u6709\u5730\u56FE\u65F6\u53EA\u80FD\u62A5 orphans \u548C\u51E0\u4F55\u95EE\u9898\uFF0C\u62A5\u4E0D\u4E86 broken / shorts \u2014\u2014 \u5148\u8DD1 eda_map_import \u751F\u6210\u5730\u56FE\uFF0C\u4F53\u68C0\u624D\u6709\u58F0\u660E\u53EF\u6BD4\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        allow_floating: {
+          type: "array",
+          items: { type: "string" },
+          description: '\u5141\u8BB8\u60AC\u7A7A\u7684\u5F15\u811A\uFF0C\u5982 ["U2.2","U2.3"]\u3002\u5DF2\u6253 NC \u6807\u8BB0\u7684\u4F1A\u81EA\u52A8\u653E\u8FC7\uFF0C\u4E0D\u7528\u91CD\u590D\u586B\u3002'
+        },
+        verbose: { type: "boolean", description: "\u8FDE\u540C\u5B9E\u9645\u7F51\u7EDC\u5206\u7EC4\u4E00\u8D77\u8FD4\u56DE\uFF0C\u4FBF\u4E8E\u4EBA\u5DE5\u6838\u5BF9" }
+      }
+    },
+    handler: async (args, ctx2) => {
+      const allow = new Set(
+        Array.isArray(args.allow_floating) ? args.allow_floating.map((s) => s.toUpperCase()) : []
+      );
+      const d = await ctx2.exec(COLLECT, 18e4);
+      if (d.error) return { error: "\u5F53\u524D\u7F16\u8F91\u5668\u91CC\u6CA1\u6709\u6253\u5F00\u539F\u7406\u56FE\u9875" };
+      const conn = buildConnectivity(d.segs, d.terms);
+      let map = null;
+      if (d.mapRaw) {
+        try {
+          map = unpackMap(d.mapRaw);
+        } catch {
+          map = null;
+        }
+      }
+      const declared = (map?.nets ?? []).map((n) => ({ id: n.id, pins: n.pins }));
+      const diff = diffConnectivity(conn, declared, d.terms);
+      const orphans = diff.orphans.filter((id) => !allow.has(id.toUpperCase()));
+      const out = [];
+      if (d.sheet) {
+        const sh = d.sheet;
+        for (const p of d.parts) {
+          const b = p.box;
+          if (!b) continue;
+          const over = [];
+          if (b.minX < 0) over.push(`\u5DE6\u51FA ${Math.round(-b.minX)}`);
+          if (b.minY < 0) over.push(`\u4E0B\u51FA ${Math.round(-b.minY)}`);
+          if (b.maxX > sh.w) over.push(`\u53F3\u51FA ${Math.round(b.maxX - sh.w)}`);
+          if (b.maxY > sh.h) over.push(`\u4E0A\u51FA ${Math.round(b.maxY - sh.h)}`);
+          if (over.length) {
+            out.push({
+              what: p.des,
+              box: [Math.round(b.minX), Math.round(b.minY), Math.round(b.maxX), Math.round(b.maxY)],
+              how: over.join("\u3001")
+            });
+          }
+        }
+      }
+      const boxes = d.parts.filter((p) => p.box).map((p) => ({ id: p.des, ...p.box }));
+      const crossings = findCrossings(d.segs, boxes);
+      const problems = diff.broken.length + diff.shorts.length + orphans.length + out.length + crossings.length;
+      return {
+        page_sheet: d.sheet ?? "\u8BFB\u4E0D\u5230\uFF08titleBlockData \u4E3A\u7A7A\uFF09\uFF0C\u672C\u6B21\u8DF3\u8FC7\u51FA\u6846\u68C0\u67E5",
+        skew_segments: d.skew || void 0,
+        counted: {
+          parts: d.parts.length,
+          pins: d.terms.filter((t) => t.kind === "pin").length,
+          wire_segments: d.segs.length,
+          flags_and_ports: d.terms.filter((t) => t.kind !== "pin").length,
+          // 图纸标题栏这类装饰单独列，免得被当成器件对不上数
+          decorations_ignored: d.decorations.length
+        },
+        declared_nets: declared.length,
+        actual_nets: conn.groups.length,
+        broken: diff.broken,
+        shorts: diff.shorts,
+        orphans,
+        outside_sheet: out,
+        wires_crossing_parts: crossings.map((c) => ({
+          part: c.part,
+          net: c.seg.net || "(\u65E0\u540D)",
+          from: [c.seg.x1, c.seg.y1],
+          to: [c.seg.x2, c.seg.y2]
+        })),
+        actual_groups: args.verbose === true ? conn.groups : void 0,
+        verdict: problems === 0 ? "\u901A\u8FC7" : `\u53D1\u73B0 ${problems} \u5904\u95EE\u9898`,
+        note: declared.length === 0 ? "\u56FE\u7EB8\u91CC\u6CA1\u6709\u5730\u56FE\uFF0C\u672C\u6B21\u53EA\u67E5\u4E86\u5B64\u513F\u5F15\u811A\u548C\u51FA\u6846 \u2014\u2014 \u65AD\u7EBF\u4E0E\u77ED\u8DEF\u67E5\u4E0D\u4E86\u3002\u8DD1 eda_map_import \u751F\u6210\u5730\u56FE\u540E\u518D\u4F53\u68C0\u3002" : problems === 0 ? "\u5B9E\u9645\u8FDE\u901A\u6027\u4E0E\u5730\u56FE\u58F0\u660E\u5B8C\u5168\u4E00\u81F4\u3002" : "\u5148\u770B shorts\uFF08\u77ED\u8DEF\u6700\u81F4\u547D\u4E14\u8089\u773C\u96BE\u53D1\u73B0\uFF09\uFF0C\u518D\u770B broken\uFF0C\u6700\u540E orphans\u3002"
       };
     }
   }
@@ -20400,25 +23599,8 @@ var projectTools = [
 				};
 			`)
   },
-  {
-    name: "eda_current_context",
-    description: "\u5F53\u524D\u6B63\u5728\u7F16\u8F91\u7684\u5BF9\u8C61\uFF1A\u54EA\u5757\u677F\u3001\u54EA\u4E00\u9875\u539F\u7406\u56FE\u3001\u54EA\u4E2A PCB\u3002\n\n\u7528\u6237\u8BF4\u300C\u8FD9\u4E2A\u539F\u7406\u56FE\u300D\u300C\u5F53\u524D\u8FD9\u5757\u677F\u300D\u65F6\uFF0C\u7528\u672C\u5DE5\u5177\u628A\u6307\u4EE3\u89E3\u6790\u6210\u5177\u4F53 uuid\u3002\n\u6CE8\u610F\uFF1A\u6253\u5F00\u539F\u7406\u56FE\u65F6 current_pcb \u4E3A null\uFF0C\u53CD\u4E4B\u4EA6\u7136 \u2014\u2014 \u7531\u6B64\u53EF\u5224\u65AD\u7528\u6237\u6B64\u523B\u5728\u54EA\u4E2A\u7F16\u8F91\u5668\u91CC\u3002",
-    inputSchema: { type: "object", properties: {} },
-    handler: async (_args, ctx2) => ctx2.exec(`
-				const pick = (o, keys) => o ? Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]])) : null;
-				const board = await eda.dmt_Board.getCurrentBoardInfo().catch(() => null);
-				const page  = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
-				const sch   = await eda.dmt_Schematic.getCurrentSchematicInfo().catch(() => null);
-				const pcb   = await eda.dmt_Pcb.getCurrentPcbInfo().catch(() => null);
-				return {
-					board: pick(board, ['uuid', 'name']),
-					schematic: pick(sch, ['uuid', 'name']),
-					schematic_page: pick(page, ['uuid', 'name', 'parentSchematicUuid']),
-					pcb: pick(pcb, ['uuid', 'name']),
-					editor: page ? 'schematic' : pcb ? 'pcb' : 'other',
-				};
-			`)
-  },
+  // eda_current_context 搬到了 tools/verify.ts —— 那边带三道数据校验和
+  // 板/原理图/图页的互相印证。这里留个记号，免得又有人在这加一份同名的。
   {
     name: "eda_list_projects",
     description: "\u5217\u51FA\u53EF\u8BBF\u95EE\u7684\u5DE5\u7A0B\uFF08uuid + \u540D\u79F0 + \u6240\u5C5E\u56E2\u961F\uFF09\uFF0C\u7528\u4E8E\u67E5\u627E\u6216\u5207\u6362\u5DE5\u7A0B\u3002\n\n\u9ED8\u8BA4\u53EA\u5217\u5F53\u524D\u56E2\u961F\uFF1Binclude_all_teams=true \u65F6\u904D\u5386\u5168\u90E8\u56E2\u961F\uFF08\u4E2A\u4EBA + \u5404\u534F\u4F5C\u56E2\u961F\uFF09\u3002\n\u6CE8\u610F\u6BCF\u4E2A\u5DE5\u7A0B\u8981\u5355\u72EC\u53D6\u4E00\u6B21\u8BE6\u60C5\uFF08\u7EA6 250ms\uFF09\uFF0C\u56E2\u961F\u5DE5\u7A0B\u591A\u65F6\u4F1A\u6162\uFF0C\u975E\u5FC5\u8981\u4E0D\u8981\u5F00 include_all_teams\u3002",
@@ -20512,7 +23694,7 @@ var projectTools = [
 
 // src/tools/schematic-edit.ts
 var EDIT_TIMEOUT_MS = 6e4;
-var ENSURE_SCH = `
+var ENSURE_SCH5 = `
 	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
 	if (!_page) return { error: 'NOT_SCH_EDITOR' };
 `;
@@ -20523,9 +23705,9 @@ function schHint(r) {
     next_step: "\u5148\u7528 eda_project_overview \u627E\u5230\u76EE\u6807\u9875 uuid\uFF0C\u518D\u7528 eda_open_document \u6253\u5F00\uFF0C\u7136\u540E\u91CD\u8BD5\u3002"
   };
 }
-function num(args, key) {
-  const v = args[key];
-  if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${key} \u5FC5\u586B\uFF08number\uFF0C\u5355\u4F4D 0.01 inch\uFF09`);
+function num(args, key2) {
+  const v = args[key2];
+  if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${key2} \u5FC5\u586B\uFF08number\uFF0C\u5355\u4F4D 0.01 inch\uFF09`);
   return v;
 }
 var schematicEditTools = [
@@ -20545,11 +23727,24 @@ var schematicEditTools = [
       const size = optionalString(args, "size");
       const w = typeof args.width === "number" ? args.width : null;
       const h = typeof args.height === "number" ? args.height : null;
+      const SHEETS = {
+        A5: [827, 583],
+        A4: [1170, 825],
+        A3: [1655, 1170],
+        A2: [2340, 1655],
+        A1: [3310, 2340],
+        A0: [4680, 3310]
+      };
+      const key2 = size ? size.toUpperCase() : "";
+      if (size && !SHEETS[key2] && !(w && h)) {
+        throw new Error(`\u4E0D\u8BA4\u8BC6\u7684\u56FE\u7EB8\u89C4\u683C ${size}\uFF0C\u53EF\u9009 ${Object.keys(SHEETS).join(" / ")}\uFF0C\u6216\u76F4\u63A5\u7ED9 width/height\uFF08inch\uFF09`);
+      }
+      const [sw, sh] = SHEETS[key2] ?? [Math.round((w ?? 0) * 100), Math.round((h ?? 0) * 100)];
       if (!size && !(w && h)) throw new Error("\u8BF7\u7ED9\u51FA size\uFF08\u5982 A3\uFF09\uFF0C\u6216\u540C\u65F6\u7ED9\u51FA width \u4E0E height\uFF08inch\uFF09");
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				// modifySchematicPageTitleBlock \u53EA\u7ED9\u90E8\u5206\u5B57\u6BB5\u4F1A\u629B
 				// \u300CCannot set properties of undefined\u300D\u2014\u2014 \u5B83\u5185\u90E8\u6309\u5B8C\u6574\u7ED3\u6784\u904D\u5386\uFF0C
 				// \u6240\u4EE5\u5FC5\u987B\u628A\u73B0\u6709 titleBlockData \u6574\u4EFD\u8BFB\u56DE\u6765\u3001\u6539\u5B8C\u518D\u5199\u56DE\u53BB\u3002
@@ -20557,16 +23752,20 @@ var schematicEditTools = [
 				const data = JSON.parse(JSON.stringify(before));
 				const put = (k, v) => { data[k] = Object.assign({}, data[k] || {}, { value: String(v) }); };
 				${size ? `put('Size', ${JSON.stringify(size)}); put('Page Size', ${JSON.stringify(size)});` : ""}
-				${w ? `put('Width', ${w});` : ""}
-				${h ? `put('Height', ${h});` : ""}
+				put('Width', ${sw});
+				put('Height', ${sh});
 				const ok = await eda.dmt_Schematic.modifySchematicPageTitleBlock(undefined, data);
+				// getCurrentSchematicPageInfo \u8BFB\u7684\u662F\u7F13\u5B58\uFF0C\u5199\u5B8C\u7ACB\u523B\u8BFB\u4F1A\u62FF\u5230**\u4E0A\u4E00\u6B21**\u7684\u503C
+				// \uFF08\u5B9E\u6D4B\u5199 1655 \u8BFB\u56DE 16.55 \u2014\u2014 \u6B63\u662F\u524D\u4E00\u6B21\u5199\u8FDB\u53BB\u7684\u6570\uFF09\uFF0C\u7B49\u4E00\u4E0B\u518D\u8BFB\u624D\u662F\u65B0\u503C\u3002
+				await new Promise((r) => setTimeout(r, 400));
 				const after = (await eda.dmt_Schematic.getCurrentSchematicPageInfo())?.titleBlockData || {};
 				const read = (k) => after[k] && after[k].value !== undefined ? String(after[k].value) : undefined;
 				return {
-					ok: ok === true,
+					ok: ok === true && Math.abs(Number(read('Width')) - ${sw}) < 0.05 && Math.abs(Number(read('Height')) - ${sh}) < 0.05,
 					page: _page.name,
 					size: read('Size'), page_size: read('Page Size'),
-					width: read('Width'), height: read('Height'),
+					canvas: { width: Number(read('Width')), height: Number(read('Height')) },
+					inch: { width: Number(read('Width')) / 100, height: Number(read('Height')) / 100 },
 					before: { size: before.Size && before.Size.value, width: before.Width && before.Width.value, height: before.Height && before.Height.value },
 				};
 			`,
@@ -20597,7 +23796,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const des = ${JSON.stringify(des)}.toUpperCase();
 				const key = ${JSON.stringify(pin)}.toUpperCase();
 				const all = await eda.sch_PrimitiveComponent.getAll();
@@ -20621,6 +23820,360 @@ var schematicEditTools = [
           EDIT_TIMEOUT_MS
         )
       );
+    }
+  },
+  {
+    name: "eda_label_nets",
+    description: '\u3010\u5199\u64CD\u4F5C\u3011\u6309\u4E00\u4EFD\u7F51\u7EDC\u58F0\u660E\u6279\u91CF\u5EFA\u7ACB\u5F15\u811A\u8FDE\u63A5\u3002\u5403\u7684\u662F\u548C eda_arrange_block \u5B8C\u5168\u76F8\u540C\u7684 nets \u53C2\u6570\uFF1A{ "+24V": ["U1.3","C11.1"], "GND": ["U1.1","C11.2"] }\u3002\n\n**\u4F1A\u6309\u7F51\u7EDC\u8BED\u4E49\u81EA\u52A8\u9009\u62E9\u56FE\u5F62\u8868\u8FBE**\uFF0C\u800C\u4E0D\u662F\u4E00\u5F8B\u8D34\u6587\u5B57\u6807\u7B7E\uFF1A\n- \u7535\u6E90\u4E0E\u5730\uFF08GND / AGND / VCC / +3V3 / +24V \u8FD9\u7C7B\uFF09\u2192 \u653E**\u7535\u6E90\u7B26\u53F7\u3001\u5730\u7B26\u53F7**\n- \u5176\u4F59\u4FE1\u53F7 \u2192 \u5F15\u51FA\u77ED\u7EBF + \u7F51\u7EDC\u6807\u7B7E\uFF0C\u4E14\u6309\u5F15\u811A\u5E8F\u9519\u5F00\u957F\u5EA6\uFF0C\u907F\u514D\u6587\u5B57\u7CCA\u5728\u4E00\u8D77\n\n\u4E3A\u4EC0\u4E48\u5FC5\u987B\u8FD9\u6837\uFF1A\u82AF\u7247\u76F8\u90BB\u5F15\u811A\u95F4\u8DDD\u53EA\u6709 10\uFF080.1 inch\uFF09\uFF0C\u800C\u4E00\u4E2A\u7F51\u7EDC\u540D\u7684\u6587\u5B57\u5BBD\u5EA6\u52A8\u8F84 50 \u4EE5\u4E0A\u3002\u5BC6\u96C6\u82AF\u7247\u4E0A\u9010\u4E2A\u5F15\u811A\u8D34\u6587\u5B57\u6807\u7B7E\uFF0C\u5FC5\u7136\u91CD\u53E0\u6210\u4E00\u56E2\uFF08\u5B9E\u6D4B LM331 \u5468\u56F4\u4E03\u516B\u4E2A\u6807\u7B7E\u53E0\u5728\u4E00\u8D77\uFF0C\u8FDE\u5F15\u811A\u540D\u90FD\u88AB\u76D6\u4F4F\uFF09\u3002\u7535\u6E90\u5730\u53C8\u6070\u6070\u662F\u5F15\u811A\u6700\u591A\u7684\u7F51\u7EDC\uFF0C\u6362\u6210\u7B26\u53F7\u80FD\u4E00\u6B21\u6D88\u6389\u5927\u534A\u91CD\u53E0\u3002\n\n\u987A\u5E8F\u5F88\u91CD\u8981\uFF1A**\u5148\u628A\u5757\u6392\u5E03\u5B9A\u7A3F\u518D\u8C03\u8FD9\u4E2A**\u3002\u8FDE\u63A5\u5EFA\u7ACB\u540E\u518D\u79FB\u52A8\u5668\u4EF6\uFF0C\u5BFC\u7EBF\u548C\u7B26\u53F7\u4F1A\u7559\u5728\u539F\u5730\uFF0C\u8FDE\u63A5\u5C31\u65AD\u4E86\u3002',
+    inputSchema: {
+      type: "object",
+      properties: {
+        nets: {
+          type: "object",
+          description: '{ \u7F51\u7EDC\u540D: ["\u4F4D\u53F7.\u5F15\u811A\u53F7", \u2026] }\uFF0C\u4E0E eda_arrange_block \u7684 nets \u540C\u683C\u5F0F',
+          additionalProperties: { type: "array", items: { type: "string" } }
+        },
+        length: { type: "number", description: "\u6BCF\u4E2A\u5F15\u811A\u5F15\u51FA\u7EBF\u7684\u957F\u5EA6\uFF080.01 inch\uFF09\uFF0C\u9ED8\u8BA4 30" },
+        power_nets: {
+          type: "object",
+          description: '\u53EF\u9009\uFF0C\u624B\u5DE5\u6307\u5B9A\u67D0\u4E2A\u7F51\u7EDC\u7528\u54EA\u79CD\u7B26\u53F7\uFF1A{ "VBUS": "power", "EARTH": "protect_ground" }\u3002\u53D6\u503C power / ground / analog_ground / protect_ground / label\u3002\u4E0D\u6307\u5B9A\u65F6\u6309\u7F51\u7EDC\u540D\u81EA\u52A8\u5224\u65AD\uFF08GND/VSS\u2192\u5730\uFF0CAGND\u2192\u6A21\u62DF\u5730\uFF0CVCC/VDD/+xxV\u2192\u7535\u6E90\uFF09\u3002\u586B label \u53EF\u4EE5\u5F3A\u5236\u67D0\u4E2A\u7535\u6E90\u7F51\u7EDC\u4ECD\u7528\u6587\u5B57\u6807\u7B7E\u3002',
+          additionalProperties: { type: "string" }
+        }
+      },
+      required: ["nets"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const nets = args.nets && typeof args.nets === "object" ? args.nets : {};
+      const len = typeof args.length === "number" && args.length > 0 ? args.length : 30;
+      const override = args.power_nets && typeof args.power_nets === "object" ? args.power_nets : {};
+      const FLAG = {
+        power: "Power",
+        ground: "Ground",
+        analog_ground: "AnalogGround",
+        protect_ground: "ProtectGround"
+      };
+      const classify = (net) => {
+        const manual = override[net];
+        if (manual) return manual === "label" ? "label" : FLAG[manual] ? manual : "label";
+        const u = net.toUpperCase();
+        if (u === "AGND" || u === "GNDA") return "analog_ground";
+        if (u === "PGND" || u === "EARTH" || u === "FGND") return "protect_ground";
+        if (u === "GND" || u === "DGND" || u === "SGND" || u === "VSS" || u === "VEE" || u === "GNDD") return "ground";
+        if (u.indexOf("VCC") === 0 || u.indexOf("VDD") === 0 || u.indexOf("VBAT") === 0 || u === "V+") return "power";
+        const c0 = u.charCodeAt(0);
+        if ((c0 >= 48 && c0 <= 57 || u.charAt(0) === "+") && u.indexOf("V") >= 0) return "power";
+        return "label";
+      };
+      const jobs = [];
+      const seqOf = {};
+      for (const [net, refs] of Object.entries(nets)) {
+        const kind = classify(net);
+        for (const ref of Array.isArray(refs) ? refs : []) {
+          const dot = String(ref).lastIndexOf(".");
+          if (dot <= 0) continue;
+          const des = String(ref).slice(0, dot).toUpperCase();
+          seqOf[des] = (seqOf[des] ?? -1) + 1;
+          jobs.push({
+            des,
+            pin: String(ref).slice(dot + 1),
+            net,
+            kind,
+            flag: FLAG[kind] ?? "",
+            seq: kind === "label" ? seqOf[des] : 0
+          });
+        }
+      }
+      if (!jobs.length) throw new Error('nets \u91CC\u6CA1\u6709\u53EF\u89E3\u6790\u7684 "\u4F4D\u53F7.\u5F15\u811A\u53F7" \u6761\u76EE');
+      const r = await ctx2.exec(
+        `
+				${ENSURE_SCH5}
+				const JOBS = ${JSON.stringify(jobs)};
+				const L = ${len};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+
+				const pinCache = {};
+				const getPins = async (des) => {
+					if (!pinCache[des]) {
+						const c = byDes[des];
+						pinCache[des] = c ? (await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId) || []) : [];
+					}
+					return pinCache[des];
+				};
+
+				const done = [], failed = [];
+				let flags = 0, labels = 0;
+				for (const j of JOBS) {
+					if (!byDes[j.des]) { failed.push({ ref: j.des + '.' + j.pin, why: '\u56FE\u4E0A\u6CA1\u6709\u8FD9\u4E2A\u4F4D\u53F7' }); continue; }
+					const pins = await getPins(j.des);
+					const key = String(j.pin).toUpperCase();
+					let p = null;
+					for (const x of pins) if (String(x.pinNumber || '').toUpperCase() === key) { p = x; break; }
+					if (!p) for (const x of pins) if (String(x.pinName || '').toUpperCase() === key) { p = x; break; }
+					if (!p) {
+						const avail = pins.map((x) => x.pinNumber + ':' + x.pinName).join(' ');
+						failed.push({ ref: j.des + '.' + j.pin, why: '\u627E\u4E0D\u5230\u8BE5\u5F15\u811A', pins: avail });
+						continue;
+					}
+					// \u987A\u7740\u5F15\u811A\u671D\u5411\u5F80\u5916\u5F15\uFF0C\u4ECE\u7B26\u53F7\u5185\u4FA7\u63A5\u5165\u7684\u8BDD EDA \u4E0D\u8BA4\u8FD9\u4E2A\u8FDE\u63A5\u3002
+					// \u6587\u5B57\u6807\u7B7E\u6309\u540C\u5668\u4EF6\u5185\u7684\u5E8F\u53F7\u9519\u5F00\u5F15\u51FA\u957F\u5EA6\uFF0C\u907F\u514D\u76F8\u90BB\u5F15\u811A\u7684\u6807\u7B7E\u53E0\u5728\u4E00\u8D77 \u2014\u2014
+					// \u5F15\u811A\u95F4\u8DDD\u53EA\u6709 10\uFF0C\u800C\u7F51\u7EDC\u540D\u6587\u5B57\u5BBD\u5EA6\u52A8\u8F84 50 \u4EE5\u4E0A\u3002
+					const rot = ((Number(p.rotation) % 360) + 360) % 360;
+					// \u7535\u6E90\u5730\u7684\u5F15\u51FA\u7EBF\u8981\u957F\u4E00\u70B9\uFF0840\uFF09\uFF0C\u5426\u5219\u7B26\u53F7\u540D\u4F1A\u538B\u5728\u5668\u4EF6\u4F4D\u53F7\u4E0A \u2014\u2014
+					// \u5B9E\u6D4B\u5F15\u51FA 30 \u65F6\uFF0CC2 \u7684\u4F4D\u53F7\u548C\u5B83\u4E0A\u65B9 +3V3 \u7684\u7F51\u7EDC\u540D\u53EA\u5DEE 5 \u4E2A\u5355\u4F4D\u3002
+					const L2 = j.kind === 'label' ? L + (j.seq % 3) * 25 : L + 10;
+					const d = rot === 0 ? [L2, 0] : rot === 90 ? [0, -L2] : rot === 180 ? [-L2, 0] : rot === 270 ? [0, L2] : [L2, 0];
+					const ex = p.x + d[0], ey = p.y + d[1];
+					// \u8981\u653E\u7B26\u53F7\u65F6\uFF0C\u5BFC\u7EBF\u672C\u8EAB**\u4E0D\u5E26\u7F51\u7EDC\u540D** \u2014\u2014 \u5426\u5219\u5BFC\u7EBF\u7684 NET \u6807\u7B7E\u548C\u7B26\u53F7\u540D\u4F1A\u628A
+					// \u540C\u4E00\u4E2A\u7F51\u7EDC\u540D\u753B\u4E24\u904D\uFF0C\u6324\u5728\u4E00\u5C0F\u6BB5\u7EBF\u7684\u4E24\u7AEF\u3002\u8BA9\u7B26\u53F7\u72EC\u81EA\u547D\u540D\u8FD9\u4E2A\u7F51\u7EDC\u3002
+					const w = j.flag
+						? await eda.sch_PrimitiveWire.create([p.x, p.y, ex, ey])
+						: await eda.sch_PrimitiveWire.create([p.x, p.y, ex, ey], j.net);
+					if (!w) { failed.push({ ref: j.des + '.' + j.pin, why: '\u5F15\u51FA\u7EBF\u521B\u5EFA\u5931\u8D25\uFF08\u8BE5\u5F15\u811A\u53EF\u80FD\u5DF2\u5C5E\u4E8E\u522B\u7684\u7F51\u7EDC\uFF09' }); continue; }
+
+					if (j.flag) {
+						// \u7535\u6E90 / \u5730\uFF1A\u5728\u5F15\u51FA\u7EBF\u672B\u7AEF\u653E\u7B26\u53F7\u3002\u7B26\u53F7\u81EA\u5E26\u4E00\u4E2A\u5F15\u811A\uFF0C\u5750\u6807\u5373\u653E\u7F6E\u70B9\uFF0C
+						// \u4E0E\u5BFC\u7EBF\u7AEF\u70B9\u91CD\u5408\u5C31\u8FDE\u4E0A\u4E86\u3002\u65CB\u8F6C\u8BA9\u7B26\u53F7\u671D\u5916\uFF08\u80CC\u5BF9\u5668\u4EF6\uFF09\u3002
+						const fr = rot === 0 ? 270 : rot === 90 ? 180 : rot === 180 ? 90 : 0;
+						const fl = await eda.sch_PrimitiveComponent.createNetFlag(j.flag, j.net, ex, ey, fr);
+						if (fl) { flags += 1; done.push(j.des + '.' + p.pinNumber + '=' + j.net + '(\u7B26\u53F7)'); }
+						else failed.push({ ref: j.des + '.' + j.pin, why: '\u7535\u6E90/\u5730\u7B26\u53F7\u521B\u5EFA\u5931\u8D25' });
+					} else {
+						labels += 1;
+						done.push(j.des + '.' + p.pinNumber + '=' + j.net);
+					}
+				}
+				return {
+					ok: failed.length === 0,
+					labeled: done.length, total: JOBS.length,
+					power_symbols: flags, text_labels: labels,
+					done, failed,
+				};
+			`,
+        18e4
+      );
+      return schHint(r);
+    }
+  },
+  {
+    name: "eda_arrange_block",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u628A\u4E00\u4E2A\u529F\u80FD\u5757\u6392\u5E03\u597D\uFF1A\u6838\u5FC3\u82AF\u7247\u5C45\u4E2D\uFF0C\u5916\u56F4\u5668\u4EF6\u6309**\u5B83\u63A5\u5728\u82AF\u7247\u54EA\u4E00\u4FA7\u7684\u5F15\u811A**\u653E\u5230\u5BF9\u5E94\u65B9\u4F4D\u3002\n\n\u8FD9\u4E00\u6B65\u662F\u7EAF\u51E0\u4F55\u8BA1\u7B97\uFF0C\u4EA4\u7ED9\u5DE5\u5177\u505A\uFF1B**\u54EA\u4E9B\u5668\u4EF6\u5C5E\u4E8E\u540C\u4E00\u4E2A\u529F\u80FD\u5757\u662F\u4F60\u7684\u5224\u65AD**\uFF0C\u8981\u5148\u8BFB eda-schematic-layout skill \u60F3\u6E05\u695A\u518D\u8C03\u3002\n\n\u5DE5\u5177\u4F1A\u8BFB\u53D6\u6BCF\u4E2A\u5668\u4EF6\u7B26\u53F7\u7684\u5B9E\u9645\u5C3A\u5BF8\uFF08bbox\uFF09\u6765\u51B3\u5B9A\u95F4\u8DDD\uFF0C\u907F\u514D\u4E92\u76F8\u538B\u4F4F \u2014\u2014 \u56FA\u5B9A\u95F4\u8DDD\u5728\u5927\u82AF\u7247\uFF08\u5341\u51E0\u4E2A\u5F15\u811A\uFF09\u4E0A\u5FC5\u7136\u91CD\u53E0\u3002\n\n\u5916\u56F4\u5668\u4EF6\u4E0E\u6838\u5FC3\u5171\u4EAB\u54EA\u6761\u7F51\u7EDC\u3001\u90A3\u6761\u7F51\u7EDC\u63A5\u5728\u6838\u5FC3\u7684\u54EA\u4E2A\u5F15\u811A\u4E0A\uFF0C\u51B3\u5B9A\u5B83\u88AB\u653E\u5230\u5DE6/\u53F3/\u4E0A/\u4E0B\u3002\u63A5\u7535\u6E90\u7F51\u7EDC\u7684\uFF08\u53BB\u8026\u7535\u5BB9\uFF09\u653E\u4E0A\u65B9\uFF0C\u63A5\u5730\u7684\u653E\u4E0B\u65B9\uFF0C\u5176\u4F59\u6309\u5F15\u811A\u65B9\u4F4D\u3002\n\n\u6392\u5B8C\u6574\u5757\u518D\u8C03 eda_auto_route\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        core: { type: "string", description: "\u6838\u5FC3\u5668\u4EF6\u4F4D\u53F7\uFF0C\u901A\u5E38\u662F\u82AF\u7247\uFF0C\u5982 U5" },
+        members: { type: "array", items: { type: "string" }, description: '\u5757\u5185\u5176\u4F59\u5668\u4EF6\u4F4D\u53F7\uFF0C\u5982 ["R15","R16","C19"]' },
+        center_x: { type: "number", description: "\u5757\u4E2D\u5FC3 X\uFF080.01 inch\uFF09" },
+        center_y: { type: "number", description: "\u5757\u4E2D\u5FC3 Y\uFF080.01 inch\uFF09" },
+        gap: { type: "number", description: "\u5668\u4EF6\u4E4B\u95F4\u7684\u51C0\u95F4\u9699\uFF0C\u9ED8\u8BA4 60\uFF080.01 inch\uFF09" },
+        nets: {
+          type: "object",
+          description: '\u672C\u5757\u7684\u8FDE\u63A5\u58F0\u660E\uFF0C**\u5F3A\u70C8\u5EFA\u8BAE\u4F20**\uFF1A{ "+24V": ["U1.3","C11.1"], "GND": ["U1.1","C11.2"] }\uFF0C\u952E\u662F\u7F51\u7EDC\u540D\u3001\u503C\u662F "\u4F4D\u53F7.\u5F15\u811A\u53F7" \u5217\u8868\u3002\u5668\u4EF6\u521A\u653E\u4E0B\u65F6\u56FE\u4E0A\u8FD8\u6CA1\u6709\u4EFB\u4F55\u7F51\u7EDC\uFF0C\u4E0D\u4F20\u8FD9\u4E2A\u53C2\u6570\u5DE5\u5177\u5C31\u65E0\u4ECE\u5224\u65AD\u8C01\u8BE5\u653E\u5DE6\u3001\u8C01\u8BE5\u653E\u53F3\uFF0C\u53EA\u80FD\u5168\u5806\u5230\u53F3\u8FB9\u4E00\u5217\u3002\u540C\u4E00\u4EFD\u58F0\u660E\u53EF\u4EE5\u539F\u6837\u5582\u7ED9 eda_label_pin_net \u505A\u6807\u6CE8 \u2014\u2014 \u5199\u4E00\u6B21\uFF0C\u7528\u4E24\u5904\u3002',
+          additionalProperties: { type: "array", items: { type: "string" } }
+        },
+        max_per_lane: {
+          type: "number",
+          description: "\u540C\u4E00\u4FA7\u6392\u6EE1\u51E0\u4E2A\u5C31\u6362\u4E0B\u4E00\u5217/\u884C\uFF0C\u9ED8\u8BA4 3\u3002\u9632\u6B62\u5916\u56F4\u5668\u4EF6\u6392\u6210\u957F\u6761\u9876\u51FA\u56FE\u6846\u3002"
+        }
+      },
+      required: ["core", "members", "center_x", "center_y"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const core = requireString(args, "core").toUpperCase();
+      const members = (Array.isArray(args.members) ? args.members : []).map((m) => String(m).toUpperCase());
+      const cx = num(args, "center_x");
+      const cy = num(args, "center_y");
+      const gap = typeof args.gap === "number" ? args.gap : 60;
+      const nets = args.nets && typeof args.nets === "object" ? args.nets : {};
+      const MAX_PER_LANE = typeof args.max_per_lane === "number" && args.max_per_lane > 0 ? args.max_per_lane : 3;
+      const declared = /* @__PURE__ */ new Map();
+      const netsOfDes = /* @__PURE__ */ new Map();
+      for (const [net, refs] of Object.entries(nets)) {
+        for (const ref of Array.isArray(refs) ? refs : []) {
+          const dot = String(ref).lastIndexOf(".");
+          if (dot <= 0) continue;
+          const des = String(ref).slice(0, dot).toUpperCase();
+          declared.set(`${des}.${String(ref).slice(dot + 1)}`, net);
+          if (!netsOfDes.has(des)) netsOfDes.set(des, /* @__PURE__ */ new Set());
+          netsOfDes.get(des)?.add(net);
+        }
+      }
+      const snap2 = await ctx2.exec(
+        `
+				${ENSURE_SCH5}
+				const WANT = ${JSON.stringify([core, ...members])};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+				const items = [];
+				for (const des of WANT) {
+					const c = byDes[des];
+					if (!c) continue;
+					const b = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => undefined);
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					items.push({
+						des: des,
+						id: c.primitiveId,
+						w: b ? Math.max(20, b.maxX - b.minX) : 60,
+						h: b ? Math.max(20, b.maxY - b.minY) : 60,
+						pins: (pins || []).map((p) => ({
+							n: String(p.pinNumber != null ? p.pinNumber : (p.number != null ? p.number : '')),
+							x: p.x, y: p.y,
+						})),
+					});
+				}
+				return { ok: true, items };
+			`,
+        12e4
+      );
+      const items = new Map((snap2.items ?? []).map((i) => [i.des, i]));
+      const coreInfo = items.get(core);
+      if (!coreInfo) return { ok: false, error: `\u627E\u4E0D\u5230\u6838\u5FC3\u5668\u4EF6 ${core}` };
+      const GND = ["GND", "AGND", "DGND", "PGND", "SGND", "VSS", "VEE"];
+      const isGnd = (n) => GND.includes(n.toUpperCase());
+      const isSupply = (n) => {
+        const u = n.toUpperCase();
+        if (u.startsWith("VCC") || u.startsWith("VDD") || u.startsWith("VBAT") || u === "V+") return true;
+        return /^[+0-9]/.test(u) && u.includes("V");
+      };
+      const gx = coreInfo.pins.reduce((a, q) => a + q.x, 0) / Math.max(1, coreInfo.pins.length);
+      const gy = coreInfo.pins.reduce((a, q) => a + q.y, 0) / Math.max(1, coreInfo.pins.length);
+      const netSide = /* @__PURE__ */ new Map();
+      for (const p of coreInfo.pins) {
+        const net = declared.get(`${core}.${p.n}`);
+        if (!net) continue;
+        const dx = p.x - gx, dy = p.y - gy;
+        const side = Math.abs(dx) >= Math.abs(dy) ? dx < 0 ? "L" : "R" : dy > 0 ? "T" : "B";
+        if (!netSide.has(net)) netSide.set(net, side);
+      }
+      const buckets = { L: [], R: [], T: [], B: [] };
+      const unresolved = [];
+      const anchorOf = /* @__PURE__ */ new Map();
+      for (const des of members) {
+        if (!items.has(des)) {
+          unresolved.push(`${des}(\u56FE\u4E0A\u6CA1\u6709)`);
+          continue;
+        }
+        const mine = [...netsOfDes.get(des) ?? []];
+        let side = mine.map((n) => netSide.get(n)).find(Boolean);
+        if (!side && mine.some(isSupply)) side = "T";
+        if (!side && mine.some(isGnd)) side = "B";
+        if (!side) {
+          side = "R";
+          unresolved.push(des);
+        }
+        const anchorPin = coreInfo.pins.find((cp) => {
+          const n = declared.get(`${core}.${cp.n}`);
+          return n != null && mine.includes(n);
+        });
+        anchorOf.set(des, anchorPin ? { x: anchorPin.x, y: anchorPin.y } : null);
+        buckets[side].push(des);
+      }
+      const moves = [
+        { des: core, id: coreInfo.id, x: Math.round(cx), y: Math.round(cy), side: "core" }
+      ];
+      const halfW = coreInfo.w / 2;
+      const halfH = coreInfo.h / 2;
+      for (const side of ["L", "R", "T", "B"]) {
+        const list = buckets[side];
+        if (!list.length) continue;
+        const key2 = (d) => {
+          const a = anchorOf.get(d);
+          if (!a) return Number.MAX_SAFE_INTEGER;
+          return side === "L" || side === "R" ? a.y : a.x;
+        };
+        list.sort((a, b) => key2(a) - key2(b));
+        const sizes = list.map((d) => items.get(d));
+        const lanes = Math.ceil(list.length / MAX_PER_LANE);
+        const perLane = Math.ceil(list.length / lanes);
+        const maxW = Math.max(...sizes.map((s) => s.w));
+        const maxH = Math.max(...sizes.map((s) => s.h));
+        if (side === "L" || side === "R") {
+          const pitch = maxH + gap;
+          const dir = side === "L" ? -1 : 1;
+          list.forEach((des, i) => {
+            const lane = Math.floor(i / perLane);
+            const inLane = i % perLane;
+            const n = Math.min(perLane, list.length - lane * perLane);
+            moves.push({
+              des,
+              id: items.get(des).id,
+              side,
+              x: Math.round(cx + dir * (halfW + gap + maxW / 2 + lane * (maxW + gap))),
+              y: Math.round(cy - (n - 1) * pitch / 2 + inLane * pitch)
+            });
+          });
+        } else {
+          const pitch = maxW + gap;
+          const dir = side === "T" ? 1 : -1;
+          list.forEach((des, i) => {
+            const lane = Math.floor(i / perLane);
+            const inLane = i % perLane;
+            const n = Math.min(perLane, list.length - lane * perLane);
+            moves.push({
+              des,
+              id: items.get(des).id,
+              side,
+              x: Math.round(cx - (n - 1) * pitch / 2 + inLane * pitch),
+              y: Math.round(cy + dir * (halfH + gap + maxH / 2 + lane * (maxH + gap)))
+            });
+          });
+        }
+      }
+      const w = await ctx2.exec(
+        `
+				${ENSURE_SCH5}
+				const MOVES = ${JSON.stringify(moves.map((m) => ({ id: m.id, x: m.x, y: m.y })))};
+				let moved = 0;
+				for (const m of MOVES) {
+					const r = await eda.sch_PrimitiveComponent.modify(m.id, { x: m.x, y: m.y });
+					if (r !== false) moved += 1;
+				}
+				return { ok: true, moved };
+			`,
+        18e4
+      );
+      const check = await verifyPlaced(
+        ctx2,
+        moves.map((m) => ({ designator: m.des, x: m.x, y: m.y }))
+      );
+      const actualOf = new Map(check.checks.map((c) => [c.designator, c]));
+      const minY = Math.min(...moves.map((m) => m.y));
+      const minX = Math.min(...moves.map((m) => m.x));
+      const outOfFrame = minX < 40 ? `x=${minX}` : minY < 40 ? `y=${minY}` : null;
+      const warnings = [];
+      if (declared.size === 0) {
+        warnings.push("\u6CA1\u4F20 nets \u58F0\u660E\uFF0C\u65E0\u4ECE\u5224\u65AD\u65B9\u4F4D\uFF0C\u5668\u4EF6\u5168\u5806\u5230\u4E86\u53F3\u8FB9\u4E00\u5217 \u2014\u2014 \u8865\u4E0A nets \u518D\u6392\u4E00\u6B21");
+      }
+      if (minY < 40) warnings.push(`\u6700\u4E0A\u9762\u7684\u5668\u4EF6 y=${minY} \u5DF2\u8D34\u8FD1\u56FE\u6846\u4E0A\u6CBF\uFF0C\u628A center_y \u8C03\u5927\u4E9B`);
+      if (outOfFrame) warnings.push(`\u6709\u5668\u4EF6\u6392\u5230\u4E86\u56FE\u6846\u5916\uFF08${outOfFrame}\uFF09`);
+      if (!check.allOk) warnings.push(check.summary);
+      return schHint({
+        ok: true,
+        core,
+        core_size: { w: coreInfo.w, h: coreInfo.h },
+        declared_pins: declared.size,
+        moved: w.moved,
+        // x/y 是回读到的实际位置；requested_x/y 只在两者不符时出现
+        placed: moves.map((m) => {
+          const got = actualOf.get(m.des);
+          const ok = got?.ok !== false;
+          return {
+            des: m.des,
+            side: m.side,
+            x: got?.actualX ?? m.x,
+            y: got?.actualY ?? m.y,
+            ...ok ? {} : { requested_x: m.x, requested_y: m.y, problem: got?.note }
+          };
+        }),
+        positions_verified: check.allOk,
+        unresolved: unresolved.length ? unresolved : void 0,
+        warning: warnings.length ? warnings.join("\uFF1B") : void 0,
+        note: check.allOk ? "\u5757\u5185\u5DF2\u6309\u58F0\u660E\u7684\u8FDE\u63A5\u5173\u7CFB\u6392\u5E03\uFF0C\u4F4D\u7F6E\u90FD\u5DF2\u56DE\u8BFB\u786E\u8BA4\u3002\u6574\u5F20\u56FE\u6392\u5B8C\u540E\u8DD1 eda_auto_route\u3002" : "\u6392\u5E03\u5199\u56DE\u4E86\uFF0C\u4F46\u56DE\u8BFB\u53D1\u73B0\u6709\u5668\u4EF6\u6CA1\u5230\u4F4D \u2014\u2014 \u5148\u770B placed \u91CC\u7684 problem\uFF0C\u522B\u6025\u7740\u8D70\u7EBF\u3002"
+      });
     }
   },
   {
@@ -20654,7 +24207,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const want = ${JSON.stringify(list)};
 				const all = await eda.sch_PrimitiveComponent.getAll();
 				const byDes = {};
@@ -20679,8 +24232,266 @@ var schematicEditTools = [
     }
   },
   {
+    name: "eda_wire_block",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u628A\u4E00\u4E2A\u529F\u80FD\u5757\u5185\u90E8\u7684\u5F15\u811A\u7528**\u771F\u5B9E\u5BFC\u7EBF**\u8FDE\u8D77\u6765 \u2014\u2014 \u5757\u5185\u8FDE\u63A5\u7684\u6B63\u786E\u505A\u6CD5\u3002\n\n\u4E3A\u4EC0\u4E48\u4E0D\u7528\u9010\u5F15\u811A\u8D34\u7F51\u7EDC\u6807\u7B7E\uFF1A\u4E24\u7AEF\u5404\u8D34\u4E00\u4E2A\u540C\u540D\u6807\u7B7E\uFF0C\u7535\u6C14\u4E0A\u6210\u7ACB\uFF0C\u4F46\u4EBA\u5F97\u6EE1\u56FE\u627E\u540C\u540D\u6587\u5B57\u624D\u80FD\u770B\u51FA\u8C01\u8FDE\u8C01\uFF1B\u5BC6\u96C6\u82AF\u7247\u4E0A\u6807\u7B7E\u8FD8\u4F1A\u4E92\u76F8\u538B\u4F4F\u3002**\u5757\u5185\u5668\u4EF6\u4E4B\u95F4\u5C31\u8BE5\u6709\u770B\u5F97\u89C1\u7684\u7EBF\u3002**\n\n\u7ED9\u5B83\u4E00\u4EFD nets \u58F0\u660E\uFF0C\u5B83\u4F1A\uFF1A\n- \u7535\u6E90\u3001\u5730\u7F51\u7EDC \u2192 \u8DF3\u8FC7\uFF08\u4EA4\u7ED9 eda_label_nets \u653E\u7B26\u53F7\uFF09\n- \u4E24\u4E2A\u5F15\u811A \u2192 \u76F4\u7EBF\u6216 L \u5F62\u8FDE\u8D77\u6765\n- \u4E09\u4E2A\u4EE5\u4E0A \u2192 \u62C9\u4E00\u6761\u4E3B\u5E72\uFF0C\u5404\u5F15\u811A\u5F15\u77ED\u7EBF\u63A5\u4E0A\u53BB\uFF08\u603B\u7EBF\u5F0F\uFF0C\u6700\u6E05\u6670\uFF09\n\n\u8DE8\u533A\u7684\u7F51\u7EDC\u4E0D\u8981\u653E\u8FDB\u6765 \u2014\u2014 \u957F\u7EBF\u7A7F\u8D8A\u56FE\u7EB8\u662F\u53EF\u8BFB\u6027\u7684\u5934\u53F7\u6740\u624B\uFF0C\u8DE8\u533A\u7528 eda_add_net_identifier \u653E IN/OUT \u7AEF\u53E3\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nets: {
+          type: "object",
+          description: '{ \u7F51\u7EDC\u540D: ["\u4F4D\u53F7.\u5F15\u811A\u53F7", \u2026] }\uFF0C\u4E0E eda_arrange_block \u540C\u683C\u5F0F',
+          additionalProperties: { type: "array", items: { type: "string" } }
+        },
+        include_power: {
+          type: "boolean",
+          description: "\u662F\u5426\u4E5F\u7ED9\u7535\u6E90\u5730\u7F51\u7EDC\u753B\u7EBF\uFF0C\u9ED8\u8BA4 false\uFF08\u7535\u6E90\u5730\u5E94\u8BE5\u7528\u7B26\u53F7\uFF0C\u4E0D\u8BE5\u62C9\u7EBF\uFF09"
+        }
+      },
+      required: ["nets"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const nets = args.nets && typeof args.nets === "object" ? args.nets : {};
+      const includePower = args.include_power === true;
+      const GND = ["GND", "AGND", "DGND", "PGND", "SGND", "VSS", "VEE", "GNDA", "GNDD", "EARTH"];
+      const isPowerish = (n) => {
+        const u = n.toUpperCase();
+        if (GND.includes(u)) return true;
+        if (u.startsWith("VCC") || u.startsWith("VDD") || u.startsWith("VBAT") || u === "V+") return true;
+        const c0 = u.charCodeAt(0);
+        return (c0 >= 48 && c0 <= 57 || u.charAt(0) === "+") && u.includes("V");
+      };
+      const groups = [];
+      const skipped = [];
+      for (const [net, refs] of Object.entries(nets)) {
+        if (!includePower && isPowerish(net)) {
+          skipped.push(net);
+          continue;
+        }
+        const parsed = [];
+        for (const ref of Array.isArray(refs) ? refs : []) {
+          const dot = String(ref).lastIndexOf(".");
+          if (dot <= 0) continue;
+          parsed.push({ des: String(ref).slice(0, dot).toUpperCase(), pin: String(ref).slice(dot + 1) });
+        }
+        if (parsed.length >= 2) groups.push({ net, refs: parsed });
+        else if (parsed.length === 1) skipped.push(`${net}(\u53EA\u6709\u4E00\u4E2A\u5F15\u811A)`);
+      }
+      if (!groups.length) {
+        return { ok: true, wired: 0, skipped, note: "\u6CA1\u6709\u9700\u8981\u753B\u7EBF\u7684\u7F51\u7EDC\uFF08\u7535\u6E90\u5730\u9ED8\u8BA4\u8DF3\u8FC7\uFF0C\u5355\u5F15\u811A\u7F51\u7EDC\u65E0\u6CD5\u6210\u7EBF\uFF09\u3002" };
+      }
+      const r = await ctx2.exec(
+        `
+				${ENSURE_SCH5}
+				const GROUPS = ${JSON.stringify(groups)};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+				const pinCache = {};
+				const getPins = async (des) => {
+					if (!pinCache[des]) {
+						const c = byDes[des];
+						pinCache[des] = c ? (await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId) || []) : [];
+					}
+					return pinCache[des];
+				};
+				const findPin = async (des, key) => {
+					const pins = await getPins(des);
+					const k = String(key).toUpperCase();
+					for (const x of pins) if (String(x.pinNumber || '').toUpperCase() === k) return x;
+					for (const x of pins) if (String(x.pinName || '').toUpperCase() === k) return x;
+					return null;
+				};
+				// \u5F15\u811A\u5FC5\u987B\u4ECE\u671D\u5411\u90A3\u4E00\u4FA7\u63A5\u5165\uFF0C\u4ECE\u7B26\u53F7\u5185\u4FA7\u753B\u8FDB\u53BB EDA \u4E0D\u8BA4\u8FD9\u4E2A\u8FDE\u63A5\u3002
+				// \u5F15\u51FA\u957F\u5EA6**\u6309\u7F51\u7EDC\u9010\u4E2A\u9519\u5F00**\uFF1A\u4E24\u4E2A\u7F51\u7EDC\u82E5\u90FD\u4ECE\u540C\u4E00\u9897\u82AF\u7247\u7684\u76F8\u90BB\u5F15\u811A\u5F15\u51FA\u3001
+				// \u53C8\u90FD\u8981\u6298\u8FD4\u5230\u540C\u4E00\u4FA7\uFF0C\u7528\u540C\u4E00\u4E2A\u957F\u5EA6\u5C31\u4F1A\u8BA9\u4E24\u6761\u7AD6\u76F4\u6BB5\u843D\u5728\u540C\u4E00\u4E2A x \u4E0A\u3002
+				// \u539F\u7406\u56FE\u91CC\u91CD\u53E0\u7684\u5BFC\u7EBF\u4F1A\u88AB\u5224\u5B9A\u4E3A\u7535\u6C14\u76F8\u8FDE \u2014\u2014 \u5B9E\u6D4B FB \u4E0E AOUT \u56E0\u6B64\u77ED\u8DEF\uFF0C
+				// \u7B49\u4E8E\u628A\u53CD\u9988\u7535\u963B\u6574\u4E2A\u65C1\u8DEF\u6389\uFF0C\u800C DRC \u4E00\u58F0\u4E0D\u542D\u3002
+				const outward = (p, stub) => {
+					const r = ((Number(p.rotation) % 360) + 360) % 360;
+					if (r === 0) return [stub, 0];
+					if (r === 90) return [0, -stub];
+					if (r === 180) return [-stub, 0];
+					return [0, stub];
+				};
+
+				const done = [], failed = [];
+				for (let gi = 0; gi < GROUPS.length; gi++) {
+					const g = GROUPS[gi];
+					const stub = 20 + (gi % 5) * 12; // \u6BCF\u4E2A\u7F51\u7EDC\u9519\u5F00 12\uFF0C\u4E94\u4E2A\u4E00\u5FAA\u73AF
+					const pts = [];
+					let bad = false;
+					for (const ref of g.refs) {
+						if (!byDes[ref.des]) { failed.push({ net: g.net, why: '\u56FE\u4E0A\u6CA1\u6709 ' + ref.des }); bad = true; break; }
+						const p = await findPin(ref.des, ref.pin);
+						if (!p) { failed.push({ net: g.net, why: ref.des + ' \u4E0A\u627E\u4E0D\u5230\u5F15\u811A ' + ref.pin }); bad = true; break; }
+						const d = outward(p, stub);
+						pts.push({ ref: ref.des + '.' + ref.pin, x: p.x, y: p.y, ex: p.x + d[0], ey: p.y + d[1] });
+					}
+					if (bad) continue;
+
+					let segs = 0;
+					if (pts.length === 2) {
+						const a = pts[0], b = pts[1];
+						if (a.y === b.y || a.x === b.x) {
+							// \u6B63\u597D\u5171\u7EBF\uFF1A\u4E00\u6761\u76F4\u7EBF\u5230\u5E95
+							if (await eda.sch_PrimitiveWire.create([a.x, a.y, b.x, b.y], g.net)) segs += 1;
+						} else {
+							// L \u5F62\uFF1A\u5148\u5404\u81EA\u671D\u5916\u5F15\u51FA\uFF0C\u518D\u6298\u4E00\u4E2A\u76F4\u89D2\u63A5\u4E0A
+							const w = await eda.sch_PrimitiveWire.create([a.x, a.y, a.ex, a.ey, a.ex, b.y, b.x, b.y], g.net);
+							if (w) segs += 1;
+							else if (await eda.sch_PrimitiveWire.create([a.x, a.y, a.ex, a.ey, b.ex, a.ey, b.ex, b.ey, b.x, b.y], g.net)) segs += 1;
+						}
+					} else {
+						// \u4E09\u4E2A\u4EE5\u4E0A\uFF1A\u62C9\u4E00\u6761\u4E3B\u5E72\uFF0C\u5404\u5F15\u811A\u5F15\u77ED\u7EBF\u63A5\u4E0A\u53BB\u3002
+						// \u4E3B\u5E72\u8D70\u5411\u53D6\u51B3\u4E8E\u5F15\u811A\u662F\u6A2A\u5411\u6563\u5F00\u8FD8\u662F\u7EB5\u5411\u6563\u5F00\u3002
+						let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+						for (const p of pts) {
+							if (p.ex < minX) minX = p.ex;
+							if (p.ex > maxX) maxX = p.ex;
+							if (p.ey < minY) minY = p.ey;
+							if (p.ey > maxY) maxY = p.ey;
+						}
+						const horizontal = (maxX - minX) >= (maxY - minY);
+						if (horizontal) {
+							const ys = pts.map((p) => p.ey).sort((a, b) => a - b);
+							const trunk = ys[Math.floor(ys.length / 2)];
+							if (await eda.sch_PrimitiveWire.create([minX, trunk, maxX, trunk], g.net)) segs += 1;
+							for (const p of pts) {
+								const path = p.ey === trunk ? [p.x, p.y, p.ex, p.ey] : [p.x, p.y, p.ex, p.ey, p.ex, trunk];
+								if (await eda.sch_PrimitiveWire.create(path, g.net)) segs += 1;
+							}
+						} else {
+							const xs = pts.map((p) => p.ex).sort((a, b) => a - b);
+							const trunk = xs[Math.floor(xs.length / 2)];
+							if (await eda.sch_PrimitiveWire.create([trunk, minY, trunk, maxY], g.net)) segs += 1;
+							for (const p of pts) {
+								const path = p.ex === trunk ? [p.x, p.y, p.ex, p.ey] : [p.x, p.y, p.ex, p.ey, trunk, p.ey];
+								if (await eda.sch_PrimitiveWire.create(path, g.net)) segs += 1;
+							}
+						}
+					}
+					if (segs) done.push(g.net + '(' + pts.length + '\u811A/' + segs + '\u6BB5)');
+					else failed.push({ net: g.net, why: '\u5BFC\u7EBF\u521B\u5EFA\u5931\u8D25' });
+				}
+				return { ok: failed.length === 0, wired: done.length, done, failed };
+			`,
+        18e4
+      );
+      return schHint({ ...r, skipped_power_nets: skipped.length ? skipped : void 0 });
+    }
+  },
+  {
+    name: "eda_draw_zone",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u7ED9\u4E00\u4E2A\u529F\u80FD\u533A\u753B\u8FB9\u6846\u3001\u6807\u9898\u548C\u8BF4\u660E \u2014\u2014 \u8BA9\u4EBA\u4E00\u773C\u770B\u51FA\u8FD9\u5757\u7535\u8DEF\u662F\u5E72\u4EC0\u4E48\u7684\u3002\n\n\u5206\u533A\u4E0D\u662F\u6446\u4F4D\u7F6E\u5C31\u5B8C\u4E8B\u4E86\uFF1A\u6846\u8D77\u6765\u3001\u5199\u4E0A\u300C\u7535\u6E90 +5V\u2192+3V3\u300D\u8FD9\u6837\u7684\u6807\u9898\uFF0C\u518D\u8865\u4E00\u53E5\u529F\u80FD\u8BF4\u660E\uFF0C\u8BFB\u56FE\u7684\u4EBA\u4E0D\u7528\u9010\u4E2A\u5668\u4EF6\u63A8\u6572\u5C31\u77E5\u9053\u6BCF\u5757\u5728\u505A\u4EC0\u4E48\u3002\n\n\u6846\u8981\u7559\u51FA\u4F59\u91CF\uFF08\u6BD4\u5668\u4EF6\u5305\u56F4\u76D2\u6BCF\u8FB9\u591A 40 \u4EE5\u4E0A\uFF09\uFF0C\u6807\u9898\u5199\u5728\u6846\u5185\u5DE6\u4E0A\u89D2\u3002\u5148\u628A\u8FD9\u4E00\u533A\u7684\u5668\u4EF6\u90FD\u6446\u597D\u3001\u91CF\u51FA\u5B9E\u9645\u8303\u56F4\uFF0C\u518D\u753B\u6846 \u2014\u2014 \u5668\u4EF6\u52A8\u4E86\u6846\u4E0D\u4F1A\u8DDF\u7740\u52A8\u3002\n\n\u5750\u6807\u7ED9\u4E24\u4E2A\u5BF9\u89D2\u70B9\u5373\u53EF\uFF08\u5DE5\u5177\u5185\u90E8\u4F1A\u8F6C\u6210 EDA \u8981\u7684 topLeft+\u5BBD\u9AD8\uFF1B`sch_PrimitiveRectangle.create` \u7684\u5B9E\u9645\u7B7E\u540D\u662F (topLeftX, topLeftY, width, height)\uFF0C\u4E0D\u662F\u4E24\u70B9\u5F0F\uFF0C\u76F4\u63A5\u6309\u4E24\u70B9\u4F20\u4F1A\u753B\u51FA\u4E00\u4E2A\u5DE8\u6846\u8DD1\u5230\u56FE\u7EB8\u5916\uFF09\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        x1: { type: "number", description: "\u6846\u5DE6\u4E0B\u89D2 X\uFF080.01 inch\uFF09" },
+        y1: { type: "number", description: "\u6846\u5DE6\u4E0B\u89D2 Y" },
+        x2: { type: "number", description: "\u6846\u53F3\u4E0A\u89D2 X" },
+        y2: { type: "number", description: "\u6846\u53F3\u4E0A\u89D2 Y" },
+        title: { type: "string", description: "\u533A\u6807\u9898\uFF0C\u5982\u300C\u7535\u6E90 +5V\u2192+3V3\u300D" },
+        note: { type: "string", description: "\u53EF\u9009\uFF0C\u4E00\u53E5\u529F\u80FD\u8BF4\u660E" }
+      },
+      required: ["x1", "y1", "x2", "y2", "title"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const x1 = num(args, "x1");
+      const y1 = num(args, "y1");
+      const x2 = num(args, "x2");
+      const y2 = num(args, "y2");
+      const title = requireString(args, "title");
+      const note = optionalString(args, "note");
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH5}
+				// \u5B9E\u6D4B\u7B7E\u540D\u662F (topLeftX, topLeftY, width, height)\uFF0C**\u4E0D\u662F\u4E24\u4E2A\u5BF9\u89D2\u70B9**\uFF1B
+				// \u800C\u4E14\u539F\u7406\u56FE y \u8F74\u5411\u4E0A\uFF0C\u6240\u4EE5 topLeftY \u8981\u53D6\u8F83\u5927\u7684\u90A3\u4E2A y\uFF0C\u9AD8\u5EA6\u5F80\u4E0B\u7B97\u3002
+				// \u7167\u4E24\u70B9\u5F0F\u4F20\u4F1A\u753B\u51FA\u4E00\u4E2A\u5BBD\u9AD8\u7B49\u4E8E\u5BF9\u89D2\u5750\u6807\u7684\u5DE8\u6846\uFF0C\u8DD1\u5230\u56FE\u7EB8\u5916\u9762\u53BB\u3002
+				const rc = await eda.sch_PrimitiveRectangle.create(${Math.min(x1, x2)}, ${Math.max(y1, y2)}, ${Math.abs(x2 - x1)}, ${Math.abs(y2 - y1)});
+				// \u9ED8\u8BA4\u6837\u5F0F\uFF08color/lineWidth \u90FD\u662F null\uFF09\u753B\u51FA\u6765\u6781\u6DE1\uFF0C\u7F29\u653E\u4E00\u5C0F\u5C31\u5B8C\u5168\u770B\u4E0D\u89C1\u4E86\uFF0C
+				// \u7B49\u4E8E\u767D\u6846\u3002\u7ED9\u4E2A\u660E\u786E\u7684\u7070\u84DD\u865A\u7EBF\uFF0C\u65E2\u80FD\u4E00\u773C\u770B\u6E05\u5206\u533A\u8FB9\u754C\uFF0C\u53C8\u4E0D\u4F1A\u8DDF\u4FE1\u53F7\u7EBF\u62A2\u773C\u3002
+				if (rc) {
+					await eda.sch_PrimitiveRectangle.modify(rc.primitiveId, {
+						color: '#5B7FA6',
+						lineWidth: 2,
+						lineType: 1,
+					}).catch(() => undefined);
+				}
+				// \u6807\u9898\u653E\u5728\u6846**\u5185**\u5DE6\u4E0A\u89D2\u3002\u653E\u6846\u5916\u770B\u7740\u6E05\u723D\uFF0C\u4F46\u533A\u6846\u5E38\u5E38\u7D27\u8D34\u56FE\u7EB8\u8FB9\u7F18\uFF0C
+				// \u5F80\u5916\u632A\u4E00\u70B9\u6807\u9898\u5C31\u6389\u5230\u56FE\u7EB8\u5916\u9762\u53BB\u4E86 \u2014\u2014 \u5B9E\u6D4B A4 \u4E0A\u5C31\u8FD9\u4E48\u4E22\u8FC7\u4E00\u6B21\u3002
+				// \u7B7E\u540D\u662F create(x, y, text) \u2014\u2014 \u5750\u6807\u5728\u524D\u3002\u4F20\u6210 (text, x, y) \u7684\u8BDD
+				// \u6587\u5B57\u4F1A\u88AB\u5F53\u6210 x \u5750\u6807\uFF0C\u56FE\u5143\u8DD1\u5230\u5929\u8FB9\u53BB\uFF0C\u56FE\u4E0A\u4EC0\u4E48\u90FD\u770B\u4E0D\u89C1\u3002
+				const t = await eda.sch_PrimitiveText.create(${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 25, ${JSON.stringify(title)});
+				let n = null;
+				${note ? `n = await eda.sch_PrimitiveText.create(${Math.min(x1, x2)} + 15, ${Math.max(y1, y2)} - 45, ${JSON.stringify(note)});` : ""}
+				return {
+					ok: !!rc, rect_id: rc && rc.primitiveId, title_id: t && t.primitiveId, note_id: n && n.primitiveId,
+					box: [${Math.min(x1, x2)}, ${Math.min(y1, y2)}, ${Math.max(x1, x2)}, ${Math.max(y1, y2)}],
+				};
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
+    name: "eda_mark_nc",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u7ED9\u4E0D\u4F7F\u7528\u7684\u5F15\u811A\u6253 NC \u6807\u8BB0\u3002\n\n\u88F8\u9732\u60AC\u7A7A\u7684\u5F15\u811A\uFF0C\u8BFB\u56FE\u7684\u4EBA\u5206\u4E0D\u6E05\u662F**\u6709\u610F\u4E0D\u63A5**\u8FD8\u662F**\u753B\u6F0F\u4E86**\u3002\u82AF\u7247\u7684 NC \u7A7A\u811A\u3001\u672A\u7528\u7684\u903B\u8F91\u95E8\u8F93\u51FA\u3001\u5355\u5411\u4F7F\u7528\u7684\u6536\u53D1\u5668\u63A5\u6536\u7AEF\uFF0C\u90FD\u8BE5\u660E\u786E\u6807\u51FA\u6765\u3002\n\n\u6CE8\u610F\uFF1A\u7ACB\u521B\u7684\u6269\u5C55 API \u6CA1\u6709\u5F00\u653E\u539F\u751F\u300C\u975E\u8FDE\u63A5\u6807\u5FD7\u300D\uFF0C\u8FD9\u91CC\u7528\u5F15\u811A\u7AEF\u70B9\u5904\u7684 \u2715 \u7B26\u53F7\u7B49\u6548\u8868\u8FBE \u2014\u2014 \u89C6\u89C9\u4E0A\u4E00\u81F4\uFF0C\u4F46\u4E0D\u53C2\u4E0E\u7535\u6C14\u68C0\u67E5\uFF0C\u6240\u4EE5 eda_check_schematic \u4ECD\u4F1A\u628A\u5B83\u4EEC\u7B97\u4F5C\u60AC\u7A7A\uFF0C\u628A\u8FD9\u4E9B\u5F15\u811A\u586B\u8FDB\u8BE5\u5DE5\u5177\u7684 allow_floating \u5373\u53EF\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        pins: {
+          type: "array",
+          items: { type: "string" },
+          description: '\u8981\u6807\u8BB0\u7684\u5F15\u811A\uFF0C\u5982 ["U2.2","U2.3","U12.6"]'
+        }
+      },
+      required: ["pins"]
+    },
+    mutating: true,
+    handler: async (args, ctx2) => {
+      const refs = (Array.isArray(args.pins) ? args.pins : []).map((x) => String(x));
+      if (!refs.length) throw new Error("pins \u4E0D\u80FD\u4E3A\u7A7A");
+      const jobs = refs.map((ref) => {
+        const dot = ref.lastIndexOf(".");
+        return dot <= 0 ? null : { des: ref.slice(0, dot).toUpperCase(), pin: ref.slice(dot + 1) };
+      }).filter(Boolean);
+      return schHint(
+        await ctx2.exec(
+          `
+				${ENSURE_SCH5}
+				const JOBS = ${JSON.stringify(jobs)};
+				const all = await eda.sch_PrimitiveComponent.getAll();
+				const byDes = {};
+				for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+				const done = [], failed = [];
+				for (const j of JOBS) {
+					const c = byDes[j.des];
+					if (!c) { failed.push(j.des + '.' + j.pin + ' \u56FE\u4E0A\u6CA1\u6709\u8FD9\u4E2A\u4F4D\u53F7'); continue; }
+					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
+					const k = String(j.pin).toUpperCase();
+					let p = null;
+					for (const x of (pins || [])) if (String(x.pinNumber || '').toUpperCase() === k) { p = x; break; }
+					if (!p) for (const x of (pins || [])) if (String(x.pinName || '').toUpperCase() === k) { p = x; break; }
+					if (!p) { failed.push(j.des + '.' + j.pin + ' \u627E\u4E0D\u5230\u8BE5\u5F15\u811A'); continue; }
+					const t = await eda.sch_PrimitiveText.create(p.x - 4, p.y - 4, String.fromCharCode(10005));
+					if (t) done.push(j.des + '.' + String(p.pinNumber));
+					else failed.push(j.des + '.' + j.pin + ' \u6807\u8BB0\u521B\u5EFA\u5931\u8D25');
+				}
+				return { ok: failed.length === 0, marked: done.length, done, failed };
+			`,
+          EDIT_TIMEOUT_MS
+        )
+      );
+    }
+  },
+  {
     name: "eda_auto_route",
-    description: "\u3010\u5199\u64CD\u4F5C\u3011\u8BA9 EDA \u81EA\u52A8\u6574\u7406\u5F53\u524D\u539F\u7406\u56FE\u9875\u7684\u8FDE\u7EBF \u2014\u2014 **\u753B\u5B8C\u7F51\u7EDC\u540E\u5FC5\u505A\u7684\u4E00\u6B65**\u3002\n\n\u5DE5\u4F5C\u65B9\u5F0F\uFF1A\u628A\u5DF2\u7ECF\u5EFA\u7ACB\u7684\u7F51\u7EDC\u5173\u7CFB\u6574\u7406\u6210\u771F\u6B63\u7684\u8D70\u7EBF\uFF08\u62D0\u5F2F\u3001\u8282\u70B9\u3001\u907F\u8BA9\uFF09\uFF0C\u800C\u4E0D\u662F\u4E00\u5806\u6563\u843D\u7684\u77ED\u5F15\u51FA\u7EBF\u3002\u5B9E\u6D4B 3.4 \u79D2\u628A 154 \u6BB5\u77ED\u7EBF\u6574\u7406\u6210 46 \u6761\u6B63\u89C4\u8FDE\u7EBF\u3002\n\n**\u63A8\u8350\u5DE5\u4F5C\u6D41**\uFF1A\n1. eda_place_component \u653E\u5668\u4EF6\n2. eda_label_pin_net \u58F0\u660E\u6BCF\u4E2A\u5F15\u811A\u5C5E\u4E8E\u54EA\u4E2A\u7F51\u7EDC\uFF08\u53EA\u8868\u8FBE\u7535\u6C14\u610F\u56FE\uFF0C\u4E0D\u7BA1\u51E0\u4F55\uFF09\n3. **eda_auto_route** \u8BA9 EDA \u628A\u7EBF\u753B\u597D\u770B\n\n\u8FD9\u6837\u5206\u5DE5\u7684\u7406\u7531\uFF1A\u81EA\u52A8\u751F\u6210\u7684\u51E0\u4F55\u8DEF\u5F84\u5728\u5BC6\u96C6\u56FE\u91CC\u4F1A\u5927\u91CF\u4EA4\u53C9\uFF0C\u800C\u4EA4\u53C9\u91CD\u5408\u7684\u5BFC\u7EBF\u4F1A\u88AB\u5224\u5B9A\u4E3A\u7535\u6C14\u76F8\u8FDE\uFF0C\u4ECE\u800C\u628A\u4E0D\u76F8\u5E72\u7684\u7F51\u7EDC\u8FDE\u6210\u4E00\u7247\u3002\u628A\u5E03\u7EBF\u4EA4\u7ED9 EDA \u81EA\u5DF1\u7684\u7B97\u6CD5\uFF0C\u65E2\u597D\u770B\u53C8\u4E0D\u4F1A\u8BEF\u8FDE\u3002",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u8BA9 EDA \u81EA\u52A8\u6574\u7406\u5F53\u524D\u539F\u7406\u56FE\u9875\u7684\u8FDE\u7EBF\uFF0C\u628A\u6563\u843D\u7684\u77ED\u5F15\u51FA\u7EBF\u6574\u7406\u6210\u6B63\u89C4\u8D70\u7EBF\u3002\n\n**\u5FC5\u987B\u4F20 nets**\uFF08\u548C eda_arrange_block / eda_label_nets \u540C\u4E00\u4EFD\u58F0\u660E\uFF09\u3002\u5B9E\u6D4B EDA \u7684\u5E03\u7EBF\u7B97\u6CD5\u5728\u91CD\u7EC4\u8FDE\u7EBF\u65F6\u4F1A\u628A\u5BFC\u7EBF\u4ECE\u5F15\u811A\u4E0A\u626F\u6389 \u2014\u2014 \u4E00\u6B21\u5168\u56FE\u5E03\u7EBF\u540E 148 \u4E2A\u5F15\u811A\u53EA\u5269 60 \u4E2A\u8FD8\u8FDE\u7740\uFF0C\u800C DRC \u7167\u6837\u62A5 0 \u9519\u8BEF\u3001\u5668\u4EF6\u548C\u7F51\u7EDC\u540D\u4E5F\u90FD\u8FD8\u5728\uFF0C\u5149\u770B DRC \u6839\u672C\u53D1\u73B0\u4E0D\u4E86\u3002\n\n\u4F20\u4E86 nets\uFF0C\u5DE5\u5177\u4F1A\u5728\u5E03\u7EBF\u540E\u9010\u4E2A\u5F15\u811A\u6838\u5BF9\uFF0C\u628A\u88AB\u626F\u6389\u7684\u91CD\u65B0\u63A5\u56DE\u53BB\uFF0C\u5E76\u62A5\u544A\u4FEE\u590D\u6570\u91CF\u3002\u4E0D\u4F20\u5C31\u53EA\u5E03\u7EBF\u4E0D\u6821\u9A8C\uFF0C**\u65AD\u4E86\u4E5F\u4E0D\u4F1A\u6709\u4EBA\u544A\u8BC9\u4F60**\u3002\n\n\u5DE5\u4F5C\u6D41\uFF1Aeda_place_component \u2192 eda_arrange_block(nets) \u2192 eda_label_nets(nets) \u2192 **eda_auto_route(nets)**\u3002",
     inputSchema: {
       type: "object",
       properties: {
@@ -20688,16 +24499,30 @@ var schematicEditTools = [
           type: "array",
           items: { type: "string" },
           description: "\u53EF\u9009\uFF0C\u53EA\u5904\u7406\u8FD9\u4E9B\u5668\u4EF6\uFF08\u56FE\u5143 id\uFF09\uFF1B\u4E0D\u7ED9\u5219\u5904\u7406\u5168\u56FE\u6240\u6709\u672A\u5E03\u7EBF\u7F51\u7EDC"
+        },
+        nets: {
+          type: "object",
+          description: '**\u5F3A\u70C8\u5EFA\u8BAE\u4F20**\uFF0C\u683C\u5F0F\u4E0E eda_arrange_block / eda_label_nets \u5B8C\u5168\u76F8\u540C\uFF1A{ "+24V": ["U1.3","C11.1"], \u2026 }\u3002\u5E03\u7EBF\u7B97\u6CD5\u4F1A\u626F\u65AD\u5F15\u811A\u8FDE\u63A5\uFF0C\u6709\u4E86\u8FD9\u4EFD\u58F0\u660E\u5DE5\u5177\u624D\u80FD\u6838\u5BF9\u5E76\u81EA\u52A8\u63A5\u56DE\u3002',
+          additionalProperties: { type: "array", items: { type: "string" } }
         }
       }
     },
     mutating: true,
     handler: async (args, ctx2) => {
       const uuids = Array.isArray(args.component_uuids) ? args.component_uuids : null;
+      const nets = args.nets && typeof args.nets === "object" ? args.nets : {};
+      const jobs = [];
+      for (const [net, refs] of Object.entries(nets)) {
+        for (const ref of Array.isArray(refs) ? refs : []) {
+          const dot = String(ref).lastIndexOf(".");
+          if (dot <= 0) continue;
+          jobs.push({ des: String(ref).slice(0, dot).toUpperCase(), pin: String(ref).slice(dot + 1), net });
+        }
+      }
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const stat = async () => {
 					const src = await eda.sys_FileManager.getDocumentSource();
 					const n = (t) => (src.match(new RegExp('"type":"' + t + '"', 'g')) || []).length;
@@ -20708,10 +24533,81 @@ var schematicEditTools = [
 				const props = ${uuids ? `{ uuids: ${JSON.stringify(uuids)} }` : "undefined"};
 				await eda.sch_Document.autoRouting(props);
 				const after = await stat();
+
+				// \u2500\u2500 \u5E03\u7EBF\u540E\u81EA\u68C0\uFF1AEDA \u7684\u7B97\u6CD5\u4F1A\u628A\u5BFC\u7EBF\u4ECE\u5F15\u811A\u4E0A\u626F\u6389 \u2500\u2500
+				// getDocumentSource \u6709\u7F13\u5B58\uFF0C\u5E03\u7EBF\u521A\u7ED3\u675F\u5C31\u8BFB\u4F1A\u62FF\u5230\u65E7\u5185\u5BB9\uFF0C\u770B\u8D77\u6765\u4E00\u5207\u6B63\u5E38\u3002
+				// \u5FC5\u987B\u7B49\u4E00\u4E0B\u518D\u8BFB\uFF0C\u5426\u5219\u8FD9\u6BB5\u6821\u9A8C\u5F62\u540C\u865A\u8BBE\u3002
+				const JOBS = ${JSON.stringify(jobs)};
+				let repaired = 0, stillOff = [];
+				if (JOBS.length) {
+					await new Promise((r) => setTimeout(r, 1500));
+					const endpoints = () => {
+						const out = [];
+						for (const ln of String(srcCache).split(String.fromCharCode(10))) {
+							if (ln.indexOf('"type":"LINE"') < 0) continue;
+							const q = ln.indexOf('||');
+							if (q < 0) continue;
+							let body = ln.slice(q + 2);
+							const last = body.lastIndexOf('|');
+							if (last >= 0) body = body.slice(0, last);
+							let o = null;
+							try { o = JSON.parse(body); } catch (e) { continue; }
+							if (o.startX == null) continue;
+							out.push([o.startX, -o.startY]);
+							out.push([o.endX, -o.endY]);
+						}
+						return out;
+					};
+					var srcCache = await eda.sys_FileManager.getDocumentSource();
+					let pts = endpoints();
+
+					const all = await eda.sch_PrimitiveComponent.getAll();
+					const byDes = {};
+					for (const c of all) if (c.designator) byDes[String(c.designator).toUpperCase()] = c;
+					const pinCache = {};
+					const getPins = async (des) => {
+						if (!pinCache[des]) {
+							const c = byDes[des];
+							pinCache[des] = c ? (await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId) || []) : [];
+						}
+						return pinCache[des];
+					};
+
+					for (const j of JOBS) {
+						const pins = await getPins(j.des);
+						const key = String(j.pin).toUpperCase();
+						let p = null;
+						for (const x of pins) if (String(x.pinNumber || '').toUpperCase() === key) { p = x; break; }
+						if (!p) for (const x of pins) if (String(x.pinName || '').toUpperCase() === key) { p = x; break; }
+						if (!p) continue;
+						let ok = false;
+						for (const pt of pts) {
+							if (Math.abs(pt[0] - p.x) + Math.abs(pt[1] - p.y) < 2) { ok = true; break; }
+						}
+						if (ok) continue;
+						// \u63A5\u56DE\u53BB\u3002\u957F\u5EA6\u53D6 30 \u800C\u4E0D\u662F 20 \u2014\u2014
+						// \u5B9E\u6D4B stub \u7AEF\u70B9\u843D\u5728\u522B\u7684\u7EBF\u7AEF\u70B9\u65C1\u8FB9 1-2 \u4E2A\u5355\u4F4D\u65F6\uFF0Ccreate \u4F1A\u9759\u9ED8\u5931\u8D25
+						// \uFF08\u8FD4\u56DE\u5BF9\u8C61\u4F46\u7EBF\u4E0D\u843D\u5728\u5F15\u811A\u4E0A\uFF09\uFF0C\u62C9\u957F\u4E00\u70B9\u5C31\u80FD\u907F\u5F00\u3002
+						const rot = ((Number(p.rotation) % 360) + 360) % 360;
+						const L = 30;
+						const d = rot === 0 ? [L, 0] : rot === 90 ? [0, -L] : rot === 180 ? [-L, 0] : rot === 270 ? [0, L] : [L, 0];
+						const w = await eda.sch_PrimitiveWire.create([p.x, p.y, p.x + d[0], p.y + d[1]], j.net);
+						if (w) repaired += 1;
+						else stillOff.push(j.des + '.' + j.pin);
+					}
+				}
+
 				return {
 					ok: true, page: _page.name, elapsed_ms: Date.now() - t0,
 					before, after,
-					note: '\u8FDE\u7EBF\u5DF2\u7531 EDA \u7684\u5E03\u7EBF\u7B97\u6CD5\u91CD\u65B0\u6574\u7406\u3002\u5EFA\u8BAE\u63A5\u7740\u8DD1 eda_schematic_drc \u786E\u8BA4\u6CA1\u6709\u65B0\u589E error\u3002',
+					checked_pins: JOBS.length,
+					repaired_after_routing: repaired,
+					still_disconnected: stillOff.length ? stillOff : undefined,
+					note: JOBS.length
+						? (repaired
+							? '\u5E03\u7EBF\u7B97\u6CD5\u626F\u65AD\u4E86 ' + repaired + ' \u4E2A\u5F15\u811A\u8FDE\u63A5\uFF0C\u5DF2\u6309 nets \u58F0\u660E\u63A5\u56DE\u3002'
+							: '\u5E03\u7EBF\u5B8C\u6210\uFF0C\u6240\u6709\u58F0\u660E\u7684\u5F15\u811A\u8FDE\u63A5\u90FD\u8FD8\u5728\u3002')
+						: '**\u6CA1\u4F20 nets\uFF0C\u6CA1\u505A\u8FDE\u63A5\u6821\u9A8C** \u2014\u2014 \u5E03\u7EBF\u7B97\u6CD5\u53EF\u80FD\u5DF2\u7ECF\u626F\u65AD\u5F15\u811A\u8FDE\u63A5\uFF0CDRC \u67E5\u4E0D\u51FA\u6765\u3002\u5EFA\u8BAE\u4F20 nets \u91CD\u8DD1\u3002',
 				};
 			`,
           18e4
@@ -20740,7 +24636,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const props = {};
 				${uuids ? `props.uuids = ${JSON.stringify(uuids)};` : ""}
 				${types ? `props.designatorDeviceTypeMap = ${JSON.stringify(types)};` : ""}
@@ -20760,7 +24656,7 @@ var schematicEditTools = [
   },
   {
     name: "eda_place_component",
-    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u4E00\u4E2A\u5143\u5668\u4EF6\u3002\n\n\u7528\u7ACB\u521B\u5546\u57CE\u7F16\u53F7\uFF08lcsc_id\uFF09\u6700\u65B9\u4FBF\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7ED9 device_uuid + library_uuid\uFF08\u4ECE eda_library_search \u62FF\uFF09\u3002\n\n**\u653E\u5668\u4EF6\u524D\u5148\u89C4\u5212\u529F\u80FD\u5206\u533A** \u2014\u2014 \u89C1 eda-schematic-layout skill\u3002\u6309\u6E05\u5355\u987A\u5E8F\u968F\u624B\u6446\u4F1A\u8BA9\u8FDE\u7EBF\u6A2A\u7A7F\u6574\u5F20\u56FE\u3001\u65E0\u6CD5\u9605\u8BFB\uFF1B\u5206\u533A\u662F\u8BBE\u8BA1\u5224\u65AD\uFF0C\u5DE5\u5177\u53EA\u8D1F\u8D23\u6267\u884C\u3002\n\n**\u5750\u6807\u5355\u4F4D\u662F 0.01 inch**\uFF08A4 \u56FE\u7EB8\u7EA6 1170 \xD7 830\uFF09\uFF0Crotation \u9006\u65F6\u9488\u4E3A\u6B63\u3002\n\n**\u4F4D\u53F7\u4F1A\u81EA\u52A8\u5206\u914D**\uFF08U1\u3001U2\u3001R1\u2026\uFF09\uFF1AEDA \u7684 create \u63A5\u53E3\u653E\u51FA\u6765\u7684\u5668\u4EF6\u4F4D\u53F7\u662F\u5E93\u91CC\u7684\u5360\u4F4D\u7B26\uFF08\u5982 `U?`\uFF09\uFF0C\u591A\u4E2A\u5668\u4EF6\u4F1A\u91CD\u540D\u3001\u6CA1\u6CD5\u5F15\u7528\uFF0C\u6240\u4EE5\u672C\u5DE5\u5177\u653E\u7F6E\u540E\u4F1A\u626B\u63CF\u5168\u56FE\u5DF2\u7528\u4F4D\u53F7\u5E76\u8865\u4E0A\u4E0B\u4E00\u4E2A\u53EF\u7528\u7F16\u53F7\u3002\u4E5F\u53EF\u4EE5\u7528 designator \u53C2\u6570\u6307\u5B9A\uFF0C\u91CD\u590D\u65F6\u4F1A\u62A5\u9519\u3002\n\n\u653E\u5B8C\u5EFA\u8BAE\u8C03 eda_schematic_components \u786E\u8BA4\uFF0C\u518D\u8DD1 eda_schematic_drc \u770B\u6709\u6CA1\u6709\u65B0\u589E error\u3002",
+    description: "\u3010\u5199\u64CD\u4F5C\u3011\u5728\u5F53\u524D\u539F\u7406\u56FE\u9875\u653E\u7F6E\u4E00\u4E2A\u5143\u5668\u4EF6\u3002\n\n\u7528\u7ACB\u521B\u5546\u57CE\u7F16\u53F7\uFF08lcsc_id\uFF09\u6700\u65B9\u4FBF\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7ED9 device_uuid + library_uuid\uFF08\u4ECE eda_library_search \u62FF\uFF09\u3002\n\n**\u653E\u5668\u4EF6\u524D\u5148\u89C4\u5212\u529F\u80FD\u5206\u533A** \u2014\u2014 \u89C1 eda-schematic-layout skill\u3002\u6309\u6E05\u5355\u987A\u5E8F\u968F\u624B\u6446\u4F1A\u8BA9\u8FDE\u7EBF\u6A2A\u7A7F\u6574\u5F20\u56FE\u3001\u65E0\u6CD5\u9605\u8BFB\uFF1B\u5206\u533A\u662F\u8BBE\u8BA1\u5224\u65AD\uFF0C\u5DE5\u5177\u53EA\u8D1F\u8D23\u6267\u884C\u3002\n\n**\u5750\u6807\u5355\u4F4D\u662F 0.01 inch**\uFF08A4 \u56FE\u7EB8\u7EA6 1170 \xD7 830\uFF09\uFF0Crotation \u9006\u65F6\u9488\u4E3A\u6B63\u3002\n\n**\u4F4D\u53F7\u4F1A\u81EA\u52A8\u5206\u914D**\uFF08U1\u3001U2\u3001R1\u2026\uFF09\uFF1AEDA \u7684 create \u63A5\u53E3\u653E\u51FA\u6765\u7684\u5668\u4EF6\u4F4D\u53F7\u662F\u5E93\u91CC\u7684\u5360\u4F4D\u7B26\uFF08\u5982 `U?`\uFF09\uFF0C\u591A\u4E2A\u5668\u4EF6\u4F1A\u91CD\u540D\u3001\u6CA1\u6CD5\u5F15\u7528\uFF0C\u6240\u4EE5\u672C\u5DE5\u5177\u653E\u7F6E\u540E\u4F1A\u626B\u63CF\u5168\u56FE\u5DF2\u7528\u4F4D\u53F7\u5E76\u8865\u4E0A\u4E0B\u4E00\u4E2A\u53EF\u7528\u7F16\u53F7\u3002\u4E5F\u53EF\u4EE5\u7528 designator \u53C2\u6570\u6307\u5B9A\uFF0C\u91CD\u590D\u65F6\u4F1A\u62A5\u9519\u3002\n\n**\u8FD4\u56DE\u503C\u91CC `placed.actual` \u662F\u56DE\u8BFB\u51FA\u6765\u7684\u5B9E\u9645\u72B6\u6001\uFF0C`placed.requested` \u624D\u662F\u4F60\u8981\u6C42\u7684**\u3002\u4E24\u8005\u4E0D\u7B26\u65F6 `position_verified` \u4E3A false \u5E76\u7ED9\u51FA warnings \u2014\u2014 \u8BF7\u4EE5 actual \u4E3A\u51C6\uFF0C\u4E0D\u8981\u5047\u5B9A\u8BF7\u6C42\u7684\u5750\u6807\u5C31\u662F\u7ED3\u679C\u3002\u82E5 `stacked_with` \u975E\u7A7A\uFF0C\u8BF4\u660E\u5668\u4EF6\u53E0\u5728\u4E86\u522B\u7684\u5668\u4EF6\u4E0A\uFF08\u6570\u91CF\u3001DRC \u90FD\u67E5\u4E0D\u51FA\u8FD9\u79CD\u9519\uFF09\u3002\n\n\u653E\u5B8C\u53EF\u4EE5\u518D\u8DD1 eda_schematic_drc \u770B\u6709\u6CA1\u6709\u65B0\u589E error\u3002",
     inputSchema: {
       type: "object",
       properties: {
@@ -20789,7 +24685,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				let uuid = ${JSON.stringify(du ?? null)}, libUuid = ${JSON.stringify(lu ?? null)};
 				const lcsc = ${JSON.stringify(lcsc ?? null)};
 				if (!uuid && lcsc) {
@@ -20797,8 +24693,12 @@ var schematicEditTools = [
 					if (!hit || !hit.length) return { ok: false, error: '\u5E93\u91CC\u627E\u4E0D\u5230\u7ACB\u521B\u7F16\u53F7 ' + lcsc };
 					uuid = hit[0].uuid; libUuid = hit[0].libraryUuid;
 				}
-				// \u4F4D\u53F7\u5728\u6574\u4EFD\u539F\u7406\u56FE\uFF08\u6240\u6709\u9875\uFF09\u5185\u552F\u4E00\uFF0C\u7B97\u4E0B\u4E00\u4E2A\u7F16\u53F7\u8981\u770B\u5168\u90E8\u9875
-				const usedAll = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+				// \u4F4D\u53F7\u552F\u4E00\u6027\u53EA\u770B**\u5F53\u524D\u9875**\u3002
+				// getAll(undefined, true) \u5B9E\u6D4B\u8DE8\u8D8A\u6574\u4E2A\u5DE5\u7A0B\u7684\u6240\u6709\u539F\u7406\u56FE \u2014\u2014 \u8FDE\u522B\u7684 Board \u90FD\u7B97\u8FDB\u6765\uFF0C
+				// \u4E8E\u662F\u65B0\u5EFA\u4E00\u5757\u677F\u653E C1 \u4F1A\u88AB\u53E6\u4E00\u5757\u677F\u4E0A\u7684 C1 \u6321\u4F4F\u3001\u987A\u5EF6\u6210 C2\uFF0C\u4F4D\u53F7\u8DDF\u8BBE\u8BA1\u5BF9\u4E0D\u4E0A\u3002
+				// \u4E0D\u540C Board \u662F\u5404\u81EA\u72EC\u7ACB\u7684\u8BBE\u8BA1\uFF0C\u7F51\u8868\u4E5F\u6309 Board \u751F\u6210\uFF0C\u672C\u5C31\u4E0D\u8BE5\u4E92\u76F8\u5360\u7528\u4F4D\u53F7\u3002
+				// \u4EE3\u4EF7\uFF1A\u540C\u4E00\u539F\u7406\u56FE\u5206\u591A\u9875\u65F6\u8DE8\u9875\u53EF\u80FD\u649E\u53F7\uFF0C\u9700\u8981\u8C03\u7528\u65B9\u81EA\u5DF1\u907F\u8BA9\u3002
+				const usedAll = await eda.sch_PrimitiveComponent.getAll();
 				const used = new Set(usedAll.map(x => String(x.designator || '').toUpperCase()));
 				const before = (await eda.sch_PrimitiveComponent.getAll()).length;
 
@@ -20820,7 +24720,7 @@ var schematicEditTools = [
 						assignError = '\u4F4D\u53F7 ' + want + ' \u5DF2\u88AB\u5360\u7528\uFF0C\u5DF2\u4FDD\u7559\u81EA\u52A8\u5206\u914D\u7684\u7F16\u53F7';
 					} else {
 						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: want });
-						const fresh = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+						const fresh = await eda.sch_PrimitiveComponent.getAll();
 						const dup = fresh.filter(x => String(x.designator || '').toUpperCase() === want.toUpperCase()).length;
 						if (m && dup === 1) { finalDes = want; assigned = true; }
 						else assignError = dup > 1 ? '\u4F4D\u53F7 ' + want + ' \u51FA\u73B0\u91CD\u590D\uFF0C\u5DF2\u653E\u5F03\u6307\u5B9A' : '\u8BBE\u7F6E\u6307\u5B9A\u4F4D\u53F7\u5931\u8D25';
@@ -20840,7 +24740,7 @@ var schematicEditTools = [
 						const auto = prefix + n;
 						const m = await eda.sch_PrimitiveComponent.modify(c.primitiveId, { designator: auto });
 						if (!m) { assignError = '\u81EA\u52A8\u7F16\u53F7\u5931\u8D25\uFF0C\u4F4D\u53F7\u4ECD\u662F\u5360\u4F4D\u7B26 ' + raw; break; }
-						const fresh = await eda.sch_PrimitiveComponent.getAll(undefined, true);
+						const fresh = await eda.sch_PrimitiveComponent.getAll();
 						const dup = fresh.filter(x => String(x.designator || '').toUpperCase() === auto).length;
 						if (dup === 1) { finalDes = auto; assigned = true; }
 						else { fresh.forEach(x => used.add(String(x.designator || '').toUpperCase())); n++; }
@@ -20848,13 +24748,52 @@ var schematicEditTools = [
 					if (!assigned && !assignError) assignError = '\u8FDE\u7EED 40 \u6B21\u90FD\u649E\u4E0A\u91CD\u540D\uFF0C\u672A\u80FD\u5206\u914D\u552F\u4E00\u4F4D\u53F7';
 				}
 
+				// \u2500\u2500 \u56DE\u8BFB\u786E\u8BA4 \u2500\u2500
+				// c.x / c.y \u662F create \u90A3\u4E00\u523B\u7684\u5BF9\u8C61\u5FEB\u7167\uFF0C\u4E0D\u662F EDA \u91CC\u7684\u5B9E\u9645\u72B6\u6001\uFF1A
+				// \u4E2D\u95F4\u7ECF\u8FC7\u4E86\u82E5\u5E72\u6B21 modify\uFF08\u6539\u4F4D\u53F7\uFF09\uFF0C\u8FD9\u4E2A JS \u5BF9\u8C61\u4E0D\u4F1A\u8DDF\u7740\u66F4\u65B0\u3002
+				// \u4EE5\u524D\u8FD9\u91CC\u76F4\u63A5\u8FD4\u56DE c.x/c.y\uFF0C\u7B49\u4E8E\u628A\u8BF7\u6C42\u503C\u56DE\u663E\u6210\u7ED3\u679C \u2014\u2014 \u5668\u4EF6\u660E\u660E
+				// \u53E0\u5728\u4E0A\u4E00\u4E2A\u8EAB\u4E0A\uFF0C\u5DE5\u5177\u5374\u62A5\u544A\u5750\u6807\u6B63\u786E\u3002\u4E00\u5F8B\u6309 primitiveId \u91CD\u65B0\u67E5\u3002
+				await new Promise(function (r) { setTimeout(r, 600); });
+				const REQ = { x: ${x}, y: ${y}, rotation: ${rotation} };
+				const TOL = 10; // \u534A\u4E2A\u7F51\u683C\uFF1AEDA \u4F1A\u628A\u5750\u6807\u5438\u9644\u5230\u7F51\u683C\uFF0C\u5DEE\u8FD9\u70B9\u4E0D\u7B97\u5931\u8D25
+				const fresh2 = await eda.sch_PrimitiveComponent.getAll();
+				const back = fresh2.filter(function (p) { return p.primitiveId === c.primitiveId; })[0];
+				const actual = back
+					? { x: back.x, y: back.y, rotation: back.rotation || 0, designator: String(back.designator || '') }
+					: null;
+				const posOk = !!actual && Math.abs(actual.x - REQ.x) <= TOL && Math.abs(actual.y - REQ.y) <= TOL;
+
+				// \u53E0\u5728\u522B\u4EBA\u8EAB\u4E0A\u662F\u6700\u5BB9\u6613\u88AB\u6F0F\u6389\u7684\u5931\u8D25\uFF1A\u6570\u91CF\u5BF9\u3001\u8FD4\u56DE\u503C\u5BF9\u3001DRC \u4E5F\u4E0D\u62A5
+				const stacked = !actual ? [] : fresh2
+					.filter(function (p) {
+						return p.componentType === 'part' && p.primitiveId !== c.primitiveId &&
+							Math.abs(p.x - actual.x) <= TOL && Math.abs(p.y - actual.y) <= TOL;
+					})
+					.map(function (p) { return String(p.designator || '?'); });
+
+				const warns = [];
+				if (!back) warns.push('\u56DE\u8BFB\u65F6\u6309 primitiveId \u627E\u4E0D\u5230\u521A\u653E\u7684\u5668\u4EF6 \u2014\u2014 \u653E\u7F6E\u53EF\u80FD\u6CA1\u771F\u6B63\u751F\u6548');
+				if (actual && !posOk) {
+					warns.push('\u5B9E\u9645\u843D\u70B9 (' + actual.x + ', ' + actual.y + ') \u4E0E\u8BF7\u6C42 (' +
+						REQ.x + ', ' + REQ.y + ') \u4E0D\u7B26');
+				}
+				if (stacked.length) warns.push('\u548C\u5DF2\u6709\u5668\u4EF6\u91CD\u53E0\uFF1A' + stacked.join('\u3001'));
+
 				return {
 					ok: true,
-					placed: { primitive_id: c.primitiveId, designator: finalDes, x: c.x, y: c.y },
+					placed: {
+						primitive_id: c.primitiveId,
+						designator: actual ? actual.designator : finalDes,
+						requested: REQ,
+						actual: actual,
+						position_verified: posOk,
+						stacked_with: stacked.length ? stacked : undefined,
+					},
 					designator_assigned: assigned,
 					designator_note: assignError,
 					component_count: { before, after: after.length },
 					page: _page.name,
+					warnings: warns.length ? warns : undefined,
 				};
 			`,
           EDIT_TIMEOUT_MS
@@ -20887,7 +24826,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const w = await eda.sch_PrimitiveWire.create(${JSON.stringify(pts)}, ${JSON.stringify(net ?? void 0)});
 				if (!w) return { ok: false, error: '\u5BFC\u7EBF\u521B\u5EFA\u5931\u8D25\u3002\u5E38\u89C1\u539F\u56E0\uFF1A\u7AEF\u70B9\u843D\u5728\u591A\u4E2A\u4E0D\u540C\u7F51\u7EDC\u7684\u56FE\u5143\u4E0A\uFF0C\u6216\u4E0E\u5DF2\u663E\u5F0F\u547D\u540D\u7F51\u7EDC\u7684\u56FE\u5143\u51B2\u7A81\u3002' };
 				return { ok: true, wire: { primitive_id: w.primitiveId, net: w.net ?? ${JSON.stringify(net ?? null)} }, page: _page.name };
@@ -20910,15 +24849,18 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const want = ${JSON.stringify(des)}.toUpperCase();
 				const all = await eda.sch_PrimitiveComponent.getAll();
 				const c = all.find(x => String(x.designator || '').toUpperCase() === want);
 				if (!c) return { error: '\u5F53\u524D\u539F\u7406\u56FE\u9875\u91CC\u6CA1\u6709\u4F4D\u53F7 ' + want, available: all.map(x => x.designator).filter(Boolean).slice(0, 40) };
 				const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId);
+				// \u7B26\u53F7\u5B9E\u9645\u5360\u591A\u5927\u662F\u5E03\u5C40\u7684\u5FC5\u8981\u8F93\u5165 \u2014\u2014 \u4E0D\u77E5\u9053\u5C3A\u5BF8\u5C31\u53EA\u80FD\u731C\u95F4\u8DDD\uFF0C\u5668\u4EF6\u4F1A\u4E92\u76F8\u538B\u4F4F
+				const bbox = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => undefined);
 				return {
 					designator: c.designator,
 					component: { primitive_id: c.primitiveId, x: c.x, y: c.y, rotation: c.rotation },
+					bbox: bbox ? { ...bbox, width: bbox.maxX - bbox.minX, height: bbox.maxY - bbox.minY } : undefined,
 					pin_count: (pins || []).length,
 					pins: (pins || []).map(p => ({
 						number: p.pinNumber, name: p.pinName,
@@ -20954,11 +24896,11 @@ var schematicEditTools = [
       const from = requireString(args, "from");
       const to = requireString(args, "to");
       const net = optionalString(args, "net");
-      const route = optionalString(args, "route") ?? "auto";
+      const route2 = optionalString(args, "route") ?? "auto";
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const all = await eda.sch_PrimitiveComponent.getAll();
 
 				// "U1.3" / "U1.VIN" \u2192 \u627E\u5230\u90A3\u6839\u5F15\u811A
@@ -21001,7 +24943,7 @@ var schematicEditTools = [
 				const a1 = [p1.x + dx1, p1.y + dy1];
 				const b1 = [p2.x + dx2, p2.y + dy2];
 
-				let mode = ${JSON.stringify(route)};
+				let mode = ${JSON.stringify(route2)};
 				if (mode === 'auto') {
 					if (a1[0] === b1[0] || a1[1] === b1[1]) mode = 'direct';
 					// \u8D77\u70B9 stub \u662F\u6C34\u5E73\u5F15\u51FA\u7684\u8BDD\uFF0C\u63A5\u7740\u8D70\u6C34\u5E73\u6BB5\u66F4\u987A\uFF1B\u53CD\u4E4B\u5148\u8D70\u5782\u76F4
@@ -21091,7 +25033,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const p = ${call};
 				if (!p) return { ok: false, error: '\u521B\u5EFA\u5931\u8D25\uFF0C\u8BF7\u786E\u8BA4\u5750\u6807\u5728\u56FE\u7EB8\u8303\u56F4\u5185\u3001\u7F51\u7EDC\u540D\u5408\u6CD5' };
 				return { ok: true, kind: ${JSON.stringify(kind)}, net: ${JSON.stringify(net)}, primitive_id: p.primitiveId, page: _page.name };
@@ -21125,7 +25067,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const t = await eda.sch_PrimitiveText.create(${x}, ${y}, ${JSON.stringify(content)}, ${rotation}, null, null, ${size});
 				if (!t) return { ok: false, error: '\u6587\u5B57\u521B\u5EFA\u5931\u8D25' };
 				return { ok: true, primitive_id: t.primitiveId, page: _page.name };
@@ -21168,7 +25110,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const ok = await eda.${api}.delete(${JSON.stringify(ids)});
 				return { ok: ok === true, deleted_count: ${ids.length}, kind: ${JSON.stringify(kind)}, page: _page.name,
 					note: ok ? undefined : '\u63A5\u53E3\u8FD4\u56DE false\uFF0C\u53EF\u80FD id \u4E0D\u5B58\u5728\u6216\u7C7B\u578B\u4E0D\u5339\u914D' };
@@ -21192,7 +25134,7 @@ var schematicEditTools = [
       return schHint(
         await ctx2.exec(
           `
-				${ENSURE_SCH}
+				${ENSURE_SCH5}
 				const list = await eda.sch_PrimitiveComponent.getAll(undefined, ${allPages});
 				return {
 					page: _page.name,
@@ -21354,23 +25296,33 @@ var schematicTools = [
 // src/tools/index.ts
 var allTools = [
   ...connectionTools,
+  ...verifyTools,
   ...projectTools,
   ...schematicTools,
   ...schematicEditTools,
+  ...netcheckTools,
+  ...layoutTools,
+  ...mapTools,
+  ...mapApplyTools,
   ...libraryTools,
   ...datasheetTools,
   ...createTools,
   ...pcbTools
 ];
+var dupes = allTools.map((t) => t.name).filter((n, i, a) => a.indexOf(n) !== i);
+if (dupes.length) {
+  throw new Error(`\u5DE5\u5177\u540D\u91CD\u590D\uFF1A${[...new Set(dupes)].join("\u3001")} \u2014\u2014 \u540C\u540D\u5DE5\u5177\u4F1A\u88AB\u9759\u9ED8\u8986\u76D6\uFF0C\u5FC5\u987B\u6539\u540D\u6216\u5408\u5E76\u5B9E\u73B0`);
+}
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.25";
+var VERSION2 = "0.1.69";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
+var currentToolIsMutating = false;
 var ctx = {
   bridge,
-  exec: async (code, timeoutMs) => await bridge.execute(code, timeoutMs)
+  exec: async (code, timeoutMs) => await bridge.execute(code, timeoutMs, currentToolIsMutating)
 };
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: allTools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
@@ -21380,6 +25332,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const tool = toolMap.get(name);
   if (!tool) throw new McpError(ErrorCode.MethodNotFound, `\u672A\u77E5\u5DE5\u5177: ${name}`);
   try {
+    currentToolIsMutating = tool.mutating === true;
     const result = await tool.handler(args ?? {}, ctx);
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   } catch (err) {

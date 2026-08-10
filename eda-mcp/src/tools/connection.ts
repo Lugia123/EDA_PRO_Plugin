@@ -39,13 +39,41 @@ export const connectionTools: ToolDef[] = [
 				active: c.id === ctx.bridge.activeClient()?.id,
 				connected_seconds: Math.round((Date.now() - c.connectedAt) / 1000),
 			}));
+			// 连接泄漏检测。
+			//
+			// v0.1.69 之前的扩展在重连时只关当前那条 WebSocket，历史连接全留着，
+			// 而且它们心跳照常响应、服务端也判不了死 —— 点几次「重新连接」就能
+			// 涨到二十条。后果是 activeClient()「取最后一个认证成功的」会选到
+			// 早就不用的那条，表现为调用发出去没反应，极难排查。
+			/** 版本号排序用的可比数值，如 0.1.25 → 1025 */
+			const verNum = (v: string): number | null => {
+				const m = v.match(/^(\d+)\.(\d+)\.(\d+)/);
+				if (!m) return null;
+				return Number(m[1]) * 1e6 + Number(m[2]) * 1e3 + Number(m[3]);
+			};
+			const FIXED_IN = verNum('0.1.69') as number;
+			const stale = clients.filter((c) => {
+				const n = verNum(String(c.ext_version ?? ''));
+				return n != null && n < FIXED_IN;
+			});
+			const leak =
+				clients.length > 3
+					? `**检测到 ${clients.length} 条连接**，但正常只该有一条（每个 EDA 标签页一条）。` +
+						(stale.length
+							? `其中 ${stale.length} 条来自 v0.1.69 之前的扩展，那个版本重连时不关旧连接 —— ` +
+								'请在 EDA 里重新导入 plugin/plugins/eda-pro/extension/ 下的最新 .eext。'
+							: '刷新 EDA 页面可以清掉多余的。') +
+						'多余的连接会让调用发到早就不用的那条上，表现为「没反应」。'
+					: null;
+
 			return {
 				bridge_port: ctx.bridge.listeningPort,
 				paired: rec !== null,
 				paired_at: rec ? new Date(rec.pairedAt).toISOString() : null,
 				pairing_file: pairingFilePath(),
 				connected_clients: clients,
-				hint: clients.length === 0 ? await notConnectedHint(ctx.bridge.listeningPort) : '连接正常，可以操作 EDA。',
+				connection_leak: leak ?? undefined,
+				hint: clients.length === 0 ? await notConnectedHint(ctx.bridge.listeningPort) : leak ?? '连接正常，可以操作 EDA。',
 			};
 		},
 	},

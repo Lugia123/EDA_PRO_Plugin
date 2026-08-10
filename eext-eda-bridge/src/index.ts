@@ -31,10 +31,22 @@ import extensionConfig from '../extension.json' with { type: 'json' };
 const WS_ID_PREFIX = 'eda-mcp-bridge';
 let wsIdSeq = 0;
 let wsId = `${WS_ID_PREFIX}-0`;
+/**
+ * 用过的所有 ID。
+ *
+ * 换 ID 是必须的（同一个 ID 只要平台还当它活着，register 的新端口就不生效），
+ * 但只关当前这个 ID 会漏掉全部历史连接 —— 每重连一次就在 bridge 那边留一条
+ * 活着的 WebSocket，实测点几次「重新连接」后 connected_clients 涨到 20 个，
+ * 而且它们心跳都正常响应，不会被判死清掉。僵尸连接会让服务端的
+ * 「最后一个认证成功的」选到早就不用的那条，表现为调用发出去没反应。
+ */
+const usedWsIds = new Set<string>([wsId]);
 
 function nextWsId(): string {
 	wsIdSeq += 1;
-	return `${WS_ID_PREFIX}-${wsIdSeq}`;
+	const id = `${WS_ID_PREFIX}-${wsIdSeq}`;
+	usedWsIds.add(id);
+	return id;
 }
 
 /** 单个端口等 hello 的时间 */
@@ -148,7 +160,8 @@ async function connect(): Promise<void> {
 	clearRetry();
 	if (phase === 'scanning') return;
 	phase = 'scanning';
-	safeClose(1000, 'rescan');
+	// 关掉所有历史连接，不只是当前这条 —— 否则每重连一次就漏一条活连接
+	closeAllSockets(1000, 'rescan');
 	// close 之后必须让平台把这个 ID 的旧连接状态清理干净再 register。
 	// 官方文档明确警告过「不要尝试相同 ID 不同参数的连接」——
 	// 不等的话新连接会建起来又被旧的关闭事件带走（日志表现为刚认证通过就 code=1000 关闭）。
@@ -424,12 +437,31 @@ function send(msg: Record<string, unknown>): void {
 	}
 }
 
+/** 关掉当前连接 */
 function safeClose(code?: number, reason?: string): void {
 	try {
 		eda.sys_WebSocket.close(wsId, code, reason);
 	} catch {
 		/* 未连接或无权限，忽略 */
 	}
+}
+
+/**
+ * 关掉**所有用过的 ID**，重连前调用。
+ *
+ * 只关当前 ID 会把历史连接留在服务端。留下的还都是活的（心跳照回），
+ * 所以服务端也清不掉，只能从源头关干净。
+ */
+function closeAllSockets(code: number, reason: string): void {
+	for (const id of usedWsIds) {
+		try {
+			eda.sys_WebSocket.close(id, code, reason);
+		} catch {
+			/* 已经不存在或无权限，忽略 */
+		}
+	}
+	usedWsIds.clear();
+	usedWsIds.add(wsId);
 }
 
 function getToken(): string {
