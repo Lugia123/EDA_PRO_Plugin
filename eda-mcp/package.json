@@ -16,7 +16,7 @@
 		"gen:api": "tsx scripts/gen-api-index.ts",
 		"predeploy": "node ../scripts/stamp-version.mjs",
 		"mcp:daemon": "tsx scripts/mcp-daemon.ts",
-		"test:unit": "npx esbuild src/layout/connectivity.ts --bundle --format=esm --outfile=dist/connectivity.mjs --log-level=warning && npx esbuild src/layout/model.ts --bundle --format=esm --outfile=dist/model.mjs --log-level=warning && node scripts/test-connectivity.mjs && node scripts/test-model.mjs"
+		"test:unit": "npx esbuild src/layout/connectivity.ts --bundle --format=esm --outfile=dist/connectivity.mjs --log-level=warning && npx esbuild src/layout/model.ts --bundle --format=esm --outfile=dist/model.mjs --log-level=warning && npx esbuild src/layout/route.ts --bundle --format=esm --outfile=dist/route.mjs --log-level=warning && npx esbuild src/layout/group.ts --bundle --format=esm --outfile=dist/group.mjs --log-level=warning && node scripts/test-connectivity.mjs && node scripts/test-model.mjs && node scripts/test-route.mjs && node scripts/test-group.mjs"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.0.4",

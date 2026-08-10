@@ -57,6 +57,13 @@ export interface GroupLayoutOptions {
 	 * 尺寸都在手上，拼起来很准。没给 anchor 的组仍由算法安排。
 	 */
 	anchors?: Map<string, { x: number; y: number }>;
+	/**
+	 * 图上**已经被占掉**的区域（逐层递进时前面层的地盘，见 design.md §4.11）。
+	 *
+	 * 两处生效：组间摆放时当作不可移动的假器件参与退火，重叠代价会把组推开；
+	 * 最终布线时作为 A* 的障碍，线不会从别人的地盘里穿过去。
+	 */
+	obstacles?: Array<{ minX: number; minY: number; maxX: number; maxY: number }>;
 }
 
 const groupOf = (partId: string, assign: Map<string, string>): string => assign.get(partId) ?? '_default';
@@ -85,6 +92,7 @@ export function layoutByGroups(
 		sheet = { w: 1655, h: 1170 },
 		margin = 120,
 		anchors,
+		obstacles = [],
 	} = opts;
 
 	// ── 分组 ──
@@ -226,6 +234,32 @@ export function layoutByGroups(
 		}
 	}
 
+	/**
+	 * 把一个起点从障碍里挪出来。
+	 *
+	 * 退火的平移一次只走几十个单位，从一块八百宽的障碍中心爬出去要很多步，
+	 * 而中途每一步都还压在障碍上、代价居高不下 —— 实测就这么卡在局部最优，
+	 * 整个组原地不动。起点直接放到障碍外面，退火才有意义。
+	 */
+	const dodgeObstacles = (x: number, y: number, w: number, h: number): { x: number; y: number } => {
+		let cx = x;
+		let cy = y;
+		for (let guard = 0; guard < 60; guard += 1) {
+			const box = { minX: cx - w / 2, minY: cy - h / 2, maxX: cx + w / 2, maxY: cy + h / 2 };
+			const hit = obstacles.find(
+				(o) => box.minX < o.maxX && o.minX < box.maxX && box.minY < o.maxY && o.minY < box.maxY,
+			);
+			if (!hit) break;
+			cx = hit.maxX + w / 2 + GROUP_GAP; // 先往右让
+			if (cx + w / 2 > sheet.w - margin) {
+				// 右边放不下了就换到障碍下方，从左边重新开始
+				cx = margin + w / 2;
+				cy = hit.maxY + h / 2 + GROUP_GAP;
+			}
+		}
+		return { x: snap(cx), y: snap(cy) };
+	};
+
 	// 组当作「器件」，跨组耦合当作「网络」，直接复用同一套退火
 	const gParts = new Map<string, Part>();
 	const gInit: Layout = new Map();
@@ -249,7 +283,8 @@ export function layoutByGroups(
 			fixed: false,
 		});
 		if (pinned) {
-			gInit.set(g, { x: snap(pinned.x), y: snap(pinned.y), rot: 0, mirror: false });
+			const safe = dodgeObstacles(pinned.x, pinned.y, s.w, s.h);
+			gInit.set(g, { x: safe.x, y: safe.y, rot: 0, mirror: false });
 			continue;
 		}
 		// 没指定的按行铺开当起点，交给退火去挪
@@ -258,10 +293,28 @@ export function layoutByGroups(
 			cursorY += rowH + GROUP_GAP;
 			rowH = 0;
 		}
-		gInit.set(g, { x: snap(cursorX + s.w / 2), y: snap(cursorY + s.h / 2), rot: 0, mirror: false });
+		const safe = dodgeObstacles(cursorX + s.w / 2, cursorY + s.h / 2, s.w, s.h);
+		gInit.set(g, { x: safe.x, y: safe.y, rot: 0, mirror: false });
 		cursorX += s.w + GROUP_GAP;
 		rowH = Math.max(rowH, s.h);
 	}
+	// 已占区域作为**不可移动的假器件**参与组间摆放 —— 退火本来就有重叠代价，
+	// 借它把组推开，比另写一套避让逻辑可靠。这些假器件不参与任何网络，
+	// 摆完之后从结果里剔掉。
+	const obstacleIds = new Set<string>();
+	obstacles.forEach((o, i) => {
+		const id = `__obstacle_${i}`;
+		obstacleIds.add(id);
+		gParts.set(id, {
+			id,
+			w: Math.max(GRID, o.maxX - o.minX),
+			h: Math.max(GRID, o.maxY - o.minY),
+			pins: [],
+			fixed: true,
+		});
+		gInit.set(id, { x: snap((o.minX + o.maxX) / 2), y: snap((o.minY + o.maxY) / 2), rot: 0, mirror: false });
+	});
+
 	const gNets: Net[] = [...affinity.entries()].map(([k, cnt]) => ({
 		id: `aff:${k}`,
 		// 耦合越强，重复越多次，等价于加权
@@ -269,8 +322,11 @@ export function layoutByGroups(
 	}));
 	// 组不能转，只能挪 —— 组内已经摆好了，整体旋转会让文字全倒
 	const gWeights: Weights = { ...weights, pinFacing: 0, supplyDir: 0 };
+	// 判据要用 gParts.size 而不是 groupIds.length：障碍是以假器件的形式加进
+	// gParts 的，只有一个真组、但有障碍时**照样要跑退火**把组从障碍里挪出来。
+	// 按 groupIds 判断的话，单组场景直接采用初始位置，障碍等于没传。
 	const gRes =
-		groupIds.length > 1
+		gParts.size > 1
 			? anneal(gParts, gNets, gInit, {
 					// 组间摆放看着简单（只有几个矩形），但解空间是离散的、代价面很崎岖：
 					// 三个区排成一行、一列、还是 2x2，差别巨大。迭代给足才找得到能塞进图纸的排布。
@@ -285,6 +341,7 @@ export function layoutByGroups(
 	const layout: Layout = new Map();
 	const groups: GroupBox[] = [];
 	for (const g of groupIds) {
+		if (obstacleIds.has(g)) continue; // 假器件不是真的组
 		const size = localSize.get(g);
 		const gp = gRes.layout.get(g);
 		const local = localLayout.get(g);
@@ -328,6 +385,25 @@ export function layoutByGroups(
 		if (needH <= availH) dy = snap(margin - allMinY);
 		else warnings.push(`所有分区纵向共需 ${Math.round(needH)}，图纸只有 ${Math.round(availH)} 可用 —— 换更大的图纸，或把分区拆细`);
 
+		// 有障碍时，整体归位不能把布局又推回障碍里。
+		//
+		// 这两段逻辑各自都对：退火把组挪出了障碍，归位把图贴回图纸左上角不留
+		// 白边。凑在一起就废了 —— 实测组被退火正确摆到 x=1040，归位算出
+		// dx=-790，一平移正好落回 800 宽的障碍中央，前面所有避让白做。
+		// 宁可留白，也不能把布局推到已占区域上。
+		if (obstacles.length && (dx !== 0 || dy !== 0)) {
+			const wouldHit = groups.some((g) =>
+				obstacles.some(
+					(o) =>
+						g.minX + dx < o.maxX && o.minX < g.maxX + dx && g.minY + dy < o.maxY && o.minY < g.maxY + dy,
+				),
+			);
+			if (wouldHit) {
+				dx = 0;
+				dy = 0;
+			}
+		}
+
 		if (dx !== 0 || dy !== 0) {
 			for (const [id, pl] of layout) layout.set(id, { ...pl, x: pl.x + dx, y: pl.y + dy });
 			for (const g of groups) {
@@ -350,7 +426,7 @@ export function layoutByGroups(
 	}
 
 	// ── 全图布线：组内线重走一遍（坐标变了），跨组线也一并走 ──
-	const routed = route(parts, nets, layout);
+	const routed = route(parts, nets, layout, { obstacles });
 	if (routed.failedCount) warnings.push(`${routed.failedCount} 条连接没走通，多半是分区之间没留够通道`);
 
 	return { layout, groups, routed, crossGroupNets, perGroup, warnings };

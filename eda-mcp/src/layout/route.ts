@@ -21,6 +21,14 @@ export interface RouteOptions {
 	bounds?: { minX: number; minY: number; maxX: number; maxY: number };
 	/** 单条路径最多扩展多少个格子，防止病态情况下卡死 */
 	maxExpand?: number;
+	/**
+	 * 图上**已经被占掉**的区域，走线必须绕开。
+	 *
+	 * 逐层递进时（design.md §4.11），前面层的器件、扇出区、走线都要作为
+	 * 硬约束传进来 —— 否则这一层的线会从上一层的地盘里穿过去。
+	 * 器件的引脚展开区也归在这里：那是芯片的一部分，该由别人避开它。
+	 */
+	obstacles?: Array<{ minX: number; minY: number; maxX: number; maxY: number }>;
 }
 
 export interface RoutedNet {
@@ -91,7 +99,7 @@ export function route(
 	layout: Layout,
 	opts: RouteOptions = {},
 ): RouteResult {
-	const { clearance = 10, maxExpand = 60000 } = opts;
+	const { clearance = 10, maxExpand = 60000, obstacles = [] } = opts;
 
 	// 边界：包住所有器件再留出余量
 	let bMinX = Infinity;
@@ -107,6 +115,9 @@ export function route(
 		bMaxX = Math.max(bMaxX, b.maxX);
 		bMaxY = Math.max(bMaxY, b.maxY);
 	}
+	// 注意**不要**把障碍并进 bounds：那样搜索范围会被障碍撑大，A* 反而能从
+	// 障碍外面绕出去 —— 一块本该封死通道的挡板，结果只是让线绕了个大圈。
+	// 搜索范围只由器件决定；障碍落在范围外的部分自然就无关。
 	const pad = 200;
 	const bounds = opts.bounds ?? {
 		minX: Math.floor((bMinX - pad) / GRID) * GRID,
@@ -127,6 +138,16 @@ export function route(
 		const y1 = Math.ceil((b.maxY + clearance) / GRID) * GRID;
 		for (let x = x0; x <= x1; x += GRID) for (let y = y0; y <= y1; y += GRID) blocked.add(key(x, y));
 	}
+	// 外部传进来的已占区域。跟器件一样量化进 blocked —— 区别只在于它们不是
+	// 本次布局的一部分，没有引脚要挖开，所以整块都是实心的。
+	for (const o of obstacles) {
+		const x0 = Math.floor((o.minX - clearance) / GRID) * GRID;
+		const x1 = Math.ceil((o.maxX + clearance) / GRID) * GRID;
+		const y0 = Math.floor((o.minY - clearance) / GRID) * GRID;
+		const y1 = Math.ceil((o.maxY + clearance) / GRID) * GRID;
+		for (let x = x0; x <= x1; x += GRID) for (let y = y0; y <= y1; y += GRID) blocked.add(key(x, y));
+	}
+
 	const pinCells = new Map<string, { x: number; y: number; dir: Rotation }>();
 	/**
 	 * 引脚的**精确**世界坐标。
