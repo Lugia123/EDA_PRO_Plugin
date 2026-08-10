@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 12e4;
-var VERSION = "0.1.70";
+var VERSION = "0.1.71";
 var Bridge = class {
   http = null;
   wss = null;
@@ -21596,9 +21596,27 @@ function validateMap(m) {
   return errs;
 }
 var MAP_MARK = "EDAMCP_MAP_V1:";
+var COMPACT_LIMIT = 96;
+function pretty(v, ind) {
+  const flat = JSON.stringify(v);
+  if (flat === void 0) return "null";
+  if (typeof v !== "object" || v === null || flat.length <= COMPACT_LIMIT) return flat;
+  const next = `${ind} `;
+  if (Array.isArray(v)) {
+    if (!v.length) return "[]";
+    return `[
+${v.map((x) => next + pretty(x, next)).join(",\n")}
+${ind}]`;
+  }
+  const entries = Object.entries(v).filter(([, x]) => x !== void 0);
+  if (!entries.length) return "{}";
+  return `{
+${entries.map(([k, x]) => `${next}${JSON.stringify(k)}: ${pretty(x, next)}`).join(",\n")}
+${ind}}`;
+}
 function packMap(map) {
   return `${MAP_MARK}
-${JSON.stringify(map, null, 1)}`;
+${pretty(map, "")}`;
 }
 function unpackMap(rawAfterMark) {
   try {
@@ -22897,12 +22915,36 @@ var mapTools = [
 					}
 				}
 
+				// \u56FE\u7EB8\u5C3A\u5BF8\uFF1A\u5148\u95EE titleBlockData\uFF0C\u8BFB\u4E0D\u5230\u5C31\u4ECE\u6587\u6863\u6E90\u7801\u91CC\u7FFB Width/Height \u7684
+				// ATTR \u2014\u2014 \u90A3\u662F\u771F\u503C\u3002\u5B9E\u6D4B titleBlockData \u6709\u65F6\u6574\u4E2A\u662F\u7A7A\u7684\uFF0C\u4E00\u65E6\u9759\u9ED8
+				// \u515C\u5E95\u6210 A4\uFF0C\u5E03\u5C40\u5C31\u6309\u9519\u8BEF\u7684\u56FE\u7EB8\u7B97\uFF0CA3 \u4E0A\u7684\u5668\u4EF6\u4F1A\u88AB\u5224\u6210\u653E\u4E0D\u4E0B\u3002
 				const tb = _page.titleBlockData || {};
+				const fromTb = function (k) {
+					const v = tb[k] && tb[k].value;
+					const n = Number(v);
+					return isFinite(n) && n > 0 ? n : null;
+				};
+				const fromSrc = function (k) {
+					for (const ln of lines) {
+						if (ln.indexOf('"key":"' + k + '"') < 0) continue;
+						const q = ln.indexOf('||');
+						if (q < 0) continue;
+						let b = ln.slice(q + 2);
+						const l = b.lastIndexOf('|');
+						if (l >= 0) b = b.slice(0, l);
+						try {
+							const o = JSON.parse(b);
+							const n = Number(o.value);
+							if (isFinite(n) && n > 0) return n;
+						} catch (e) { /* \u8FD9\u4E00\u884C\u4E0D\u662F\u6211\u4EEC\u8981\u7684 */ }
+					}
+					return null;
+				};
+				const sheetW = fromTb('Width') || fromSrc('Width');
+				const sheetH = fromTb('Height') || fromSrc('Height');
 				return {
-					sheet: {
-						w: tb.Width && tb.Width.value ? Number(tb.Width.value) : 1170,
-						h: tb.Height && tb.Height.value ? Number(tb.Height.value) : 825,
-					},
+					sheet_source: sheetW ? (fromTb('Width') ? 'titleBlockData' : '\u6587\u6863\u6E90\u7801') : '\u8BFB\u4E0D\u5230\uFF0C\u7528\u4E86 A4 \u9ED8\u8BA4\u503C',
+					sheet: { w: sheetW || 1170, h: sheetH || 825 },
 					parts: parts,
 					nets: nets,
 					wire_segments: segs.length,
@@ -25342,7 +25384,7 @@ if (dupes.length) {
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.70";
+var VERSION2 = "0.1.71";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var currentToolIsMutating = false;

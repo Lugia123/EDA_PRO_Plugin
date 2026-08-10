@@ -256,12 +256,36 @@ export const mapTools: ToolDef[] = [
 					}
 				}
 
+				// 图纸尺寸：先问 titleBlockData，读不到就从文档源码里翻 Width/Height 的
+				// ATTR —— 那是真值。实测 titleBlockData 有时整个是空的，一旦静默
+				// 兜底成 A4，布局就按错误的图纸算，A3 上的器件会被判成放不下。
 				const tb = _page.titleBlockData || {};
+				const fromTb = function (k) {
+					const v = tb[k] && tb[k].value;
+					const n = Number(v);
+					return isFinite(n) && n > 0 ? n : null;
+				};
+				const fromSrc = function (k) {
+					for (const ln of lines) {
+						if (ln.indexOf('"key":"' + k + '"') < 0) continue;
+						const q = ln.indexOf('||');
+						if (q < 0) continue;
+						let b = ln.slice(q + 2);
+						const l = b.lastIndexOf('|');
+						if (l >= 0) b = b.slice(0, l);
+						try {
+							const o = JSON.parse(b);
+							const n = Number(o.value);
+							if (isFinite(n) && n > 0) return n;
+						} catch (e) { /* 这一行不是我们要的 */ }
+					}
+					return null;
+				};
+				const sheetW = fromTb('Width') || fromSrc('Width');
+				const sheetH = fromTb('Height') || fromSrc('Height');
 				return {
-					sheet: {
-						w: tb.Width && tb.Width.value ? Number(tb.Width.value) : 1170,
-						h: tb.Height && tb.Height.value ? Number(tb.Height.value) : 825,
-					},
+					sheet_source: sheetW ? (fromTb('Width') ? 'titleBlockData' : '文档源码') : '读不到，用了 A4 默认值',
+					sheet: { w: sheetW || 1170, h: sheetH || 825 },
 					parts: parts,
 					nets: nets,
 					wire_segments: segs.length,

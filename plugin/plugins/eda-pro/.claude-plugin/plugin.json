@@ -1,7 +1,7 @@
 {
   "name": "eda-pro",
   "description": "用 AI 操作立创EDA专业版（EasyEDA Pro）：读工程与原理图、查器件与网络、跑 DRC、库检索选型、下载数据手册，以及按功能分区画原理图（放器件 → 声明网络 → EDA 自动布线）。本地 MCP + EDA 扩展，全程 loopback 不出本机，首次使用需一次配对。",
-  "version": "0.1.70",
+  "version": "0.1.71",
   "author": {
     "name": "EDA_PRO_Plugin contributors"
   },

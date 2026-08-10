@@ -179,24 +179,46 @@ export function validateMap(m: SchematicMap): string[] {
 /** 地图文字图元的标记前缀，靠它在图上认出哪一条是地图 */
 export const MAP_MARK = 'EDAMCP_MAP_V1:';
 
+/** 短于这个长度的子树压成一行，超过才展开 */
+const COMPACT_LIMIT = 96;
+
 /**
- * 地图存进图纸时**格式化**成多行。
+ * 按**体积**决定展开还是压平的序列化。
  *
- * 两个理由：
+ * `JSON.stringify(map, null, 1)` 是把每一层都展开，一个只有五个字段的引脚
+ * 也要占五行 —— 48 脚的芯片光 pins 就几百行，翻起来根本找不到重点。
+ * 这里改成：子树序列化后够短就压成一行，长了才展开。于是
  *
- *   人要能看。地图是这张图的真相源，出问题时第一件事就是打开它对一眼；
- *   六七千字符挤成一行谁也读不了。
+ *   {"id":"1","name":"ADJ(GND)","dx":-60,"dy":10,"dir":180}   一行
+ *   pins: [ ... ]                                             每个引脚一行
+ *   整张地图                                                   分层展开
  *
- *   画布不能被撑爆。地图是一个文字图元，单行时它的渲染宽度有两万多个单位
- *   （图纸本身才 1655），包围盒被一路撑到二十多米宽，`zoomToAllPrimitives`
- *   和界面上的「适应全部」直接失效，缩放卡在 7%，电路缩成左上角一个点。
+ * 既能一眼看清结构，又不会像单行那样把文字图元的渲染宽度撑到两万单位
+ * （那会让 zoomToAllPrimitives 和界面的「适应全部」直接失效）。
+ */
+function pretty(v: unknown, ind: string): string {
+	const flat = JSON.stringify(v);
+	if (flat === undefined) return 'null';
+	if (typeof v !== 'object' || v === null || flat.length <= COMPACT_LIMIT) return flat;
+	const next = `${ind} `;
+	if (Array.isArray(v)) {
+		if (!v.length) return '[]';
+		return `[\n${v.map((x) => next + pretty(x, next)).join(',\n')}\n${ind}]`;
+	}
+	const entries = Object.entries(v as Record<string, unknown>).filter(([, x]) => x !== undefined);
+	if (!entries.length) return '{}';
+	return `{\n${entries.map(([k, x]) => `${next}${JSON.stringify(k)}: ${pretty(x, next)}`).join(',\n')}\n${ind}}`;
+}
+
+/**
+ * 地图存进图纸时格式化成多行。
  *
- * 缩进给 1 个空格：JSON.stringify 的多行输出天然一行一个字段，最长的行也就
- * 是个引脚名，比之前按 96 字符硬切还短，而且切在合法位置 —— 硬切片会把
- * 字符串从中间劈开，只能靠读回时删掉所有换行才拼得回来。
+ * 两个理由：人要能看 —— 地图是这张图的真相源，出问题第一件事就是打开它
+ * 对一眼；画布不能被撑爆 —— 单行时这个文字图元的渲染宽度有两万多个单位
+ * （图纸本身才 1655），包围盒被一路撑开，缩放会卡在 7%。
  */
 export function packMap(map: SchematicMap): string {
-	return `${MAP_MARK}\n${JSON.stringify(map, null, 1)}`;
+	return `${MAP_MARK}\n${pretty(map, '')}`;
 }
 
 /**
