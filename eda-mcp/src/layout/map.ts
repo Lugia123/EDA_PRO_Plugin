@@ -74,6 +74,17 @@ export interface MapPart {
 	fixed?: boolean;
 	/** EDA 里的图元 id，渲染时用来定位已有器件；重建时为空 */
 	primitiveId?: string;
+	/**
+	 * 属于第几层（逐层递进，见 design.md §4.11）。
+	 *
+	 * AI 决定顺序：核心芯片第 1 层，它的外围第 2 层，依此类推。
+	 * `eda_map_apply({ layer: N })` 只摆这一层，**前面所有层已占的地盘
+	 * （器件有效包围盒 ＋ 走线）作为障碍传给布局与布线** —— 后来的器件
+	 * 被算法挡在外面，而不是靠自己去躲。
+	 *
+	 * 不写就是 1。整张图都不分层时行为跟以前一样。
+	 */
+	layer?: number;
 }
 
 export interface MapNet {

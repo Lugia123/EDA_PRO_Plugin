@@ -5,7 +5,7 @@
  * 下次再 apply 就从上次的结果继续爬，不必从零开始。
  */
 import { layoutByGroups } from '../layout/group.js';
-import { FAN_BASE, FAN_STEP, FLAG_LONG, FLAG_WIDE, LABEL_SLOTS, dirVec, pinWorld, type Layout, type Net, type Part, type Rotation } from '../layout/model.js';
+import { FAN_BASE, FAN_STEP, FLAG_LONG, FLAG_WIDE, LABEL_SLOTS, dirVec, effectiveBox, pinWorld, type Layout, type Net, type Part, type Rotation } from '../layout/model.js';
 import { MAP_MARK, type NetKind, type SchematicMap, defaultStyle, packMap, unpackMap } from '../layout/map.js';
 import { Trace, checkRouteEndpoints } from '../layout/trace.js';
 import type { ToolDef } from './types.js';
@@ -54,6 +54,15 @@ export const mapApplyTools: ToolDef[] = [
 						'trace_full=true 时连正常流水一起返回。',
 				},
 				trace_full: { type: 'boolean', description: '返回完整流水而不只是问题行，默认 false' },
+				layer: {
+					type: 'number',
+					description:
+						'只渲染第 N 层（逐层递进，见 design.md §4.11）。' +
+						'**前面所有层已占的地盘会作为障碍**传给布局与布线 —— 这一层的器件被算法挡在外面，' +
+						'不会压到已经画好的部分。器件的层号写在地图的 part.layer 上，不写就是第 1 层。' +
+						'\n\n配合 incremental 使用：第 1 层全量渲染，之后每层都加 incremental 保住前面的成果。' +
+						'不传 layer 就是老行为，一次画完所有器件。',
+				},
 				incremental: {
 					type: 'boolean',
 					description:
@@ -70,6 +79,7 @@ export const mapApplyTools: ToolDef[] = [
 			const trace = new Trace(args.trace !== false);
 			const traceFull = args.trace_full === true;
 			const incremental = args.incremental === true;
+			const layer = typeof args.layer === 'number' ? args.layer : null;
 			const saveMap = args.save_map !== false;
 
 			let map = args.map as SchematicMap | undefined;
@@ -96,12 +106,23 @@ export const mapApplyTools: ToolDef[] = [
 				map = unpackMap(loaded.raw);
 			}
 
+			// ── 分层：本层参与布局，前面层变成障碍 ──
+			// AI 决定顺序（谁先谁后是设计判断），算法在「前面层已定」的前提下
+			// 摆这一层。约束是递增的，不是一次性同时求解 —— 解空间小得多，
+			// 也更容易收敛到人看得懂的结果。
+			const layerOf = (p: SchematicMap['parts'][number]) => p.layer ?? 1;
+			const thisLayer = layer == null ? map.parts : map.parts.filter((p) => layerOf(p) === layer);
+			const priorLayers = layer == null ? [] : map.parts.filter((p) => layerOf(p) < layer);
+			if (layer != null && !thisLayer.length) {
+				return { error: `第 ${layer} 层没有任何器件。地图里的 part.layer 是多少？不写默认是 1。` };
+			}
+
 			// ── 地图 → 布局模型 ──
 			const parts = new Map<string, Part>();
 			const assign = new Map<string, string>();
 			const titles = new Map<string, { title?: string; note?: string }>();
 			const idToPrimitive = new Map<string, string>();
-			for (const p of map.parts) {
+			for (const p of thisLayer) {
 				if (!p.id.trim()) continue; // 位号为空的跳过：图上偶有这种残留，参与优化只会添乱
 				parts.set(p.id, {
 					id: p.id,
@@ -160,11 +181,54 @@ export const mapApplyTools: ToolDef[] = [
 				}
 			}
 
+			// ── 前面层的地盘 → 障碍 ──
+			// 用**有效包围盒**（本体 ＋ 引脚扇出区），不是本体：芯片的引脚展开区
+			// 是它的一部分，这一层的器件该避开整块，而不是只避开芯片方框。
+			// stubPins 要按同一套规则算出来，否则前面层的扇出区会被漏掉。
+			const stubOf = (p: SchematicMap['parts'][number]): { pins: string[]; up: string[] } => {
+				const pins: string[] = [];
+				const up: string[] = [];
+				for (const n of stubNets) {
+					for (const ref of n.pins) {
+						const dot = ref.lastIndexOf('.');
+						if (dot <= 0 || ref.slice(0, dot) !== p.id) continue;
+						const pid = ref.slice(dot + 1);
+						pins.push(pid);
+						if (n.kind === 'power') up.push(pid);
+					}
+				}
+				return { pins, up };
+			};
+			const obstacles = priorLayers
+				.filter((p) => p.id.trim())
+				.map((p) => {
+					const st = stubOf(p);
+					const part: Part = {
+						id: p.id,
+						w: p.w,
+						h: p.h,
+						pins: p.pins.map((q) => ({ id: q.id, dx: q.dx, dy: q.dy, dir: q.dir })),
+						stubPins: st.pins.length ? st.pins : undefined,
+						stubUp: st.up.length ? st.up : undefined,
+					};
+					return effectiveBox(part, {
+						x: p.place.x,
+						y: p.place.y,
+						rot: p.place.rot,
+						mirror: p.place.mirror,
+					});
+				});
+			if (obstacles.length) {
+				trace.at('分层');
+				trace.log(`第 ${layer} 层：本层 ${thisLayer.length} 个器件，前面层 ${obstacles.length} 块地盘作为障碍`, {});
+			}
+
 			const t0 = Date.now();
 			const res = layoutByGroups(parts, layoutNets, assign, titles, {
 				iterations,
 				sheet: map.meta.sheet,
 				anchors: anchors.size ? anchors : undefined,
+				obstacles: obstacles.length ? obstacles : undefined,
 			});
 			const elapsed = Date.now() - t0;
 
