@@ -435,7 +435,7 @@ export const mapApplyTools: ToolDef[] = [
 				return out;
 			};
 
-			for (const group of clusters.values()) {
+			for (const [clusterKey, group] of clusters.entries()) {
 				// 沿垂直于引出方向排序，阶梯才是单调的、线不会交叉
 				const horizontal = group[0]?.vx !== 0;
 				group.sort((a, b) => (horizontal ? a.y - b.y : a.x - b.x));
@@ -458,11 +458,22 @@ export const mapApplyTools: ToolDef[] = [
 						const ty = q5(g.y + g.vy * len);
 						// 引出线经过的格子 ＋ 符号自己占的地盘，都不能压到别的网络
 						const path = [...cellsAlong(g.x, g.y, tx, ty), ...flagCells(tx, ty, rot)];
+						// 同一簇内不算冲突。
+						//
+						// 簇内的符号是靠**长度**错开的（40 / 90 / 140…），x 各不相同；
+						// 但符号占位宽 FLAG_WIDE=40，而同侧相邻引脚只差 10，垂直方向
+						// 必然「重叠」。按重叠判的话第二个开始就一路往外让，让到上限
+						// 还撞，最后全走退化路径贴回引脚 —— 实测 U1 的 VSSA、VSS_1
+						// 就是这么变成「符号直接压在引脚上、一根引出线都没有」的。
 						const clash =
 							takenSpots.has(spotKey(tx, ty)) ||
 							path.some((c) => {
 								const owner = occupiedCells.get(c);
-								return owner != null && owner !== g.net;
+								if (!owner) return false;
+								const at = owner.lastIndexOf('@');
+								const oNet = at < 0 ? owner : owner.slice(0, at);
+								const oCluster = at < 0 ? '' : owner.slice(at + 1);
+								return oCluster !== clusterKey && oNet !== g.net;
 							});
 						if (!clash) {
 							ex = tx;
@@ -480,7 +491,7 @@ export const mapApplyTools: ToolDef[] = [
 						cells = flagCells(ex, ey, rot);
 					}
 					takenSpots.add(spotKey(ex, ey));
-					for (const c of cells) occupiedCells.set(c, g.net);
+					for (const c of cells) occupiedCells.set(c, `${g.net}@${clusterKey}`);
 					const placed = { kind: g.kind, net: g.net, x: g.x, y: g.y, ex, ey, rot };
 					if (g.what === 'port') ports.push({ ...placed, dir: 'BI' });
 					else flags.push(placed);

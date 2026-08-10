@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 12e4;
-var VERSION = "0.1.72";
+var VERSION = "0.1.73";
 var Bridge = class {
   http = null;
   wss = null;
@@ -20324,7 +20324,12 @@ var DEFAULT_WEIGHTS = {
   tooClose: 6,
   // 「电源在上、地在下」是原理图最强的视觉约定，值得给个不低的权重，
   // 让退火主动把器件转到地脚朝下的姿势，而不是事后硬掰符号方向。
-  supplyDir: 60,
+  //
+  // 60 不够：去耦电容横放只罚 2×60=120，而转正往往要多走一点线，
+  // 退火就懒得转 —— 实测 C2/C5 一直横躺着，电源符号从侧面接出来。
+  // 提到 150（和 chipRotation 同量级）后才稳定竖放。这仍是软约束，
+  // 真到了转正就摆不下的地步，几百的线长收益依然能翻盘。
+  supplyDir: 150,
   // 占地面积。单位是「格数」，一个 600x400 的块约合 24 格，
   // 权重 4 意味着多占一格约等于多走 4 个单位线长 —— 够把器件收拢，又不至于挤成一堆
   // （挤过头会被 tooClose 拦住）。缺了这一项，组内网络少时器件会散得到处都是：
@@ -22399,7 +22404,7 @@ var mapApplyTools = [
         }
         return out;
       };
-      for (const group of clusters.values()) {
+      for (const [clusterKey, group] of clusters.entries()) {
         const horizontal = group[0]?.vx !== 0;
         group.sort((a, b) => horizontal ? a.y - b.y : a.x - b.x);
         const mid = (group.length - 1) / 2;
@@ -22417,7 +22422,11 @@ var mapApplyTools = [
             const path = [...cellsAlong(g.x, g.y, tx, ty), ...flagCells(tx, ty, rot)];
             const clash = takenSpots.has(spotKey(tx, ty)) || path.some((c) => {
               const owner = occupiedCells.get(c);
-              return owner != null && owner !== g.net;
+              if (!owner) return false;
+              const at = owner.lastIndexOf("@");
+              const oNet = at < 0 ? owner : owner.slice(0, at);
+              const oCluster = at < 0 ? "" : owner.slice(at + 1);
+              return oCluster !== clusterKey && oNet !== g.net;
             });
             if (!clash) {
               ex = tx;
@@ -22434,7 +22443,7 @@ var mapApplyTools = [
             cells = flagCells(ex, ey, rot);
           }
           takenSpots.add(spotKey(ex, ey));
-          for (const c of cells) occupiedCells.set(c, g.net);
+          for (const c of cells) occupiedCells.set(c, `${g.net}@${clusterKey}`);
           const placed = { kind: g.kind, net: g.net, x: g.x, y: g.y, ex, ey, rot };
           if (g.what === "port") ports.push({ ...placed, dir: "BI" });
           else flags.push(placed);
@@ -22974,19 +22983,18 @@ var mapTools = [
             place: { x: cx, y: cy, rot, mirror },
             // 引脚存本地定义：世界坐标减去摆放，再逆转回去
             pins: p.pins.map((q) => {
-              const rx = q.x - cx;
-              const ry = q.y - cy;
-              const rad = -rot * Math.PI / 180;
-              const cos = Math.round(Math.cos(rad));
-              const sin = Math.round(Math.sin(rad));
-              let dx = rx * cos - ry * sin;
-              const dy = rx * sin + ry * cos;
-              let dir = (q.dir - rot + 360) % 360;
-              if (mirror) {
-                dx = -dx;
-                dir = (180 - dir + 360) % 360;
-              }
-              return { id: q.n, name: q.name, dx, dy, dir };
+              const local = pinLocal(
+                { x: cx, y: cy, rot, mirror },
+                { x: q.x, y: q.y, dir: q.dir },
+                q.n
+              );
+              return {
+                id: q.n,
+                name: q.name,
+                dx: Math.round(local.dx),
+                dy: Math.round(local.dy),
+                dir: local.dir
+              };
             }),
             labels: [
               { key: "Designator", text: p.id, dx: -10, dy: p.h / 2 + 12 },
@@ -25384,7 +25392,7 @@ if (dupes.length) {
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.72";
+var VERSION2 = "0.1.73";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var currentToolIsMutating = false;

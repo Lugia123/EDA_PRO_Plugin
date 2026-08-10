@@ -6,6 +6,7 @@
  * 载体选了 sch_PrimitiveText：实测单个文字图元存 60000 字符仍然无损。
  */
 import { EMPTY_MAP, MAP_MARK, defaultStyle, guessNetKind, packMap, saveMapCode, unpackMap, validateMap, type SchematicMap } from '../layout/map.js';
+import { type Rotation, pinLocal } from '../layout/model.js';
 import type { ToolDef } from './types.js';
 
 const ENSURE_SCH = `
@@ -317,19 +318,27 @@ export const mapTools: ToolDef[] = [
 						place: { x: cx, y: cy, rot, mirror },
 						// 引脚存本地定义：世界坐标减去摆放，再逆转回去
 						pins: (p.pins as Array<Record<string, unknown>>).map((q) => {
-							const rx = (q.x as number) - cx;
-							const ry = (q.y as number) - cy;
-							const rad = (-rot * Math.PI) / 180;
-							const cos = Math.round(Math.cos(rad));
-							const sin = Math.round(Math.sin(rad));
-							let dx = rx * cos - ry * sin;
-							const dy = rx * sin + ry * cos;
-							let dir = (((q.dir as number) - rot + 360) % 360) as 0 | 90 | 180 | 270;
-							if (mirror) {
-								dx = -dx;
-								dir = ((180 - dir + 360) % 360) as 0 | 90 | 180 | 270;
-							}
-							return { id: q.n as string, name: q.name as string, dx, dy, dir };
+							// 反推本地定义一律走 pinLocal，**不要在这里另写一份**。
+							// 之前这里手抄了一版「先反旋转、再反镜像」，而 pinLocal 后来
+							// 改成了「先反镜像、再反旋转」（跟 EDA 实测的正变换顺序对齐）。
+							// 两份实现在有镜像时结果不同，于是同型号的两个电容反推出相反的
+							// pin1 位置 —— C1 是 dx=+20、C4 是 dx=-20，后面所有摆放和
+							// 接线都跟着错，而每一步自检都是绿的。
+							const local = pinLocal(
+								{ x: cx, y: cy, rot: rot as Rotation, mirror },
+								{ x: q.x as number, y: q.y as number, dir: (q.dir as number) as Rotation },
+								q.n as string,
+							);
+							// 取整：三角函数会留下 -20.000000000000114 这种尾巴，
+							// 带着它做后续计算，格子键、坐标比对都会莫名对不上
+							// （占位表就被这种尾巴废过一次）。
+							return {
+								id: q.n as string,
+								name: q.name as string,
+								dx: Math.round(local.dx),
+								dy: Math.round(local.dy),
+								dir: local.dir,
+							};
 						}),
 						labels: [
 							{ key: 'Designator', text: p.id as string, dx: -10, dy: (p.h as number) / 2 + 12 },
