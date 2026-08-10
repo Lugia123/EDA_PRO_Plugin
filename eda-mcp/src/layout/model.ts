@@ -135,23 +135,35 @@ export interface Box {
  * 镜像沿竖直轴翻转（左右互换），这与 EDA 的 mirror 语义一致 ——
  * 用镜像而不是旋转 180° 是因为后者会把文字也转倒。
  */
+/**
+ * 引脚的世界坐标。
+ *
+ * **顺序是先旋转、再水平镜像** —— 这跟 EDA 实测出来的一致，不能颠倒。
+ *
+ * 原来写的是先镜像后旋转，rot=180 时两种顺序碰巧同解（180° 旋转与水平
+ * 镜像可交换），所以一直没露馅；**rot=90 / 270 时两个引脚会整个对调**。
+ * 后果极隐蔽：器件位置、角度、导线端点全都"正确"，但算法以为的 R1.1
+ * 其实是 EDA 的 R1.2 —— 于是上拉电阻两端接反，RESET 接到了 +3V3 上，
+ * 体检报一堆短路而每一步自检都是绿的。实测数据：
+ *
+ *   R1  rot=90  mirror=true  → pin1 实际 (0,-20)；先镜像后旋转会算成 (0,+20)
+ *   R2  rot=180 mirror=true  → pin1 实际 (-20,0)；两种顺序同解，看不出问题
+ *
+ * 退火经常产出 mirror=true 的解，所以竖放的两脚器件基本全中招。
+ */
 export function pinWorld(part: Part, pl: Placement, pin: PinDef): { x: number; y: number; dir: Rotation } {
-	let { dx, dy } = pin;
-	let dir = pin.dir;
-	if (pl.mirror) {
-		dx = -dx;
-		dir = ((180 - dir + 360) % 360) as Rotation;
-	}
+	const { dx, dy } = pin;
 	const rad = (pl.rot * Math.PI) / 180;
 	const cos = Math.round(Math.cos(rad));
 	const sin = Math.round(Math.sin(rad));
-	const rx = dx * cos - dy * sin;
+	let rx = dx * cos - dy * sin;
 	const ry = dx * sin + dy * cos;
-	return {
-		x: pl.x + rx,
-		y: pl.y + ry,
-		dir: (((dir + pl.rot) % 360 + 360) % 360) as Rotation,
-	};
+	let dir = (((pin.dir + pl.rot) % 360 + 360) % 360) as Rotation;
+	if (pl.mirror) {
+		rx = -rx;
+		dir = ((180 - dir + 360) % 360) as Rotation;
+	}
+	return { x: pl.x + rx, y: pl.y + ry, dir };
 }
 
 /** 旋转后的包围盒（90/270 度会交换宽高）*/
@@ -191,19 +203,18 @@ export function pinLocal(
 	world: { x: number; y: number; dir: Rotation },
 	id: string,
 ): PinDef {
-	const rx = world.x - pl.x;
+	// pinWorld 的逆运算，顺序也要反过来：先反镜像，再反旋转
+	let rx = world.x - pl.x;
 	const ry = world.y - pl.y;
-	// 先转回去
+	let dir = world.dir;
+	if (pl.mirror) {
+		rx = -rx;
+		dir = ((180 - dir + 360) % 360) as Rotation;
+	}
 	const rad = (-pl.rot * Math.PI) / 180;
 	const cos = Math.round(Math.cos(rad));
 	const sin = Math.round(Math.sin(rad));
-	let dx = rx * cos - ry * sin;
+	const dx = rx * cos - ry * sin;
 	const dy = rx * sin + ry * cos;
-	let dir = (((world.dir - pl.rot) % 360 + 360) % 360) as Rotation;
-	// 再翻回来
-	if (pl.mirror) {
-		dx = -dx;
-		dir = ((180 - dir + 360) % 360) as Rotation;
-	}
-	return { id, dx, dy, dir };
+	return { id, dx, dy, dir: (((dir - pl.rot) % 360 + 360) % 360) as Rotation };
 }

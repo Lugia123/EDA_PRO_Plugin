@@ -10,12 +10,13 @@
 		"dev:bridge": "tsx scripts/dev-bridge.ts",
 		"typecheck": "tsc --noEmit",
 		"check:edacode": "node scripts/check-eda-code.mjs",
-		"check": "npm run typecheck && npm run check:edacode",
+		"check": "npm run typecheck && npm run check:edacode && npm run test:unit",
 		"test:mcp": "npm run build && tsx scripts/test-mcp.ts",
 		"deploy": "npm run build && bash scripts/deploy-to-plugin.sh",
 		"gen:api": "tsx scripts/gen-api-index.ts",
 		"predeploy": "node ../scripts/stamp-version.mjs",
-		"mcp:daemon": "tsx scripts/mcp-daemon.ts"
+		"mcp:daemon": "tsx scripts/mcp-daemon.ts",
+		"test:unit": "npx esbuild src/layout/connectivity.ts --bundle --format=esm --outfile=dist/connectivity.mjs --log-level=warning && npx esbuild src/layout/model.ts --bundle --format=esm --outfile=dist/model.mjs --log-level=warning && node scripts/test-connectivity.mjs && node scripts/test-model.mjs"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.0.4",

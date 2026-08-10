@@ -9,7 +9,7 @@ import { LABEL_SLOTS, type Layout, type Net, type Part, type Rotation, dirVec, p
 import { MAP_MARK, type NetKind, type SchematicMap, defaultStyle, packMap } from '../layout/map.js';
 import { Trace, checkRouteEndpoints } from '../layout/trace.js';
 import type { ToolDef } from './types.js';
-import { census, diffCensus } from './verify.js';
+import { census, diffCensus, verifyPlaced } from './verify.js';
 
 const ENSURE_SCH = `
 	const _page = await eda.dmt_Schematic.getCurrentSchematicPageInfo().catch(() => null);
@@ -383,6 +383,30 @@ export const mapApplyTools: ToolDef[] = [
 			`,
 				180_000,
 			);
+			// ── 摆完必须回读 ──
+			// modify 的返回值只说明「调用没报错」。后面每一步（走线、符号、端口）
+			// 都建立在「器件真的在算法以为的位置上」这个假设上 —— 假设一旦不成立，
+			// 导线全部对不上引脚，而各步自报的数字仍然全是绿的。
+			// eda_arrange_block 早就补了这道确认，这条渲染路径一直漏着。
+			trace.at('摆器件回读');
+			const wantPlaced = [...res.layout.entries()]
+				.filter(([des]) => idToPrimitive.has(des))
+				.map(([des, pl]) => ({ designator: des, x: pl.x, y: pl.y, rotation: pl.rot }));
+			const placedCheck = await verifyPlaced(ctx, wantPlaced).catch((e) => {
+				trace.error('回读器件位置失败', { error: e instanceof Error ? e.message : String(e) });
+				return null;
+			});
+			if (placedCheck) {
+				if (placedCheck.allOk) {
+					trace.log(`${wantPlaced.length} 个器件的位置与角度已回读确认`, {});
+				} else {
+					trace.error('器件没摆到算法要求的位置 —— 后面的走线会成片对不上引脚', {
+						概况: placedCheck.summary,
+						明细: placedCheck.checks.filter((c) => !c.ok).slice(0, 8),
+					});
+				}
+			}
+
 			await runStep(
 				'画导线',
 				`
@@ -520,6 +544,7 @@ export const mapApplyTools: ToolDef[] = [
 				...applied,
 				...traceOut(),
 				endpoint_mismatches: endpointBad,
+				parts_placed_verified: placedCheck ? placedCheck.allOk : null,
 				map_saved: mapSaved,
 				census_diff: diff ? { delta: diff.delta, changed: diff.changed, summary: diff.summary } : undefined,
 				note: notes.join(' '),
