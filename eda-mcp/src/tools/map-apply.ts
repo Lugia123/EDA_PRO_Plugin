@@ -321,6 +321,8 @@ export const mapApplyTools: ToolDef[] = [
 			 */
 			const q5 = (v: number) => Math.round(v / 5) * 5;
 
+			/** 符号本体从落点往哪个方向伸。占地与朝向都以它为准。 */
+			type BodyDir = 'up' | 'down' | 'left' | 'right';
 			type StubPin = {
 				what: 'flag' | 'port';
 				kind: string;
@@ -367,35 +369,75 @@ export const mapApplyTools: ToolDef[] = [
 			const takenSpots = new Set<string>();
 			const spotKey = (x: number, y: number) => `${Math.round(x / 45)},${Math.round(y / 45)}`;
 			/**
-			 * 符号朝向。
+			 * 符号朝向 —— **由阶梯方向唯一确定，不看周围有没有空间**。
 			 *
-			 * **每种符号的原生朝向不一样，没有统一的「rot→视觉方向」映射。**
-			 * 真机标定（图纸上摆 rot 0/90/180/270 四个，人眼确认）：
+			 * ## 为什么全部朝同一侧
 			 *
-			 *   Power   rot=0 → 朝上（原生就朝上）
-			 *   Ground  rot=0 → 朝下（原生就朝下）
+			 * 符号本体（约 45 长）从落点往某个方向伸。同侧相邻引脚只差 10，
+			 * 本体一定会跨过邻居那根引出线所在的高度。撞不撞，只取决于邻居的
+			 * 线**够不够长、能不能延伸到本体所在的 x**：
 			 *
-			 * 也就是两者都用 0 就各自正确。此前拿地符号量出「0=朝下、180=朝上」，
-			 * 当成通用映射套到电源上，给 Power 写死 180，把电源符号翻了个个儿 ——
-			 * 图上电源和地全都朝下。以后要改任何符号的朝向，先在真机上摆一排
+			 *   本体朝「阶梯变短」的那侧 → 那侧的线更短，左端还没够到本体，安全
+			 *   本体朝「阶梯变长」的那侧 → 那侧的线更长，必然横跨本体，必撞
+			 *
+			 * 阶梯是「从上到下由长到短」，所以水平引出时**全部朝下**就无冲突，
+			 * 而且是确定性的：不需要逐个探测空间，也不会因为长度微调而翻脸。
+			 *
+			 * 曾经按「符号语义」固定成 Power 朝上、Ground 朝下，结果同一侧一上
+			 * 一下：朝下的那些安全，朝上的那些（U1 的 VDDA、VDD_1）本体必然穿过
+			 * 上方那根更长的线。当时误以为这是「一上一下必有一个撞」的死结，
+			 * 其实两侧并不对称 —— 全部朝下就同时避开了。
+			 *
+			 * 代价是电源符号会倒过来画（单横杠 ⊥）。它和地符号（三条递减横杠）
+			 * 形状不同，旁边还有网络名，图上不会误读。
+			 *
+			 * ## rot 参数 → 本体朝向
+			 *
+			 * 没有通用映射，每种符号的原生朝向不同，且 createNetFlag 的入参与
+			 * 读回的 component.rotation 在 90/270 上是反的（传 90 存成 270）。
+			 * 下表由真机标定得出（摆一排 rot 0/90/180/270，人眼确认朝上朝下，
+			 * 再用「符号自带引脚的 rotation 背离本体」这条客观指纹补齐左右）：
+			 *
+			 *   rot 参数  |  Ground 本体  |  Power 本体
+			 *      0      |      下       |     上
+			 *     90      |      左       |     右
+			 *    180      |      上       |     下
+			 *    270      |      右       |     左
+			 *
+			 * 即 Power 恒比 Ground 差 180°。要改任何符号的朝向，先在真机上摆一排
 			 * 标定，别从别的符号推。
-			 *
-			 * **朝向是符号语义的一部分，不能拿来做避让。** 地符号转 180° 就成了
-			 * 倒地符号，图上根本读不出那是接地。密集引脚区靠**引出线长度逐级
-			 * 错开**（阶梯扇出）来防打架：符号落在不同的 x（或 y）上，各自朝各自
-			 * 的方向伸。避让是长度的事，不是朝向的事。
 			 *
 			 * 端口不一样：它的朝向表示信号进出的方向，跟着引出方向走。
 			 * （端口这四个值尚未做过真机标定，沿用旧值。）
 			 */
-			const flagRotOf = (g: StubPin): number => {
+			const bodyDirOf = (g: StubPin, clusterSize: number): BodyDir => {
+				// 端口的本体沿引出方向伸，表示信号进出。
 				if (g.what === 'port') {
-					if (g.vx < 0) return 90; // 朝左
-					if (g.vx > 0) return 270; // 朝右
-					if (g.vy > 0) return 180; // 朝上（y 轴向上为正）
-					return 0; // 朝下
+					if (g.vx < 0) return 'left';
+					if (g.vx > 0) return 'right';
+					if (g.vy > 0) return 'up';
+					return 'down';
 				}
-				return 0; // Power 朝上、Ground 朝下，都是各自的原生朝向
+				// ── 独苗：按语义朝向 ──
+				// 簇里只有一个引脚（电容、电阻这类两脚器件的电源地脚就是这种），
+				// 前方没有邻居的引出线，不存在撞不撞的问题，就该画成语义正确的
+				// 姿势：Power 本体朝上、Ground 本体朝下。
+				//
+				// 这条必须留。阶梯规则会让本体朝**引出的反侧**伸 —— 电容竖放时
+				// +3V3 符号落在 pin1 上方 40 处，本体再往下伸 45，正好压回电容
+				// 身上。多引脚芯片的密集扇出和单个器件是两种场景，不能共用一套
+				// 规则（§4.10）。
+				if (clusterSize <= 1) return g.kind === 'Power' ? 'up' : 'down';
+				// ── 密集扇出：本体伸向阶梯变短的那一侧 ──
+				// 水平引出按 y 升序排（y 小 = 靠下 = 线更短）→ 朝下
+				// 垂直引出按 x 升序排（x 小 = 靠左 = 线更短）→ 朝左
+				return g.vx !== 0 ? 'down' : 'left';
+			};
+			// Ground（与端口）的原生朝向：本体方向 → rot 参数。Power 恒差 180°。
+			const GROUND_ROT: Record<BodyDir, number> = { down: 0, left: 90, up: 180, right: 270 };
+			const flagRotOf = (g: StubPin, clusterSize: number): number => {
+				const base = GROUND_ROT[bodyDirOf(g, clusterSize)];
+				return g.what !== 'port' && g.kind === 'Power' ? (base + 180) % 360 : base;
 			};
 
 			/**
@@ -424,15 +466,18 @@ export const mapApplyTools: ToolDef[] = [
 				return out;
 			};
 
-			const flagCells = (x: number, y: number, rot: number): string[] => {
+			// 按**本体方向**算，不能按 rot 算 —— Power 和 Ground 的 rot 含义差
+			// 180°（见 flagRotOf 的标定表），拿同一张 rot 表套两种符号，Power
+			// 的占地会记到反方向去，避让就完全失灵。
+			const flagCells = (x: number, y: number, body: BodyDir): string[] => {
 				const half = FLAG_WIDE / 2;
 				let x0 = x;
 				let x1 = x;
 				let y0 = y;
 				let y1 = y;
-				if (rot === 0) { x0 = x - half; x1 = x + half; y0 = y - FLAG_LONG; y1 = y; }
-				else if (rot === 180) { x0 = x - half; x1 = x + half; y0 = y; y1 = y + FLAG_LONG; }
-				else if (rot === 90) { x0 = x - FLAG_LONG; x1 = x; y0 = y - half; y1 = y + half; }
+				if (body === 'down') { x0 = x - half; x1 = x + half; y0 = y - FLAG_LONG; y1 = y; }
+				else if (body === 'up') { x0 = x - half; x1 = x + half; y0 = y; y1 = y + FLAG_LONG; }
+				else if (body === 'left') { x0 = x - FLAG_LONG; x1 = x; y0 = y - half; y1 = y + half; }
 				else { x0 = x; x1 = x + FLAG_LONG; y0 = y - half; y1 = y + half; }
 				const out: string[] = [];
 				for (let px = q5(x0); px <= q5(x1); px += 5) {
@@ -447,7 +492,8 @@ export const mapApplyTools: ToolDef[] = [
 				group.sort((a, b) => (horizontal ? a.y - b.y : a.x - b.x));
 				const mid = (group.length - 1) / 2;
 				group.forEach((g, idx) => {
-					const rot = flagRotOf(g);
+					const rot = flagRotOf(g, group.length);
+					const body = bodyDirOf(g, group.length);
 					// 让不开就**贴回引脚**，绝不无限往外拉。
 					// 实测放任它让下去，一个 GND 符号被推到 y=-920，那条纵贯
 					// 整张图的引出线一路碰到别的引脚，反而制造出新的短路 ——
@@ -463,7 +509,7 @@ export const mapApplyTools: ToolDef[] = [
 						const tx = q5(g.x + g.vx * len);
 						const ty = q5(g.y + g.vy * len);
 						// 引出线经过的格子 ＋ 符号自己占的地盘，都不能压到别的网络
-						const path = [...cellsAlong(g.x, g.y, tx, ty), ...flagCells(tx, ty, rot)];
+						const path = [...cellsAlong(g.x, g.y, tx, ty), ...flagCells(tx, ty, body)];
 						// 同一簇内不算冲突。
 						//
 						// 簇内的符号是靠**长度**错开的（40 / 90 / 140…），x 各不相同；
@@ -494,7 +540,7 @@ export const mapApplyTools: ToolDef[] = [
 						// 退化：符号直接落在引脚上，不画引出线
 						ex = q5(g.x);
 						ey = q5(g.y);
-						cells = flagCells(ex, ey, rot);
+						cells = flagCells(ex, ey, body);
 					}
 					takenSpots.add(spotKey(ex, ey));
 					for (const c of cells) occupiedCells.set(c, `${g.net}@${clusterKey}`);

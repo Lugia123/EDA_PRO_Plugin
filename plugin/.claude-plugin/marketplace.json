@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "立创EDA专业版（EasyEDA Pro）的 AI 接入。通过本地 MCP + EDA 官方扩展点操作原理图、PCB、器件库，全链路在本机 loopback 内完成。",
-    "version": "0.1.74"
+    "version": "0.1.75"
   },
   "plugins": [
     {

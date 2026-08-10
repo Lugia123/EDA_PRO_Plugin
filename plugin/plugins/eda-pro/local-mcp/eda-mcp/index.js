@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 12e4;
-var VERSION = "0.1.74";
+var VERSION = "0.1.75";
 var Bridge = class {
   http = null;
   wss = null;
@@ -22348,14 +22348,20 @@ var mapApplyTools = [
       const ports = [];
       const takenSpots = /* @__PURE__ */ new Set();
       const spotKey = (x, y) => `${Math.round(x / 45)},${Math.round(y / 45)}`;
-      const flagRotOf = (g) => {
+      const bodyDirOf = (g, clusterSize) => {
         if (g.what === "port") {
-          if (g.vx < 0) return 90;
-          if (g.vx > 0) return 270;
-          if (g.vy > 0) return 180;
-          return 0;
+          if (g.vx < 0) return "left";
+          if (g.vx > 0) return "right";
+          if (g.vy > 0) return "up";
+          return "down";
         }
-        return 0;
+        if (clusterSize <= 1) return g.kind === "Power" ? "up" : "down";
+        return g.vx !== 0 ? "down" : "left";
+      };
+      const GROUND_ROT = { down: 0, left: 90, up: 180, right: 270 };
+      const flagRotOf = (g, clusterSize) => {
+        const base = GROUND_ROT[bodyDirOf(g, clusterSize)];
+        return g.what !== "port" && g.kind === "Power" ? (base + 180) % 360 : base;
       };
       const occupiedCells = /* @__PURE__ */ new Map();
       const cellsAlong = (x1, y1, x2, y2) => {
@@ -22370,23 +22376,23 @@ var mapApplyTools = [
         for (let i = 0; i <= steps2; i += 1) out.push(`${ax + sx * i * 5},${ay + sy * i * 5}`);
         return out;
       };
-      const flagCells = (x, y, rot) => {
+      const flagCells = (x, y, body) => {
         const half = FLAG_WIDE / 2;
         let x0 = x;
         let x1 = x;
         let y0 = y;
         let y1 = y;
-        if (rot === 0) {
+        if (body === "down") {
           x0 = x - half;
           x1 = x + half;
           y0 = y - FLAG_LONG;
           y1 = y;
-        } else if (rot === 180) {
+        } else if (body === "up") {
           x0 = x - half;
           x1 = x + half;
           y0 = y;
           y1 = y + FLAG_LONG;
-        } else if (rot === 90) {
+        } else if (body === "left") {
           x0 = x - FLAG_LONG;
           x1 = x;
           y0 = y - half;
@@ -22408,7 +22414,8 @@ var mapApplyTools = [
         group.sort((a, b) => horizontal ? a.y - b.y : a.x - b.x);
         const mid = (group.length - 1) / 2;
         group.forEach((g, idx) => {
-          const rot = flagRotOf(g);
+          const rot = flagRotOf(g, group.length);
+          const body = bodyDirOf(g, group.length);
           const maxLen = FAN_BASE + (idx + 3) * FAN_STEP;
           let len = FAN_BASE + idx * FAN_STEP;
           let ex = g.x;
@@ -22418,7 +22425,7 @@ var mapApplyTools = [
           while (len <= maxLen) {
             const tx = q5(g.x + g.vx * len);
             const ty = q5(g.y + g.vy * len);
-            const path = [...cellsAlong(g.x, g.y, tx, ty), ...flagCells(tx, ty, rot)];
+            const path = [...cellsAlong(g.x, g.y, tx, ty), ...flagCells(tx, ty, body)];
             const clash = takenSpots.has(spotKey(tx, ty)) || path.some((c) => {
               const owner = occupiedCells.get(c);
               if (!owner) return false;
@@ -22439,7 +22446,7 @@ var mapApplyTools = [
           if (!placedOut) {
             ex = q5(g.x);
             ey = q5(g.y);
-            cells = flagCells(ex, ey, rot);
+            cells = flagCells(ex, ey, body);
           }
           takenSpots.add(spotKey(ex, ey));
           for (const c of cells) occupiedCells.set(c, `${g.net}@${clusterKey}`);
@@ -25396,7 +25403,7 @@ if (dupes.length) {
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.74";
+var VERSION2 = "0.1.75";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var currentToolIsMutating = false;
