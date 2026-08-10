@@ -40,6 +40,14 @@ export interface Weights {
 	supplyDir: number;
 	/** 整体占地面积 —— 没有这一项，网络少的时候器件会散得到处都是 */
 	spread: number;
+	/**
+	 * 多引脚器件偏离符号原始朝向的代价。
+	 *
+	 * 芯片符号的引脚布局是画符号的人按惯例排好的（输入左、输出右、电源上、
+	 * 地下），转一下这套语义就没了 —— 实测 AMS1117 被转成 270°，VIN/VOUT/
+	 * ADJ 三个脚全部朝上，读图的人无从判断信号往哪流。两脚阻容不受此约束。
+	 */
+	chipRotation: number;
 }
 
 /** 器件之间至少要留出的间隙，小于它就开始罚。留给走线和文字。
@@ -67,6 +75,10 @@ export const DEFAULT_WEIGHTS: Weights = {
 	// （挤过头会被 tooClose 拦住）。缺了这一项，组内网络少时器件会散得到处都是：
 	// 实测 3 个器件的电源区占到 749x629，组框直接顶出图纸。
 	spread: 4,
+	// 芯片朝向。要压得过「转一下能省点线长」的诱惑：一条线通常几十到几百
+	// 单位，而转 90° 只罚 2×150=300，足以让退火老实待着；真到了不转就摆不下
+	// 的地步，几百的收益仍然能翻盘 —— 这是软约束，不是禁令。
+	chipRotation: 150,
 };
 
 export interface CostBreakdown {
@@ -80,6 +92,8 @@ export interface CostBreakdown {
 	tooClose: number;
 	supplyDir: number;
 	spread: number;
+	/** 多引脚器件偏离符号原始朝向的代价 */
+	chipRotation: number;
 }
 
 /** 两个盒子的间隙（负数表示重叠）。取两轴间隙的较大者：
@@ -223,6 +237,26 @@ export function evaluate(
 		}
 	}
 
+	// ── 芯片朝向：多引脚器件应当保持符号的原始朝向 ──
+	//
+	// 芯片符号的引脚布局是画符号的人按惯例排好的：输入在左、输出在右、
+	// 电源在上、地在下。转一下就把这套语义毁了 —— 实测 AMS1117 被转成
+	// 270°，VIN / VOUT / ADJ(GND) 三个引脚全部朝上，读图的人无从判断
+	// 信号往哪流。而算法此前只看几何代价，转一下能省几十的线长它就转了。
+	//
+	// 两脚的阻容不在此列：它们本来就对称，横放竖放都合理，强行不许转
+	// 反而会逼出更差的布局。
+	let chipRotation = 0;
+	for (const id of ids) {
+		const p = parts.get(id);
+		const pl = layout.get(id);
+		if (!p || !pl || p.pins.length < 3) continue;
+		// 90/270 比 180 更糟：一整排横向引脚会变成竖向，最难读
+		if (pl.rot === 90 || pl.rot === 270) chipRotation += 2;
+		else if (pl.rot === 180) chipRotation += 1;
+		if (pl.mirror) chipRotation += 1;
+	}
+
 	// ── 连线：用每条网络的最小生成树近似，边取曼哈顿距离 ──
 	const pinPos = (ref: string): { x: number; y: number; dir: number } | null => {
 		const dot = ref.lastIndexOf('.');
@@ -311,7 +345,8 @@ export function evaluate(
 		weights.netSpread * netSpread +
 		weights.tooClose * tooClose +
 		weights.supplyDir * supplyDir +
+		weights.chipRotation * chipRotation +
 		weights.spread * spread;
 
-	return { total, partOverlap, textOverlap, wireLength, crossing, pinFacing, netSpread, tooClose, supplyDir, spread };
+	return { total, partOverlap, textOverlap, wireLength, crossing, pinFacing, netSpread, tooClose, supplyDir, spread, chipRotation };
 }
