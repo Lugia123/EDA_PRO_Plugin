@@ -296,26 +296,27 @@ export const mapApplyTools: ToolDef[] = [
 			/**
 			 * 符号朝向。实测：0=朝下、90=朝左、180=朝上、270=朝右。
 			 *
-			 * **判据是「同一侧有没有别的引脚」，不是器件总引脚数。**
+			 * **电源地符号的朝向是符号语义的一部分，不能拿来做避让。**
+			 * 地符号转 180° 就成了「短边在上、竖线朝下」的倒地符号，图上根本
+			 * 读不出那是接地；电源符号同理。所以一律固定：Power 朝上、
+			 * Ground 朝下，不管同侧挤了几个引脚。
 			 *
-			 * 同侧只有它一个 → 按原理图通用惯例：电源朝上、地朝下。运放这类
-			 * 符号的 V+ 单独占顶边、GND 单独占底边，本来就不会跟谁打架，
-			 * 硬套「背离簇」反而会把 V+ 的符号甩到右边去。
+			 * 那密集引脚区怎么不打架？靠**引出线的长度逐级错开**（阶梯扇出）：
+			 * 符号落在不同的 x（或 y）上，各自朝各自的方向伸，互不干涉。
+			 * 避让是长度的事，不是朝向的事 —— 之前用「背离引脚簇」去转符号，
+			 * 转出来一堆倒着的地，方向倒是躲开了，图却读不成了。
 			 *
-			 * 同侧有好几个 → 惯例失效。多 pin 芯片一边挤着七八个引脚、间距只有
-			 * 10，地要是一律朝下，上面那个的符号体就伸进下面那根引出线里了。
-			 * 这时候只能**背离引脚簇**：上半朝上、下半朝下（垂直引出按左右分）。
-			 *
-			 * 这跟 §0 的「电源上、地下」不冲突 —— 那条惯例的前提是符号周围有
-			 * 地方，密集引脚区没有这个前提。
+			 * 端口不一样：它的朝向表示信号进出的方向，跟着引出方向走。
 			 */
-			const flagRotOf = (g: StubPin, horizontal: boolean, rel: number, clusterSize: number): number => {
-				if (clusterSize <= 1) {
-					if (g.kind === 'Power') return 180; // 朝上
-					if (g.kind === 'Ground') return 0; // 朝下
-					return horizontal ? 0 : 180; // 端口之类，给个稳定的默认
+			const flagRotOf = (g: StubPin): number => {
+				if (g.what === 'port') {
+					if (g.vx < 0) return 90; // 朝左
+					if (g.vx > 0) return 270; // 朝右
+					if (g.vy > 0) return 180; // 朝上
+					return 0; // 朝下
 				}
-				return horizontal ? (rel >= 0 ? 180 : 0) : rel >= 0 ? 270 : 90;
+				if (g.kind === 'Power') return 180; // 朝上
+				return 0; // 地及其它：朝下
 			};
 
 			/**
@@ -369,7 +370,7 @@ export const mapApplyTools: ToolDef[] = [
 				group.sort((a, b) => (horizontal ? a.y - b.y : a.x - b.x));
 				const mid = (group.length - 1) / 2;
 				group.forEach((g, idx) => {
-					const rot = flagRotOf(g, horizontal, idx - mid, group.length);
+					const rot = flagRotOf(g);
 					// 让不开就**贴回引脚**，绝不无限往外拉。
 					// 实测放任它让下去，一个 GND 符号被推到 y=-920，那条纵贯
 					// 整张图的引出线一路碰到别的引脚，反而制造出新的短路 ——
