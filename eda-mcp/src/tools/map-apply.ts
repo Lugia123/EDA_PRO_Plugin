@@ -54,6 +54,12 @@ export const mapApplyTools: ToolDef[] = [
 						'trace_full=true 时连正常流水一起返回。',
 				},
 				trace_full: { type: 'boolean', description: '返回完整流水而不只是问题行，默认 false' },
+				incremental: {
+					type: 'boolean',
+					description:
+						'增量渲染：**不清场**，只把这一次算出来的东西画上去，保留图上已有的图元。' +
+						'逐层递进时必须开（否则第二层会把第一层抹掉）；默认 false，即照旧清空重画。',
+				},
 				save_map: { type: 'boolean', description: '是否把优化结果写回地图，默认 true' },
 			},
 		},
@@ -63,6 +69,7 @@ export const mapApplyTools: ToolDef[] = [
 			const dryRun = args.dry_run === true;
 			const trace = new Trace(args.trace !== false);
 			const traceFull = args.trace_full === true;
+			const incremental = args.incremental === true;
 			const saveMap = args.save_map !== false;
 
 			let map = args.map as SchematicMap | undefined;
@@ -480,38 +487,46 @@ export const mapApplyTools: ToolDef[] = [
 			// 图纸整体到底变成了什么样 —— 尤其能抓住「一步都没生效」这种情形。
 			const before = await census(ctx).catch(() => null);
 
-			await runStep(
-				'清导线',
-				`
-				const ids = (await eda.sch_PrimitiveWire.getAll()).map(function (w) { return w.primitiveId; });
-				if (ids.length) await eda.sch_PrimitiveWire.delete(ids);
-				return { removed: ids.length };
-			`,
-			);
-			await runStep(
-				'清符号与端口',
-				`
-				const ids = (await eda.sch_PrimitiveComponent.getAll())
-					.filter(function (c) { return c.componentType === 'netflag' || c.componentType === 'netport'; })
-					.map(function (c) { return c.primitiveId; });
-				if (ids.length) await eda.sch_PrimitiveComponent.delete(ids);
-				return { removed: ids.length };
-			`,
-			);
-			await runStep(
-				'清旧区框与文字',
-				`
-				const MARKTXT = ${JSON.stringify(MARK)};
-				const rects = (await eda.sch_PrimitiveRectangle.getAll()).map(function (x) { return x.primitiveId; });
-				if (rects.length) await eda.sch_PrimitiveRectangle.delete(rects);
-				// 地图那条文字要留着，靠标记认出来
-				const texts = (await eda.sch_PrimitiveText.getAll())
-					.filter(function (x) { return String(x.content || '').indexOf(MARKTXT) !== 0; })
-					.map(function (x) { return x.primitiveId; });
-				if (texts.length) await eda.sch_PrimitiveText.delete(texts);
-				return { rects: rects.length, texts: texts.length };
-			`,
-			);
+			// 增量模式下**不清场**：图上已有的东西是前面层的成果，抹掉就白做了。
+			// 分层流程里每层只渲染一次，不会产生重复图元；真要重来就全量跑一遍。
+			if (incremental) {
+				trace.at('清场');
+				trace.log('增量模式，跳过清场', {});
+			} else {
+				await runStep(
+					'清导线',
+					`
+					const ids = (await eda.sch_PrimitiveWire.getAll()).map(function (w) { return w.primitiveId; });
+					if (ids.length) await eda.sch_PrimitiveWire.delete(ids);
+					return { removed: ids.length };
+				`,
+				);
+				await runStep(
+					'清符号与端口',
+					`
+					const ids = (await eda.sch_PrimitiveComponent.getAll())
+						.filter(function (c) { return c.componentType === 'netflag' || c.componentType === 'netport'; })
+						.map(function (c) { return c.primitiveId; });
+					if (ids.length) await eda.sch_PrimitiveComponent.delete(ids);
+					return { removed: ids.length };
+				`,
+				);
+				await runStep(
+					'清旧区框与文字',
+					`
+					const MARKTXT = ${JSON.stringify(MARK)};
+					const rects = (await eda.sch_PrimitiveRectangle.getAll()).map(function (x) { return x.primitiveId; });
+					if (rects.length) await eda.sch_PrimitiveRectangle.delete(rects);
+					// 地图那条文字要留着，靠标记认出来
+					const texts = (await eda.sch_PrimitiveText.getAll())
+						.filter(function (x) { return String(x.content || '').indexOf(MARKTXT) !== 0; })
+						.map(function (x) { return x.primitiveId; });
+					if (texts.length) await eda.sch_PrimitiveText.delete(texts);
+					return { rects: rects.length, texts: texts.length };
+				`,
+				);
+			}
+
 			await runStep(
 				'摆器件',
 				`

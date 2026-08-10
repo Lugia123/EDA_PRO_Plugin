@@ -73,7 +73,13 @@ const COLLECT = `
 			const des = String(c.designator || '');
 			// 图纸标题栏也是 part，但它没有引脚 —— 这是唯一稳的判据
 			if (!pins.length) { decorations.push({ id: c.primitiveId, xy: [c.x, c.y] }); continue; }
-			parts.push({ des: des, xy: [c.x, c.y], pins: pins.length });
+			const bb = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(function () { return null; });
+			parts.push({
+				des: des,
+				xy: [c.x, c.y],
+				pins: pins.length,
+				box: bb ? { minX: bb.minX, minY: bb.minY, maxX: bb.maxX, maxY: bb.maxY } : null,
+			});
 			for (const p of pins) {
 				const n = String(p.pinNumber != null ? p.pinNumber : p.number);
 				terms.push({ id: des + '.' + n, x: p.x, y: p.y, kind: 'pin', nc: p.noConnected === true });
@@ -180,11 +186,28 @@ export const netcheckTools: ToolDef[] = [
 			const orphans = diff.orphans.filter((id) => !allow.has(id.toUpperCase()));
 
 			// ── 几何问题：只看电路图元，图纸装饰与地图文字排除在外 ──
-			const out: Array<{ what: string; xy: [number, number] }> = [];
+			// 出框判据用**包围盒**，不是中心点。
+			//
+			// 只看中心点会漏掉一大半：器件半个身子在图纸外照样判「在框内」。
+			// 实测 led 区 minY=-21、mcu maxY=1301（图纸高 1170）都超出去了，
+			// 旧判据一律报 0 —— 这是假阴性，比误报更坏，因为没人会去复查。
+			const out: Array<{ what: string; box: [number, number, number, number]; how: string }> = [];
 			if (d.sheet) {
+				const sh = d.sheet;
 				for (const p of d.parts) {
-					if (p.xy[0] < 0 || p.xy[1] < 0 || p.xy[0] > d.sheet.w || p.xy[1] > d.sheet.h) {
-						out.push({ what: p.des, xy: p.xy });
+					const b = p.box;
+					if (!b) continue;
+					const over: string[] = [];
+					if (b.minX < 0) over.push(`左出 ${Math.round(-b.minX)}`);
+					if (b.minY < 0) over.push(`下出 ${Math.round(-b.minY)}`);
+					if (b.maxX > sh.w) over.push(`右出 ${Math.round(b.maxX - sh.w)}`);
+					if (b.maxY > sh.h) over.push(`上出 ${Math.round(b.maxY - sh.h)}`);
+					if (over.length) {
+						out.push({
+							what: p.des,
+							box: [Math.round(b.minX), Math.round(b.minY), Math.round(b.maxX), Math.round(b.maxY)],
+							how: over.join('、'),
+						});
 					}
 				}
 			}
