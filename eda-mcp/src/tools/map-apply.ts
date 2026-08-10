@@ -6,7 +6,7 @@
  */
 import { layoutByGroups } from '../layout/group.js';
 import { LABEL_SLOTS, type Layout, type Net, type Part, type Rotation, dirVec, pinWorld } from '../layout/model.js';
-import { MAP_MARK, type NetKind, type SchematicMap, defaultStyle, packMap } from '../layout/map.js';
+import { MAP_MARK, type NetKind, type SchematicMap, defaultStyle, packMap, unpackMap } from '../layout/map.js';
 import { Trace, checkRouteEndpoints } from '../layout/trace.js';
 import type { ToolDef } from './types.js';
 import { census, diffCensus, verifyPlaced } from './verify.js';
@@ -82,7 +82,11 @@ export const mapApplyTools: ToolDef[] = [
 				);
 				if (loaded.error) return { error: '当前编辑器里没有打开原理图页' };
 				if (!loaded.raw) return { error: '没传 map，图纸里也没有地图。先跑 eda_map_import 生成一份。' };
-				map = JSON.parse(loaded.raw) as SchematicMap;
+				// 必须走 unpackMap：地图是分行存的（单行六七千字符会把画布包围盒
+				// 撑到两万多宽，见 layout/map.ts），直接 JSON.parse 带换行的字符串
+				// 会抛异常。存那边改了格式，读这边漏改了一处 —— T5 一直是传 map
+				// 参数进来的，没走这条路，直到 T6 从图纸读才炸出来。
+				map = unpackMap(loaded.raw);
 			}
 
 			// ── 地图 → 布局模型 ──
@@ -252,6 +256,8 @@ export const mapApplyTools: ToolDef[] = [
 				y: number;
 				vx: number;
 				vy: number;
+				/** 所属器件的引脚总数 —— 决定符号朝向按哪套规则来 */
+				pinCount: number;
 			};
 			// 按「器件 + 引出方向」归组。电源地符号和跨区端口**必须一起归组**：
 			// 它们挂在同一排引脚上，各排各的必然撞。
@@ -274,12 +280,12 @@ export const mapApplyTools: ToolDef[] = [
 					const key = `${des}|${vx},${vy}`;
 					clusters.set(key, [
 						...(clusters.get(key) ?? []),
-						{ what: isPort ? 'port' : 'flag', kind, net: n.id, x: w.x, y: w.y, vx, vy },
+						{ what: isPort ? 'port' : 'flag', kind, net: n.id, x: w.x, y: w.y, vx, vy, pinCount: part.pins.length },
 					]);
 				}
 			}
 
-			type Placed = { kind: string; net: string; x: number; y: number; ex: number; ey: number };
+			type Placed = { kind: string; net: string; x: number; y: number; ex: number; ey: number; rot: number };
 			const flags: Placed[] = [];
 			const ports: Array<Placed & { dir: string }> = [];
 
@@ -287,6 +293,40 @@ export const mapApplyTools: ToolDef[] = [
 			// 同网络共用没关系，本来就该连在一起。
 			const takenSpots = new Set<string>();
 			const spotKey = (x: number, y: number) => `${Math.round(x / 45)},${Math.round(y / 45)}`;
+			/**
+			 * 符号朝向。实测：0=朝下、90=朝左、180=朝上、270=朝右。
+			 *
+			 * **判据是「同一侧有没有别的引脚」，不是器件总引脚数。**
+			 *
+			 * 同侧只有它一个 → 按原理图通用惯例：电源朝上、地朝下。运放这类
+			 * 符号的 V+ 单独占顶边、GND 单独占底边，本来就不会跟谁打架，
+			 * 硬套「背离簇」反而会把 V+ 的符号甩到右边去。
+			 *
+			 * 同侧有好几个 → 惯例失效。多 pin 芯片一边挤着七八个引脚、间距只有
+			 * 10，地要是一律朝下，上面那个的符号体就伸进下面那根引出线里了。
+			 * 这时候只能**背离引脚簇**：上半朝上、下半朝下（垂直引出按左右分）。
+			 *
+			 * 这跟 §0 的「电源上、地下」不冲突 —— 那条惯例的前提是符号周围有
+			 * 地方，密集引脚区没有这个前提。
+			 */
+			const flagRotOf = (g: StubPin, horizontal: boolean, rel: number, clusterSize: number): number => {
+				if (clusterSize <= 1) {
+					if (g.kind === 'Power') return 180; // 朝上
+					if (g.kind === 'Ground') return 0; // 朝下
+					return horizontal ? 0 : 180; // 端口之类，给个稳定的默认
+				}
+				return horizontal ? (rel >= 0 ? 180 : 0) : rel >= 0 ? 270 : 90;
+			};
+
+			/**
+			 * 符号连文字占的地盘。
+			 *
+			 * 光管朝向不够：符号体是有尺寸的（GND 本体 21×10，带上网络名文字
+			 * 更宽），器件一大，**横向**也会压到邻居那根线上。所以把整个包围盒
+			 * 都登记进占位表，而不是只占落点那一个格子。
+			 */
+			const FLAG_LONG = 45; // 沿朝向方向伸出多少
+			const FLAG_WIDE = 40; // 垂直于朝向的宽度（文字主要占这边）
 			const occupiedCells = new Map<string, string>();
 			// 格子键必须先量化再拼字符串。引脚世界坐标是浮点算出来的，带着
 			// 169.9999999999999 这种尾巴 —— 直接拼进键里，"1140,270" 和
@@ -306,11 +346,30 @@ export const mapApplyTools: ToolDef[] = [
 				return out;
 			};
 
+			const flagCells = (x: number, y: number, rot: number): string[] => {
+				const half = FLAG_WIDE / 2;
+				let x0 = x;
+				let x1 = x;
+				let y0 = y;
+				let y1 = y;
+				if (rot === 0) { x0 = x - half; x1 = x + half; y0 = y - FLAG_LONG; y1 = y; }
+				else if (rot === 180) { x0 = x - half; x1 = x + half; y0 = y; y1 = y + FLAG_LONG; }
+				else if (rot === 90) { x0 = x - FLAG_LONG; x1 = x; y0 = y - half; y1 = y + half; }
+				else { x0 = x; x1 = x + FLAG_LONG; y0 = y - half; y1 = y + half; }
+				const out: string[] = [];
+				for (let px = q5(x0); px <= q5(x1); px += 5) {
+					for (let py = q5(y0); py <= q5(y1); py += 5) out.push(`${px},${py}`);
+				}
+				return out;
+			};
+
 			for (const group of clusters.values()) {
 				// 沿垂直于引出方向排序，阶梯才是单调的、线不会交叉
 				const horizontal = group[0]?.vx !== 0;
 				group.sort((a, b) => (horizontal ? a.y - b.y : a.x - b.x));
+				const mid = (group.length - 1) / 2;
 				group.forEach((g, idx) => {
+					const rot = flagRotOf(g, horizontal, idx - mid, group.length);
 					// 让不开就**贴回引脚**，绝不无限往外拉。
 					// 实测放任它让下去，一个 GND 符号被推到 y=-920，那条纵贯
 					// 整张图的引出线一路碰到别的引脚，反而制造出新的短路 ——
@@ -325,7 +384,8 @@ export const mapApplyTools: ToolDef[] = [
 					while (len <= maxLen) {
 						const tx = q5(g.x + g.vx * len);
 						const ty = q5(g.y + g.vy * len);
-						const path = cellsAlong(g.x, g.y, tx, ty);
+						// 引出线经过的格子 ＋ 符号自己占的地盘，都不能压到别的网络
+						const path = [...cellsAlong(g.x, g.y, tx, ty), ...flagCells(tx, ty, rot)];
 						const clash =
 							takenSpots.has(spotKey(tx, ty)) ||
 							path.some((c) => {
@@ -345,11 +405,11 @@ export const mapApplyTools: ToolDef[] = [
 						// 退化：符号直接落在引脚上，不画引出线
 						ex = q5(g.x);
 						ey = q5(g.y);
-						cells = [];
+						cells = flagCells(ex, ey, rot);
 					}
 					takenSpots.add(spotKey(ex, ey));
 					for (const c of cells) occupiedCells.set(c, g.net);
-					const placed = { kind: g.kind, net: g.net, x: g.x, y: g.y, ex, ey };
+					const placed = { kind: g.kind, net: g.net, x: g.x, y: g.y, ex, ey, rot };
 					if (g.what === 'port') ports.push({ ...placed, dir: 'BI' });
 					else flags.push(placed);
 				});
@@ -514,7 +574,7 @@ export const mapApplyTools: ToolDef[] = [
 					if (f.ex !== f.x || f.ey !== f.y) {
 						await eda.sch_PrimitiveWire.create([f.x, f.y, f.ex, f.ey]).catch(() => {});
 					}
-					if (await eda.sch_PrimitiveComponent.createNetFlag(f.kind, f.net, f.ex, f.ey, 0)) n += 1;
+					if (await eda.sch_PrimitiveComponent.createNetFlag(f.kind, f.net, f.ex, f.ey, f.rot)) n += 1;
 				}
 				return { drawn: n, total: FLAGS.length };
 			`,
@@ -529,7 +589,7 @@ export const mapApplyTools: ToolDef[] = [
 					if (p.ex !== p.x || p.ey !== p.y) {
 						await eda.sch_PrimitiveWire.create([p.x, p.y, p.ex, p.ey]).catch(() => {});
 					}
-					if (await eda.sch_PrimitiveComponent.createNetPort(p.dir, p.net, p.ex, p.ey, 0)) n += 1;
+					if (await eda.sch_PrimitiveComponent.createNetPort(p.dir, p.net, p.ex, p.ey, p.rot)) n += 1;
 				}
 				return { drawn: n, total: PORTS.length };
 			`,

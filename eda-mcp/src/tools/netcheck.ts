@@ -13,7 +13,7 @@
  * 它自己错的（把图纸标题栏当器件、把端口连接判成悬空、图纸尺寸取错字段），
  * 这种体检比不体检更坏 —— 真问题会被淹在假警报里。
  */
-import { MAP_MARK, type SchematicMap } from '../layout/map.js';
+import { MAP_MARK, type SchematicMap, unpackMap } from '../layout/map.js';
 import {
 	type PartBox,
 	type Segment,
@@ -170,7 +170,7 @@ export const netcheckTools: ToolDef[] = [
 			let map: SchematicMap | null = null;
 			if (d.mapRaw) {
 				try {
-					map = JSON.parse(d.mapRaw.replace(/[\r\n]+/g, '')) as SchematicMap;
+					map = unpackMap(d.mapRaw);
 				} catch {
 					map = null;
 				}

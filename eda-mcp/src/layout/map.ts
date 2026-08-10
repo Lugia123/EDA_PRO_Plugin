@@ -169,25 +169,36 @@ export function validateMap(m: SchematicMap): string[] {
 export const MAP_MARK = 'EDAMCP_MAP_V1:';
 
 /**
- * 地图切成短行再存。
+ * 地图存进图纸时**格式化**成多行。
  *
- * 地图是当作**一个文字图元**存进图纸的，六七千字符挤在一行，这个图元的
- * 渲染宽度就有两万多个单位（图纸本身才 1655）—— 画布包围盒被它一路撑到
- * 二十多米宽，于是 `zoomToAllPrimitives`、界面上的「适应全部」全部失效，
- * 缩放卡在 7%，图上的电路缩成左上角一个小点，根本没法看。
+ * 两个理由：
  *
- * 切成短行之后，渲染宽度按最长的一行算，包围盒就回到正常范围。
+ *   人要能看。地图是这张图的真相源，出问题时第一件事就是打开它对一眼；
+ *   六七千字符挤成一行谁也读不了。
+ *
+ *   画布不能被撑爆。地图是一个文字图元，单行时它的渲染宽度有两万多个单位
+ *   （图纸本身才 1655），包围盒被一路撑到二十多米宽，`zoomToAllPrimitives`
+ *   和界面上的「适应全部」直接失效，缩放卡在 7%，电路缩成左上角一个点。
+ *
+ * 缩进给 1 个空格：JSON.stringify 的多行输出天然一行一个字段，最长的行也就
+ * 是个引脚名，比之前按 96 字符硬切还短，而且切在合法位置 —— 硬切片会把
+ * 字符串从中间劈开，只能靠读回时删掉所有换行才拼得回来。
  */
-const MAP_CHUNK = 96;
-
 export function packMap(map: SchematicMap): string {
-	const json = JSON.stringify(map);
-	const lines: string[] = [];
-	for (let i = 0; i < json.length; i += MAP_CHUNK) lines.push(json.slice(i, i + MAP_CHUNK));
-	return MAP_MARK + '\n' + lines.join('\n');
+	return `${MAP_MARK}\n${JSON.stringify(map, null, 1)}`;
 }
 
-/** 读回地图。换行是存的时候加的，解析前一律去掉；旧的单行格式也照样能读 */
+/**
+ * 读回地图。
+ *
+ * 新格式是格式化过的 JSON，换行和缩进都在合法位置，直接 parse 即可。
+ * 旧格式是按 96 字符硬切的 —— 切点可能落在字符串中间，必须先把换行全删掉
+ * 才拼得回原文。两种都要能读，图纸上还存着老地图。
+ */
 export function unpackMap(rawAfterMark: string): SchematicMap {
-	return JSON.parse(rawAfterMark.replace(/[\r\n]+/g, '')) as SchematicMap;
+	try {
+		return JSON.parse(rawAfterMark) as SchematicMap;
+	} catch {
+		return JSON.parse(rawAfterMark.replace(/[\r\n]+/g, '')) as SchematicMap;
+	}
 }

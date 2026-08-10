@@ -376,7 +376,7 @@ export const mapTools: ToolDef[] = [
 					60_000,
 				);
 				if (!loaded.raw) return { error: '没传 map，图纸里也没有存地图' };
-				map = JSON.parse(loaded.raw) as SchematicMap;
+				map = unpackMap(loaded.raw);
 			}
 
 			const real = await ctx.exec<Record<string, unknown>>(
