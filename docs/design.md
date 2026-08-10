@@ -14,6 +14,12 @@
    文字被当成 x 坐标，图元飞到天边，表现为「图上什么都没有」，白查半天渲染问题。
    `sch_PrimitiveRectangle.create(topLeftX, topLeftY, width, height)` 同理，
    不是两点式。写一句 create 再读回来比对，比读文档快。
+
+   同一个类里，方法适用的对象类型也可能不一样：`sch_PrimitiveComponent.modify`
+   **只认元件（part）**，拿它改 `netflag` 会抛「仅当器件类型为元件时允许使用该函数
+   进行修改」。电源地符号要挪位置，只能删掉重建（`createNetFlag`）。而 `create`
+   系列参数里的坐标会被吸附到 5 的倍数，`sch_PrimitiveWire.create` 不会 —— 同一张
+   图上两套取整规则，落点自己先量化好再传。
 7. **传给 EDA 的代码里不许出现任何反斜杠转义**。那段代码是放在 TS 模板字符串里发过去的，
    模板字符串会**先求值一遍**，于是：
    - `\d` `\+` `\?` 这类无效转义，反斜杠被吃掉 → 到 EDA 那边成了非法正则，工具直接挂
@@ -32,10 +38,23 @@
    | `eda_auto_route` | 148 根连线全成功 | 只有 60 根还连在引脚上 |
    | `eda_set_page_size` | 写入成功 | 写的是 EDA 不认的字段名，尺寸没动 |
    | `sch_PrimitiveComponent.create` | 坐标 = 请求值 | 那是 create 时刻的对象快照，之后 `modify` 过就不再是实际值 |
+   | `sch_PrimitiveText.delete(数组)` | 不报错、不抛异常 | **一份都没删掉**；代码按 `olds.length` 报 `removed_old`，图纸上悄悄攒到 27 份地图 |
 
    所以：**凡写操作，写完按 id 回读实际状态，返回 `requested` 与 `actual` 两组值**，
    不符就报 warning。不许把请求值回显成结果 —— 那等于向调用方撒谎，
    而且会让真正的失败沉默地留在图纸上（叠件、断连都是数量对、DRC 也不报的）。
+
+   推论一：**统计数必须是实际成功数，不能是意图数**。`for (…) if (await delete(id)) n++`，
+   不是 `delete(ids); n = ids.length`。地图攒到 27 份就是这么攒的 —— 每次
+   `map_saved` 都报 `copies:1 removed_old:N`，全是假的，回读又拿到缓存看不出来。
+
+   推论二：**批量删除一律当作可能无效**。已知 `sch_PrimitiveText.delete(数组)`
+   静默失效，`Wire`/`Component` 的批量删除目前有效但不能依赖 —— 批量删完回读一次，
+   把漏掉的逐个删，最后报 `still_left`。收敛不到预期就把错误喊出来，别让它沉默。
+
+   推论三：**图纸上有多份同类元数据时，用内容里的时间戳定谁为准**。地图的
+   `meta.updatedAt` 就是为此存在的 —— 排序取最新那份，其余删掉。靠 `getAll()`
+   的返回顺序猜是不行的。
 
 9. **查对象不许按名字查，要按自己刚创建的 uuid 查**。
    `IDMT_BoardItem` **没有 uuid 字段**，板名就是唯一标识，而 `createBoard` 返回的是

@@ -257,38 +257,51 @@ export function saveMapCode(payload: string, x: number, y: number): string {
 			});
 		};
 
-		const olds = (await findMaps()).map(function (t) { return t.primitiveId; });
-		if (olds.length) await eda.sch_PrimitiveText.delete(olds);
+		// **逐个删，不能传数组。** 实测 sch_PrimitiveText.delete(数组) 静默无效：
+		// 传进去不报错、不抛异常，一份都没删掉。而这里原来按 olds.length 报
+		// removed_old，回读又可能拿到缓存，于是 copies:1 是假的 —— 图纸上悄悄
+		// 攒到 27 份地图，横跨好几个版本，谁也不知道哪份是真的。
+		// 现在统计的是**实际删成功的个数**。
+		const olds = await findMaps();
+		let removedOld = 0;
+		for (const t of olds) {
+			try { if (await eda.sch_PrimitiveText.delete(t.primitiveId)) removedOld += 1; } catch (e) {}
+		}
 		await new Promise(function (r) { setTimeout(r, 400); });
 
 		const made = await eda.sch_PrimitiveText.create(${x}, ${y}, PAYLOAD);
-		if (!made) return { ok: false, error: '地图写入失败', removed_old: olds.length };
+		if (!made) return { ok: false, error: '地图写入失败', removed_old: removedOld, found_old: olds.length };
 
 		// 回读：上面那次删可能因为缓存漏掉了几份，这里把除自己以外的都清掉
 		await new Promise(function (r) { setTimeout(r, 600); });
 		let all = await findMaps();
 		let cleanedExtra = 0;
 		if (all.length > 1) {
-			const dup = all
-				.filter(function (t) { return t.primitiveId !== made.primitiveId; })
-				.map(function (t) { return t.primitiveId; });
-			if (dup.length) {
-				await eda.sch_PrimitiveText.delete(dup);
-				cleanedExtra = dup.length;
-				await new Promise(function (r) { setTimeout(r, 400); });
-				all = await findMaps();
+			for (const t of all) {
+				if (t.primitiveId === made.primitiveId) continue;
+				try { if (await eda.sch_PrimitiveText.delete(t.primitiveId)) cleanedExtra += 1; } catch (e) {}
 			}
+			await new Promise(function (r) { setTimeout(r, 400); });
+			all = await findMaps();
 		}
 
 		const got = all.filter(function (t) { return t.primitiveId === made.primitiveId; })[0];
 		const len = got ? String(got.content || '').length : 0;
-		return {
+		const out = {
 			ok: len === PAYLOAD.length && all.length === 1,
 			copies: all.length,
-			removed_old: olds.length,
+			found_old: olds.length,
+			removed_old: removedOld,
 			cleaned_extra: cleanedExtra,
 			bytes: PAYLOAD.length,
 			read_back: len,
 		};
+		// 没收敛到唯一一份就必须喊出来。图纸上留着多份地图是最难查的一类问题：
+		// 读的时候拿到哪份取决于 getAll 的顺序，改动会莫名其妙丢失或回滚。
+		if (all.length !== 1) {
+			out.error = '图纸上有 ' + all.length + ' 份地图，没能收敛到唯一一份。' +
+				'删除可能又失效了 —— 用 meta.updatedAt 最新的那份为准，其余逐个删掉。';
+		}
+		return out;
 	`;
 }

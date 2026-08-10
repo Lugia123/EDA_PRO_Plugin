@@ -625,7 +625,15 @@ export const mapApplyTools: ToolDef[] = [
 					`
 					const ids = (await eda.sch_PrimitiveWire.getAll()).map(function (w) { return w.primitiveId; });
 					if (ids.length) await eda.sch_PrimitiveWire.delete(ids);
-					return { removed: ids.length };
+					// 批量删完必须回读补删。实测 sch_PrimitiveText.delete(数组) 是静默无效的
+					// （一份都没删掉还不报错，图纸上攒到 27 份地图）。Wire/Component 目前看是
+					// 生效的，但不能靠「目前看」—— 回读一次把漏掉的逐个删，报的也是实际值。
+					let swept = 0;
+					for (const w of (await eda.sch_PrimitiveWire.getAll()) || []) {
+						try { if (await eda.sch_PrimitiveWire.delete(w.primitiveId)) swept += 1; } catch (e) {}
+					}
+					const stillLeft = ((await eda.sch_PrimitiveWire.getAll()) || []).length;
+					return { removed: ids.length, swept_one_by_one: swept, still_left: stillLeft };
 				`,
 				);
 				await runStep(
@@ -635,7 +643,14 @@ export const mapApplyTools: ToolDef[] = [
 						.filter(function (c) { return c.componentType === 'netflag' || c.componentType === 'netport'; })
 						.map(function (c) { return c.primitiveId; });
 					if (ids.length) await eda.sch_PrimitiveComponent.delete(ids);
-					return { removed: ids.length };
+					// 同上：回读补删，别信批量删除的返回值
+					const isFlag = function (c) { return c.componentType === 'netflag' || c.componentType === 'netport'; };
+					let swept = 0;
+					for (const c of ((await eda.sch_PrimitiveComponent.getAll()) || []).filter(isFlag)) {
+						try { if (await eda.sch_PrimitiveComponent.delete(c.primitiveId)) swept += 1; } catch (e) {}
+					}
+					const stillLeft = ((await eda.sch_PrimitiveComponent.getAll()) || []).filter(isFlag).length;
+					return { removed: ids.length, swept_one_by_one: swept, still_left: stillLeft };
 				`,
 				);
 				await runStep(
