@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 12e4;
-var VERSION = "0.1.69";
+var VERSION = "0.1.70";
 var Bridge = class {
   http = null;
   wss = null;
@@ -21607,6 +21607,51 @@ function unpackMap(rawAfterMark) {
     return JSON.parse(rawAfterMark.replace(/[\r\n]+/g, ""));
   }
 }
+function saveMapCode(payload, x, y) {
+  return `
+		const PAYLOAD = ${JSON.stringify(payload)};
+		const MARK = ${JSON.stringify(MAP_MARK)};
+		const findMaps = async function () {
+			return ((await eda.sch_PrimitiveText.getAll()) || []).filter(function (t) {
+				return String(t.content || '').indexOf(MARK) === 0;
+			});
+		};
+
+		const olds = (await findMaps()).map(function (t) { return t.primitiveId; });
+		if (olds.length) await eda.sch_PrimitiveText.delete(olds);
+		await new Promise(function (r) { setTimeout(r, 400); });
+
+		const made = await eda.sch_PrimitiveText.create(${x}, ${y}, PAYLOAD);
+		if (!made) return { ok: false, error: '\u5730\u56FE\u5199\u5165\u5931\u8D25', removed_old: olds.length };
+
+		// \u56DE\u8BFB\uFF1A\u4E0A\u9762\u90A3\u6B21\u5220\u53EF\u80FD\u56E0\u4E3A\u7F13\u5B58\u6F0F\u6389\u4E86\u51E0\u4EFD\uFF0C\u8FD9\u91CC\u628A\u9664\u81EA\u5DF1\u4EE5\u5916\u7684\u90FD\u6E05\u6389
+		await new Promise(function (r) { setTimeout(r, 600); });
+		let all = await findMaps();
+		let cleanedExtra = 0;
+		if (all.length > 1) {
+			const dup = all
+				.filter(function (t) { return t.primitiveId !== made.primitiveId; })
+				.map(function (t) { return t.primitiveId; });
+			if (dup.length) {
+				await eda.sch_PrimitiveText.delete(dup);
+				cleanedExtra = dup.length;
+				await new Promise(function (r) { setTimeout(r, 400); });
+				all = await findMaps();
+			}
+		}
+
+		const got = all.filter(function (t) { return t.primitiveId === made.primitiveId; })[0];
+		const len = got ? String(got.content || '').length : 0;
+		return {
+			ok: len === PAYLOAD.length && all.length === 1,
+			copies: all.length,
+			removed_old: olds.length,
+			cleaned_extra: cleanedExtra,
+			bytes: PAYLOAD.length,
+			read_back: len,
+		};
+	`;
+}
 
 // src/layout/trace.ts
 var Trace = class {
@@ -22588,17 +22633,7 @@ var mapApplyTools = [
         map.meta.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
         const payload = packMap(map);
         mapSaved = await ctx2.exec(
-          `
-					${ENSURE_SCH2}
-					const PAYLOAD = ${JSON.stringify(payload)};
-					const MARK = ${JSON.stringify(MARK)};
-					const stale = (await eda.sch_PrimitiveText.getAll())
-						.filter(function (t) { return String(t.content || '').indexOf(MARK) === 0; })
-						.map(function (t) { return t.primitiveId; });
-					if (stale.length) await eda.sch_PrimitiveText.delete(stale);
-					const t = await eda.sch_PrimitiveText.create(-400, -400, PAYLOAD);
-					return { ok: !!t, bytes: PAYLOAD.length };
-				`,
+          `${ENSURE_SCH2}${saveMapCode(packMap(map), -400, -400)}`,
           12e4
         );
       }
@@ -22661,25 +22696,7 @@ var mapTools = [
       map.meta = { ...map.meta ?? { sheet: { w: 1170, h: 825 }, grid: 10 }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
       const payload = packMap(map);
       const r = await ctx2.exec(
-        `
-				${ENSURE_SCH3}
-				const PAYLOAD = ${JSON.stringify(payload)};
-				const MARK = ${JSON.stringify(MARK2)};
-				// \u5148\u6E05\u6389\u65E7\u5730\u56FE\uFF0C\u907F\u514D\u8BFB\u7684\u65F6\u5019\u649E\u89C1\u4E24\u4EFD
-				const olds = (await eda.sch_PrimitiveText.getAll())
-					.filter(function (t) { return String(t.content || '').indexOf(MARK) === 0; })
-					.map(function (t) { return t.primitiveId; });
-				if (olds.length) await eda.sch_PrimitiveText.delete(olds);
-				const removed = olds.length;
-				// \u7B7E\u540D\u662F create(x, y, text)\uFF0C\u5750\u6807\u5728\u524D
-				const t = await eda.sch_PrimitiveText.create(${MAP_X}, ${MAP_Y}, PAYLOAD);
-				if (!t) return { ok: false, error: '\u5730\u56FE\u5199\u5165\u5931\u8D25' };
-				await new Promise((r) => setTimeout(r, 400));
-				const back = await eda.sch_PrimitiveText.getAll();
-				const got = back.filter((x) => x.primitiveId === t.primitiveId)[0];
-				const len = got ? String(got.content || '').length : 0;
-				return { ok: len === PAYLOAD.length, removed_old: removed, bytes: PAYLOAD.length, read_back: len };
-			`,
+        `${ENSURE_SCH3}${saveMapCode(payload, MAP_X, MAP_Y)}`,
         12e4
       );
       return {
@@ -22769,11 +22786,19 @@ var mapTools = [
 				const all = await eda.sch_PrimitiveComponent.getAll();
 				const parts = [];
 				const pinRefs = [];
+				const skipped = [];
 				for (const c of all) {
 					if (c.componentType !== 'part') continue;
 					const bb = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => null);
 					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
 					const des = String(c.designator || '');
+					// \u56FE\u7EB8\u6807\u9898\u680F\uFF08Drawing-Symbol_*\uFF09\u4E5F\u662F part\uFF0C\u4F46\u5B83\u6CA1\u6709\u5F15\u811A\uFF0C\u4F4D\u53F7\u4E5F\u662F\u7A7A\u7684\u3002
+					// \u6536\u8FDB\u5730\u56FE\u4F1A\u8BA9 validateMap \u76F4\u63A5\u62D2\u6536\uFF08\u300C \u6CA1\u6709\u5F15\u811A\u300D\uFF09\uFF0C\u800C\u4E14\u5B83\u6839\u672C\u4E0D\u662F
+					// \u7535\u8DEF\u7684\u4E00\u90E8\u5206 \u2014\u2014 \u5224\u636E\u548C\u4F53\u68C0\u90A3\u8FB9\u4E00\u81F4\uFF1A\u65E0\u5F15\u811A\u5373\u56FE\u7EB8\u88C5\u9970\u3002
+					if (!pins || !pins.length || !des.trim()) {
+						skipped.push({ primitiveId: c.primitiveId, xy: [c.x, c.y], reason: !des.trim() ? '\u4F4D\u53F7\u4E3A\u7A7A' : '\u6CA1\u6709\u5F15\u811A' });
+						continue;
+					}
 					parts.push({
 						id: des,
 						primitiveId: c.primitiveId,
@@ -22881,6 +22906,7 @@ var mapTools = [
 					parts: parts,
 					nets: nets,
 					wire_segments: segs.length,
+					skipped_decorations: skipped,
 				};
 			`,
         18e4
@@ -25316,7 +25342,7 @@ if (dupes.length) {
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.69";
+var VERSION2 = "0.1.70";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var currentToolIsMutating = false;

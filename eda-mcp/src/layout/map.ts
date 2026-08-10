@@ -213,3 +213,60 @@ export function unpackMap(rawAfterMark: string): SchematicMap {
 		return JSON.parse(rawAfterMark.replace(/[\r\n]+/g, '')) as SchematicMap;
 	}
 }
+
+/**
+ * 存地图的标准流程，`eda_map_save` 与 `eda_map_apply` 共用。
+ *
+ * 地图是这张图的真相源，**图上只能有一份**。之前两处各写了一遍"先按标记
+ * 删旧的、再创建新的"，看着没错，实际会累积 —— `getAll()` 有缓存，删的
+ * 时候读到的是旧列表，漏掉的那些就永远留在图上了。实测 T6 攒了 12 份，
+ * 新旧格式混杂，根本分不清哪份算数。
+ *
+ * 所以：删完写完还要**回读确认只剩一份**，多出来的当场清掉（铁律 8 ——
+ * 写操作的返回值只作参考，真相靠回读）。返回 copies 让调用方能自己判断。
+ */
+export function saveMapCode(payload: string, x: number, y: number): string {
+	return `
+		const PAYLOAD = ${JSON.stringify(payload)};
+		const MARK = ${JSON.stringify(MAP_MARK)};
+		const findMaps = async function () {
+			return ((await eda.sch_PrimitiveText.getAll()) || []).filter(function (t) {
+				return String(t.content || '').indexOf(MARK) === 0;
+			});
+		};
+
+		const olds = (await findMaps()).map(function (t) { return t.primitiveId; });
+		if (olds.length) await eda.sch_PrimitiveText.delete(olds);
+		await new Promise(function (r) { setTimeout(r, 400); });
+
+		const made = await eda.sch_PrimitiveText.create(${x}, ${y}, PAYLOAD);
+		if (!made) return { ok: false, error: '地图写入失败', removed_old: olds.length };
+
+		// 回读：上面那次删可能因为缓存漏掉了几份，这里把除自己以外的都清掉
+		await new Promise(function (r) { setTimeout(r, 600); });
+		let all = await findMaps();
+		let cleanedExtra = 0;
+		if (all.length > 1) {
+			const dup = all
+				.filter(function (t) { return t.primitiveId !== made.primitiveId; })
+				.map(function (t) { return t.primitiveId; });
+			if (dup.length) {
+				await eda.sch_PrimitiveText.delete(dup);
+				cleanedExtra = dup.length;
+				await new Promise(function (r) { setTimeout(r, 400); });
+				all = await findMaps();
+			}
+		}
+
+		const got = all.filter(function (t) { return t.primitiveId === made.primitiveId; })[0];
+		const len = got ? String(got.content || '').length : 0;
+		return {
+			ok: len === PAYLOAD.length && all.length === 1,
+			copies: all.length,
+			removed_old: olds.length,
+			cleaned_extra: cleanedExtra,
+			bytes: PAYLOAD.length,
+			read_back: len,
+		};
+	`;
+}

@@ -5,7 +5,7 @@
  * 换台机器、别人打开工程，地图都还在，才谈得上「下次接着优化」。
  * 载体选了 sch_PrimitiveText：实测单个文字图元存 60000 字符仍然无损。
  */
-import { EMPTY_MAP, MAP_MARK, type SchematicMap, guessNetKind, defaultStyle, packMap, unpackMap, validateMap } from '../layout/map.js';
+import { EMPTY_MAP, MAP_MARK, defaultStyle, guessNetKind, packMap, saveMapCode, unpackMap, validateMap, type SchematicMap } from '../layout/map.js';
 import type { ToolDef } from './types.js';
 
 const ENSURE_SCH = `
@@ -47,25 +47,7 @@ export const mapTools: ToolDef[] = [
 			const payload = packMap(map);
 
 			const r = await ctx.exec<Record<string, unknown>>(
-				`
-				${ENSURE_SCH}
-				const PAYLOAD = ${JSON.stringify(payload)};
-				const MARK = ${JSON.stringify(MARK)};
-				// 先清掉旧地图，避免读的时候撞见两份
-				const olds = (await eda.sch_PrimitiveText.getAll())
-					.filter(function (t) { return String(t.content || '').indexOf(MARK) === 0; })
-					.map(function (t) { return t.primitiveId; });
-				if (olds.length) await eda.sch_PrimitiveText.delete(olds);
-				const removed = olds.length;
-				// 签名是 create(x, y, text)，坐标在前
-				const t = await eda.sch_PrimitiveText.create(${MAP_X}, ${MAP_Y}, PAYLOAD);
-				if (!t) return { ok: false, error: '地图写入失败' };
-				await new Promise((r) => setTimeout(r, 400));
-				const back = await eda.sch_PrimitiveText.getAll();
-				const got = back.filter((x) => x.primitiveId === t.primitiveId)[0];
-				const len = got ? String(got.content || '').length : 0;
-				return { ok: len === PAYLOAD.length, removed_old: removed, bytes: PAYLOAD.length, read_back: len };
-			`,
+				`${ENSURE_SCH}${saveMapCode(payload, MAP_X, MAP_Y)}`,
 				120_000,
 			);
 			return {
@@ -163,11 +145,19 @@ export const mapTools: ToolDef[] = [
 				const all = await eda.sch_PrimitiveComponent.getAll();
 				const parts = [];
 				const pinRefs = [];
+				const skipped = [];
 				for (const c of all) {
 					if (c.componentType !== 'part') continue;
 					const bb = await eda.sch_Primitive.getPrimitivesBBox([c.primitiveId]).catch(() => null);
 					const pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(c.primitiveId).catch(() => []);
 					const des = String(c.designator || '');
+					// 图纸标题栏（Drawing-Symbol_*）也是 part，但它没有引脚，位号也是空的。
+					// 收进地图会让 validateMap 直接拒收（「 没有引脚」），而且它根本不是
+					// 电路的一部分 —— 判据和体检那边一致：无引脚即图纸装饰。
+					if (!pins || !pins.length || !des.trim()) {
+						skipped.push({ primitiveId: c.primitiveId, xy: [c.x, c.y], reason: !des.trim() ? '位号为空' : '没有引脚' });
+						continue;
+					}
 					parts.push({
 						id: des,
 						primitiveId: c.primitiveId,
@@ -275,6 +265,7 @@ export const mapTools: ToolDef[] = [
 					parts: parts,
 					nets: nets,
 					wire_segments: segs.length,
+					skipped_decorations: skipped,
 				};
 			`,
 				180_000,

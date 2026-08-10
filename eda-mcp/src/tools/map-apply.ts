@@ -6,7 +6,7 @@
  */
 import { layoutByGroups } from '../layout/group.js';
 import { FAN_BASE, FAN_STEP, FLAG_LONG, FLAG_WIDE, LABEL_SLOTS, dirVec, effectiveBox, pinWorld, type Layout, type Net, type Part, type Rotation } from '../layout/model.js';
-import { MAP_MARK, type NetKind, type SchematicMap, defaultStyle, packMap, unpackMap } from '../layout/map.js';
+import { MAP_MARK, defaultStyle, packMap, saveMapCode, unpackMap, type NetKind, type SchematicMap } from '../layout/map.js';
 import { Trace, checkRouteEndpoints } from '../layout/trace.js';
 import type { ToolDef } from './types.js';
 import { census, diffCensus, verifyPlaced } from './verify.js';
@@ -732,17 +732,7 @@ export const mapApplyTools: ToolDef[] = [
 				map.meta.updatedAt = new Date().toISOString();
 				const payload = packMap(map);
 				mapSaved = await ctx.exec<Record<string, unknown>>(
-					`
-					${ENSURE_SCH}
-					const PAYLOAD = ${JSON.stringify(payload)};
-					const MARK = ${JSON.stringify(MARK)};
-					const stale = (await eda.sch_PrimitiveText.getAll())
-						.filter(function (t) { return String(t.content || '').indexOf(MARK) === 0; })
-						.map(function (t) { return t.primitiveId; });
-					if (stale.length) await eda.sch_PrimitiveText.delete(stale);
-					const t = await eda.sch_PrimitiveText.create(-400, -400, PAYLOAD);
-					return { ok: !!t, bytes: PAYLOAD.length };
-				`,
+					`${ENSURE_SCH}${saveMapCode(packMap(map), -400, -400)}`,
 					120_000,
 				);
 			}
