@@ -221,22 +221,44 @@ export const mapApplyTools: ToolDef[] = [
 				pinXY,
 			);
 
-			// ── 电源地符号：直接放在引脚上，不画引出线 ──
+			// ── 电源地符号与跨区端口：沿引脚方向阶梯式引出 ──
 			//
-			// 试过两版引出线，都会造成**真短路**：
-			//   沿引脚方向直着拉 → 一排水平引脚的 stub 落在同一条 y 线上首尾相接
-			//   改成 L 形转向   → 转向后在垂直方向又互相撞上，反而并了五条网络
-			// 根子在于 stub 不参与 A* 避让，在密集区怎么走都会碰到别人；这些线
-			// 又刻意不带网络名，碰上就是一条连通导线 —— DRC 不报，肉眼只看到
-			// "几个符号排成一列"。
+			//     1 ──────── 电源
+			//     2 ──────────────── 接地
+			//     3 ──────────────────────── 输入输出
 			//
-			// 所以不画线，符号直接落在引脚上：EDA 里 netflag 放在引脚位置就表示
-			// 该引脚接入该网络，手工画图也是这么做的。代价是相邻引脚的符号可能
-			// 视觉重叠（芯片引脚间距只有 10），但那是可读性问题，比电气短路轻。
-			// 真要把符号分开，正解是让 stub 也走 A* 避让 —— 那是后话。
-			const flags: Array<{ kind: string; net: string; x: number; y: number }> = [];
-			for (const n of symbolNets) {
-				const kind = FLAG_OF[n.kind];
+			// 同一侧的引脚本来就差着 10，只要引出长度逐级拉开，几条线天然平行、
+			// 末端的符号自然错成阶梯 —— 不用转向，也就不会有「引出线拐进器件
+			// 内部把两极短接」那种事（上一版对称扇形就栽在这）。
+			//
+			// 之前误判过一次：见到一堆 stub 落在同一条 y 线上首尾相接，就以为
+			// 直线引出行不通。其实那是**不同器件**碰巧排在同一水平线上，跟同
+			// 一个芯片的多引脚扇出是两码事 —— 后者引脚 y 各不相同，压根不会
+			// 碰。跨器件的冲突另外用占位表处理。
+			const FAN_BASE = 40; // 第一根引出多远
+			const FAN_STEP = 50; // 每往外一位加长多少（要够符号连文字的宽度）
+			/**
+			 * 落点一律对齐到 5 的倍数：**createNetFlag 会把坐标吸附到 5 的倍数，
+			 * 而 sch_PrimitiveWire.create 不吸附** —— 线停在 917.5、符号被吸到
+			 * 920，差 5 刚好连不上，引脚就成了孤儿。
+			 */
+			const q5 = (v: number) => Math.round(v / 5) * 5;
+
+			type StubPin = {
+				what: 'flag' | 'port';
+				kind: string;
+				net: string;
+				x: number;
+				y: number;
+				vx: number;
+				vy: number;
+			};
+			// 按「器件 + 引出方向」归组。电源地符号和跨区端口**必须一起归组**：
+			// 它们挂在同一排引脚上，各排各的必然撞。
+			const clusters = new Map<string, StubPin[]>();
+			for (const n of [...symbolNets, ...portNets]) {
+				const isPort = (n.style ?? defaultStyle(n.kind)) === 'port';
+				const kind = isPort ? 'BI' : FLAG_OF[n.kind];
 				if (!kind) continue;
 				for (const ref of n.pins) {
 					const dot = ref.lastIndexOf('.');
@@ -248,31 +270,92 @@ export const mapApplyTools: ToolDef[] = [
 					const pin = part.pins.find((q) => q.id === ref.slice(dot + 1));
 					if (!pin) continue;
 					const w = pinWorld(part, pl, pin);
-					flags.push({ kind, net: n.id, x: w.x, y: w.y });
+					const [vx, vy] = dirVec(w.dir);
+					const key = `${des}|${vx},${vy}`;
+					clusters.set(key, [
+						...(clusters.get(key) ?? []),
+						{ what: isPort ? 'port' : 'flag', kind, net: n.id, x: w.x, y: w.y, vx, vy },
+					]);
 				}
 			}
 
-			// 跨区网络用端口。它们不参与布线，靠同名端口相连。
-			// 判据是**地图声明的 style**，不是 res.crossGroupNets ——
-			// 后者由 layoutByGroups 从它收到的网络里算，而 port 网络压根没传给它，
-			// 于是那个列表恒为空、端口一个也画不出来。AI 说了用端口就画端口。
-			const ports: Array<{ dir: string; net: string; x: number; y: number; ex: number; ey: number }> = [];
-			for (const n of portNets) {
-				for (const ref of n.pins) {
-					const dot = ref.lastIndexOf('.');
-					if (dot <= 0) continue;
-					const des = ref.slice(0, dot);
-					const part = parts.get(des);
-					const pl = res.layout.get(des);
-					if (!part || !pl) continue;
-					const pin = part.pins.find((q) => q.id === ref.slice(dot + 1));
-					if (!pin) continue;
-					const w = pinWorld(part, pl, pin);
-					const [vx, vy] = dirVec(w.dir);
-					const L = 50;
-					ports.push({ dir: 'BI', net: n.id, x: w.x, y: w.y, ex: w.x + vx * L, ey: w.y + vy * L });
-				}
+			type Placed = { kind: string; net: string; x: number; y: number; ex: number; ey: number };
+			const flags: Placed[] = [];
+			const ports: Array<Placed & { dir: string }> = [];
+
+			// 跨器件的冲突：落点不能撞，引出线经过的格子也不能被别的网络占着。
+			// 同网络共用没关系，本来就该连在一起。
+			const takenSpots = new Set<string>();
+			const spotKey = (x: number, y: number) => `${Math.round(x / 45)},${Math.round(y / 45)}`;
+			const occupiedCells = new Map<string, string>();
+			// 格子键必须先量化再拼字符串。引脚世界坐标是浮点算出来的，带着
+			// 169.9999999999999 这种尾巴 —— 直接拼进键里，"1140,270" 和
+			// "1140,270.0000001" 就是两个不同的键，占位表整个形同虚设：
+			// 实测 C1 的 GND 向下引、C2 的 +3V3 向上引，在 (1140,250) 正面撞上
+			// 接成一条，两条网络短路，而避让逻辑一无所知。
+			const cellsAlong = (x1: number, y1: number, x2: number, y2: number): string[] => {
+				const out: string[] = [];
+				const ax = q5(x1);
+				const ay = q5(y1);
+				const bx = q5(x2);
+				const by = q5(y2);
+				const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) / 5;
+				const sx = Math.sign(bx - ax);
+				const sy = Math.sign(by - ay);
+				for (let i = 0; i <= steps; i += 1) out.push(`${ax + sx * i * 5},${ay + sy * i * 5}`);
+				return out;
+			};
+
+			for (const group of clusters.values()) {
+				// 沿垂直于引出方向排序，阶梯才是单调的、线不会交叉
+				const horizontal = group[0]?.vx !== 0;
+				group.sort((a, b) => (horizontal ? a.y - b.y : a.x - b.x));
+				group.forEach((g, idx) => {
+					// 让不开就**贴回引脚**，绝不无限往外拉。
+					// 实测放任它让下去，一个 GND 符号被推到 y=-920，那条纵贯
+					// 整张图的引出线一路碰到别的引脚，反而制造出新的短路 ——
+					// 为了好看把电路搞坏，不划算。贴在引脚上虽然可能和邻居的
+					// 符号视觉重叠，但电气上一定是对的。
+					const maxLen = FAN_BASE + (idx + 3) * FAN_STEP;
+					let len = FAN_BASE + idx * FAN_STEP;
+					let ex = g.x;
+					let ey = g.y;
+					let cells: string[] = [];
+					let placedOut = false;
+					while (len <= maxLen) {
+						const tx = q5(g.x + g.vx * len);
+						const ty = q5(g.y + g.vy * len);
+						const path = cellsAlong(g.x, g.y, tx, ty);
+						const clash =
+							takenSpots.has(spotKey(tx, ty)) ||
+							path.some((c) => {
+								const owner = occupiedCells.get(c);
+								return owner != null && owner !== g.net;
+							});
+						if (!clash) {
+							ex = tx;
+							ey = ty;
+							cells = path;
+							placedOut = true;
+							break;
+						}
+						len += FAN_STEP;
+					}
+					if (!placedOut) {
+						// 退化：符号直接落在引脚上，不画引出线
+						ex = q5(g.x);
+						ey = q5(g.y);
+						cells = [];
+					}
+					takenSpots.add(spotKey(ex, ey));
+					for (const c of cells) occupiedCells.set(c, g.net);
+					const placed = { kind: g.kind, net: g.net, x: g.x, y: g.y, ex, ey };
+					if (g.what === 'port') ports.push({ ...placed, dir: 'BI' });
+					else flags.push(placed);
+				});
 			}
+
+// 端口落点已在上面那套阶梯引出里一起算好（与电源地符号同组错开）。
 
 			const summary = {
 				parts: parts.size,
@@ -425,8 +508,13 @@ export const mapApplyTools: ToolDef[] = [
 				const FLAGS = ${JSON.stringify(flags)};
 				let n = 0;
 				for (const f of FLAGS) {
-					// 不画引出线 —— 那是短路的来源，见 map-apply.ts 里的说明
-					if (await eda.sch_PrimitiveComponent.createNetFlag(f.kind, f.net, f.x, f.y, 0)) n += 1;
+					// 引出线不带网络名 —— 带了会让导线的 NET 标签和符号名把同一个
+					// 网络名画两遍。沿引脚方向一条直线，不转向。
+					// 退化成贴引脚时 ex/ey 就是引脚本身，不必画零长度的线
+					if (f.ex !== f.x || f.ey !== f.y) {
+						await eda.sch_PrimitiveWire.create([f.x, f.y, f.ex, f.ey]).catch(() => {});
+					}
+					if (await eda.sch_PrimitiveComponent.createNetFlag(f.kind, f.net, f.ex, f.ey, 0)) n += 1;
 				}
 				return { drawn: n, total: FLAGS.length };
 			`,
@@ -438,7 +526,9 @@ export const mapApplyTools: ToolDef[] = [
 				const PORTS = ${JSON.stringify(ports)};
 				let n = 0;
 				for (const p of PORTS) {
-					await eda.sch_PrimitiveWire.create([p.x, p.y, p.ex, p.ey]).catch(() => {});
+					if (p.ex !== p.x || p.ey !== p.y) {
+						await eda.sch_PrimitiveWire.create([p.x, p.y, p.ex, p.ey]).catch(() => {});
+					}
 					if (await eda.sch_PrimitiveComponent.createNetPort(p.dir, p.net, p.ex, p.ey, 0)) n += 1;
 				}
 				return { drawn: n, total: PORTS.length };
