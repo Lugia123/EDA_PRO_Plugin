@@ -8,7 +8,7 @@
  *
  *   node scripts/test-model.mjs
  */
-import { pinLocal, pinWorld } from '../dist/model.mjs';
+import { effectiveBox, partBox, pinLocal, pinWorld } from '../dist/model.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -91,6 +91,59 @@ const p2 = part.pins[1];
 		}
 	}
 	check('pinLocal 是 pinWorld 的逆（16 种组合）', ok, bad.slice(0, 3));
+}
+
+
+// ── effectiveBox：扇出区要算进器件的地盘 ──
+// design.md §4.11：芯片的引脚展开区是芯片的一部分，别人该避开它。
+{
+	// 三脚器件，引脚都在左侧、间距 10（AMS1117 就是这个形状）
+	const chip = {
+		id: 'U',
+		w: 90,
+		h: 40,
+		pins: [
+			{ id: '1', dx: -45, dy: 10, dir: 180 },
+			{ id: '2', dx: -45, dy: 0, dir: 180 },
+			{ id: '3', dx: -45, dy: -10, dir: 180 },
+		],
+	};
+	const pl = { x: 500, y: 500, rot: 0, mirror: false };
+
+	const plain = partBox(chip, pl);
+	check('没有 stubPins 时退化成 partBox', JSON.stringify(effectiveBox(chip, pl)) === JSON.stringify(plain));
+
+	// 三个引脚都挂符号
+	const withStubs = { ...chip, stubPins: ['1', '2', '3'] };
+	const eb = effectiveBox(withStubs, pl);
+	check('挂了符号后向左扩展', eb.minX < plain.minX, { eb, plain });
+	// 三根阶梯：40 / 90 / 140，末端再加符号 45 —— 最远约 185
+	const reach = plain.minX - eb.minX;
+	check('扩展量够放下最长那根阶梯', reach >= 140 + 45 - 5, { reach });
+	check('没挂符号的方向不扩展', eb.maxX === plain.maxX, { eb, plain });
+
+	// 只挂一个：只需一档
+	const one = { ...chip, stubPins: ['2'] };
+	const eb1 = effectiveBox(one, pl);
+	check('只挂一个符号时扩展更少', plain.minX - eb1.minX < reach, {
+		one: plain.minX - eb1.minX,
+		three: reach,
+	});
+}
+
+// ── 扇出方向跟着旋转走 ──
+{
+	const chip = {
+		id: 'U',
+		w: 90,
+		h: 40,
+		pins: [{ id: '1', dx: -45, dy: 0, dir: 180 }],
+		stubPins: ['1'],
+	};
+	const up = effectiveBox(chip, { x: 500, y: 500, rot: 90, mirror: false });
+	const plainUp = partBox(chip, { x: 500, y: 500, rot: 90, mirror: false });
+	// 转 90° 后引脚朝下（180+90=270），扇出应该往下扩
+	check('旋转 90° 后扇出朝下扩展', up.minY < plainUp.minY && up.maxY === plainUp.maxY, { up, plainUp });
 }
 
 console.log(`\n${pass} 通过, ${fail} 失败`);

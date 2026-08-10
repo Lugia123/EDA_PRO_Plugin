@@ -5,7 +5,7 @@
  * 下次再 apply 就从上次的结果继续爬，不必从零开始。
  */
 import { layoutByGroups } from '../layout/group.js';
-import { LABEL_SLOTS, type Layout, type Net, type Part, type Rotation, dirVec, pinWorld } from '../layout/model.js';
+import { FAN_BASE, FAN_STEP, FLAG_LONG, FLAG_WIDE, LABEL_SLOTS, dirVec, pinWorld, type Layout, type Net, type Part, type Rotation } from '../layout/model.js';
 import { MAP_MARK, type NetKind, type SchematicMap, defaultStyle, packMap, unpackMap } from '../layout/map.js';
 import { Trace, checkRouteEndpoints } from '../layout/trace.js';
 import type { ToolDef } from './types.js';
@@ -239,8 +239,10 @@ export const mapApplyTools: ToolDef[] = [
 			// 直线引出行不通。其实那是**不同器件**碰巧排在同一水平线上，跟同
 			// 一个芯片的多引脚扇出是两码事 —— 后者引脚 y 各不相同，压根不会
 			// 碰。跨器件的冲突另外用占位表处理。
-			const FAN_BASE = 40; // 第一根引出多远
-			const FAN_STEP = 50; // 每往外一位加长多少（要够符号连文字的宽度）
+			// FAN_BASE / FAN_STEP / FLAG_LONG / FLAG_WIDE 都从 layout/model.ts 取 ——
+			// 布局按这套参数给引脚展开区留地方（effectiveBox），渲染按同一套真的
+			// 画出去。两边各写一份的话，留的和画的对不上：要么白留一大块，
+			// 要么符号又挤到邻居身上。
 			/**
 			 * 落点一律对齐到 5 的倍数：**createNetFlag 会把坐标吸附到 5 的倍数，
 			 * 而 sch_PrimitiveWire.create 不吸附** —— 线停在 917.5、符号被吸到
@@ -326,8 +328,6 @@ export const mapApplyTools: ToolDef[] = [
 			 * 更宽），器件一大，**横向**也会压到邻居那根线上。所以把整个包围盒
 			 * 都登记进占位表，而不是只占落点那一个格子。
 			 */
-			const FLAG_LONG = 45; // 沿朝向方向伸出多少
-			const FLAG_WIDE = 40; // 垂直于朝向的宽度（文字主要占这边）
 			const occupiedCells = new Map<string, string>();
 			// 格子键必须先量化再拼字符串。引脚世界坐标是浮点算出来的，带着
 			// 169.9999999999999 这种尾巴 —— 直接拼进键里，"1140,270" 和

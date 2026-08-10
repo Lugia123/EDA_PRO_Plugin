@@ -54,6 +54,19 @@ export interface Part {
 /** 电源／地符号连引出线占的地方，约一格半见方 */
 export const SYMBOL_RESERVE = 55;
 
+/**
+ * 阶梯扇出的几何参数。
+ *
+ * **布局与渲染必须用同一份** —— 布局按这个给引脚展开区留地方，渲染按这个
+ * 真的画出去。两边各写一套的话，留的地方和画的位置对不上，要么白留一大块，
+ * 要么符号又挤到邻居身上。
+ */
+export const FAN_BASE = 40;
+export const FAN_STEP = 50;
+/** 符号连网络名文字占的地盘：沿朝向 FLAG_LONG，垂直于朝向 FLAG_WIDE */
+export const FLAG_LONG = 45;
+export const FLAG_WIDE = 40;
+
 /** 一条连接需求：把这些引脚接到一起 */
 export interface Net {
 	id: string;
@@ -172,6 +185,57 @@ export function partBox(part: Part, pl: Placement): Box {
 	const w = swap ? part.h : part.w;
 	const h = swap ? part.w : part.h;
 	return { minX: pl.x - w / 2, minY: pl.y - h / 2, maxX: pl.x + w / 2, maxY: pl.y + h / 2 };
+}
+
+/**
+ * 器件的**有效**包围盒：本体 ＋ 引脚扇出区。
+ *
+ * 芯片的引脚展开区是芯片的一部分，别人该避开它 —— 这是 design.md §4.11
+ * 的核心判断。之前扇出排在最后、只能在别人留下的缝里挤，于是补了一层又一层
+ * 避让；把展开区算进包围盒之后，后面层的器件是被布局算法**挡在外面**的，
+ * 扇出不必再自己去躲。
+ *
+ * 按引脚朝向分组，组内沿垂直方向排序、逐级伸长（和渲染那套阶梯一致），
+ * 末端再算上符号连文字的地盘。没有 stubPins 的器件就退化成 partBox。
+ */
+export function effectiveBox(part: Part, pl: Placement): Box {
+	const box = partBox(part, pl);
+	const stubs = part.stubPins ?? [];
+	if (!stubs.length) return box;
+
+	const groups = new Map<string, Array<{ x: number; y: number; vx: number; vy: number }>>();
+	for (const pid of stubs) {
+		const pin = part.pins.find((q) => q.id === pid);
+		if (!pin) continue;
+		const w = pinWorld(part, pl, pin);
+		const [vx, vy] = dirVec(w.dir);
+		const k = `${vx},${vy}`;
+		groups.set(k, [...(groups.get(k) ?? []), { x: w.x, y: w.y, vx, vy }]);
+	}
+
+	let { minX, minY, maxX, maxY } = box;
+	for (const list of groups.values()) {
+		const horizontal = (list[0]?.vx ?? 0) !== 0;
+		list.sort((a, b) => (horizontal ? a.y - b.y : a.x - b.x));
+		list.forEach((g, idx) => {
+			const len = FAN_BASE + idx * FAN_STEP;
+			// 引出末端
+			const ex = g.x + g.vx * len;
+			const ey = g.y + g.vy * len;
+			// 末端还要摆下符号连文字：沿朝向 FLAG_LONG，横向 FLAG_WIDE
+			const along = FLAG_LONG;
+			const wide = FLAG_WIDE / 2;
+			const x0 = Math.min(g.x, ex + g.vx * along) - (horizontal ? 0 : wide);
+			const x1 = Math.max(g.x, ex + g.vx * along) + (horizontal ? 0 : wide);
+			const y0 = Math.min(g.y, ey + g.vy * along) - (horizontal ? wide : 0);
+			const y1 = Math.max(g.y, ey + g.vy * along) + (horizontal ? wide : 0);
+			minX = Math.min(minX, x0);
+			minY = Math.min(minY, y0);
+			maxX = Math.max(maxX, x1);
+			maxY = Math.max(maxY, y1);
+		});
+	}
+	return { minX, minY, maxX, maxY };
 }
 
 /** 两个盒子的重叠面积，不相交为 0 */

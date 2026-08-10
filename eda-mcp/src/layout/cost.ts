@@ -8,18 +8,7 @@
  * 优化阶段不做真实布线（太慢），用曼哈顿距离和线段相交做快速估计；
  * 收敛之后再跑一次真正的 A* 布线。
  */
-import {
-	type Box,
-	type Layout,
-	type Net,
-	type Part,
-	SYMBOL_RESERVE,
-	dirVec,
-	labelWorld,
-	overlapArea,
-	partBox,
-	pinWorld,
-} from './model.js';
+import { dirVec, effectiveBox, labelWorld, overlapArea, partBox, pinWorld, type Box, type Layout, type Net, type Part } from './model.js';
 
 export interface Weights {
 	/** 器件互相压住 —— 最严重，压住就没法看 */
@@ -129,25 +118,23 @@ export function evaluate(
 	weights: Weights = DEFAULT_WEIGHTS,
 ): CostBreakdown {
 	const ids = [...parts.keys()];
+	/**
+	 * 参与避让的是**有效包围盒**（本体 ＋ 引脚扇出区），不是本体。
+	 *
+	 * 芯片的引脚展开区是芯片的一部分 —— 别人该避开它（design.md §4.11）。
+	 * 之前这里是给每个挂符号的引脚外面放一个 55×55 的方块当占位，形状跟实际
+	 * 画出来的阶梯扇出对不上：留的地方不够长、又没按次序张开，符号照样挤到
+	 * 邻居身上。现在直接用 effectiveBox，布局留的地方和渲染画的位置同源。
+	 */
 	const boxes = new Map<string, Box>();
-	// 挂符号的引脚，在它朝外那一侧占一块地。符号本身不是 part，
-	// 不替它占位的话，布局一收紧符号就压到邻居身上了。
-	const reserved: Box[] = [];
+	/** 器件本体，判文字压不压在器件上时用它 —— 扇出区里放文字是允许的 */
+	const bodies = new Map<string, Box>();
 	for (const id of ids) {
 		const p = parts.get(id);
 		const pl = layout.get(id);
 		if (!p || !pl) continue;
-		boxes.set(id, partBox(p, pl));
-		for (const pid of p.stubPins ?? []) {
-			const pin = p.pins.find((q) => q.id === pid);
-			if (!pin) continue;
-			const w = pinWorld(p, pl, pin);
-			const [vx, vy] = dirVec(w.dir);
-			const cx = w.x + (vx * SYMBOL_RESERVE) / 2;
-			const cy = w.y + (vy * SYMBOL_RESERVE) / 2;
-			const half = SYMBOL_RESERVE / 2;
-			reserved.push({ minX: cx - half, minY: cy - half, maxX: cx + half, maxY: cy + half });
-		}
+		boxes.set(id, effectiveBox(p, pl));
+		bodies.set(id, partBox(p, pl));
 	}
 
 	// ── 器件重叠，以及「不重叠但贴太近」──
@@ -163,14 +150,6 @@ export function evaluate(
 			const gap = gapBetween(a, b);
 			// 只罚 0 到 MIN_GAP 之间的：已经重叠的交给 partOverlap，离得远的不管
 			if (gap >= 0 && gap < MIN_GAP) tooClose += MIN_GAP - gap;
-		}
-		// 别的器件压到本器件的符号占位上，同样算重叠
-		for (const rbox of reserved) {
-			const ov = overlapArea(a, rbox);
-			// 占位是从自己的引脚长出来的，跟自己重叠不算数
-			if (ov > 0 && !(rbox.minX >= a.minX && rbox.maxX <= a.maxX && rbox.minY >= a.minY && rbox.maxY <= a.maxY)) {
-				partOverlap += ov * 0.6;
-			}
 		}
 	}
 
@@ -192,8 +171,10 @@ export function evaluate(
 	for (let i = 0; i < texts.length; i++) {
 		const t = texts[i] as Box;
 		for (let j = i + 1; j < texts.length; j++) textOverlap += overlapArea(t, texts[j] as Box);
+		// 判文字压不压在器件上用**本体**，不用有效包围盒 ——
+		// 扇出区里本来就要放符号的网络名，那不算压。
 		for (const id of ids) {
-			const b = boxes.get(id);
+			const b = bodies.get(id);
 			if (b) textOverlap += overlapArea(t, b);
 		}
 	}
