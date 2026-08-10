@@ -226,6 +226,10 @@ export const layoutTools: ToolDef[] = [
 				// 符号朝向**固定**：地永远朝下、电源永远朝上，跟引脚朝哪无关。
 				// 这是原理图里最强的视觉约定 —— 按「背对器件」算会让朝上的引脚
 				// 挂出一个倒过来的地符号，实测 C3/C4 就是这么倒的。
+				//
+				// 两种符号都用 0：真机标定过 Power 原生朝上、Ground 原生朝下，
+				// 各自的 0 就是各自的正确姿势，不存在通用的角度映射
+				// （详见 map-apply.ts 的 flagRotOf 注释）。
 				const rot = 0;
 				flags.push({ net, x: w.x, y: w.y, ex, ey, rot });
 			}

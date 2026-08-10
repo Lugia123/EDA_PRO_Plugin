@@ -298,8 +298,13 @@ export const schematicEditTools: ToolDef[] = [
 
 					if (j.flag) {
 						// 电源 / 地：在引出线末端放符号。符号自带一个引脚，坐标即放置点，
-						// 与导线端点重合就连上了。旋转让符号朝外（背对器件）。
-						const fr = rot === 0 ? 270 : rot === 90 ? 180 : rot === 180 ? 90 : 0;
+						// 与导线端点重合就连上了。
+						//
+						// 朝向**固定为 0**，不跟引出方向走。真机标定过 Power 原生朝上、
+						// Ground 原生朝下，各自的 0 就是各自的正确姿势。此前按「背对器件」
+						// 算角度，朝上的引脚就会挂出一个倒过来的地符号 —— 方向是躲开了
+						// 邻居，可图上读不出那是接地。避让该靠引出线长度错开，不是转符号。
+						const fr = 0;
 						const fl = await eda.sch_PrimitiveComponent.createNetFlag(j.flag, j.net, ex, ey, fr);
 						if (fl) { flags += 1; done.push(j.des + '.' + p.pinNumber + '=' + j.net + '(符号)'); }
 						else failed.push({ ref: j.des + '.' + j.pin, why: '电源/地符号创建失败' });

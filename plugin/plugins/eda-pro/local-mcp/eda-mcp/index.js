@@ -19302,7 +19302,7 @@ var AUTH_TIMEOUT_MS = 6e4;
 var DEFAULT_EXEC_TIMEOUT_MS = 3e4;
 var HEARTBEAT_MS = 2e4;
 var RECONNECT_WAIT_MS = 12e4;
-var VERSION = "0.1.73";
+var VERSION = "0.1.74";
 var Bridge = class {
   http = null;
   wss = null;
@@ -22355,7 +22355,6 @@ var mapApplyTools = [
           if (g.vy > 0) return 180;
           return 0;
         }
-        if (g.kind === "Power") return 180;
         return 0;
       };
       const occupiedCells = /* @__PURE__ */ new Map();
@@ -24011,8 +24010,13 @@ var schematicEditTools = [
 
 					if (j.flag) {
 						// \u7535\u6E90 / \u5730\uFF1A\u5728\u5F15\u51FA\u7EBF\u672B\u7AEF\u653E\u7B26\u53F7\u3002\u7B26\u53F7\u81EA\u5E26\u4E00\u4E2A\u5F15\u811A\uFF0C\u5750\u6807\u5373\u653E\u7F6E\u70B9\uFF0C
-						// \u4E0E\u5BFC\u7EBF\u7AEF\u70B9\u91CD\u5408\u5C31\u8FDE\u4E0A\u4E86\u3002\u65CB\u8F6C\u8BA9\u7B26\u53F7\u671D\u5916\uFF08\u80CC\u5BF9\u5668\u4EF6\uFF09\u3002
-						const fr = rot === 0 ? 270 : rot === 90 ? 180 : rot === 180 ? 90 : 0;
+						// \u4E0E\u5BFC\u7EBF\u7AEF\u70B9\u91CD\u5408\u5C31\u8FDE\u4E0A\u4E86\u3002
+						//
+						// \u671D\u5411**\u56FA\u5B9A\u4E3A 0**\uFF0C\u4E0D\u8DDF\u5F15\u51FA\u65B9\u5411\u8D70\u3002\u771F\u673A\u6807\u5B9A\u8FC7 Power \u539F\u751F\u671D\u4E0A\u3001
+						// Ground \u539F\u751F\u671D\u4E0B\uFF0C\u5404\u81EA\u7684 0 \u5C31\u662F\u5404\u81EA\u7684\u6B63\u786E\u59FF\u52BF\u3002\u6B64\u524D\u6309\u300C\u80CC\u5BF9\u5668\u4EF6\u300D
+						// \u7B97\u89D2\u5EA6\uFF0C\u671D\u4E0A\u7684\u5F15\u811A\u5C31\u4F1A\u6302\u51FA\u4E00\u4E2A\u5012\u8FC7\u6765\u7684\u5730\u7B26\u53F7 \u2014\u2014 \u65B9\u5411\u662F\u8EB2\u5F00\u4E86
+						// \u90BB\u5C45\uFF0C\u53EF\u56FE\u4E0A\u8BFB\u4E0D\u51FA\u90A3\u662F\u63A5\u5730\u3002\u907F\u8BA9\u8BE5\u9760\u5F15\u51FA\u7EBF\u957F\u5EA6\u9519\u5F00\uFF0C\u4E0D\u662F\u8F6C\u7B26\u53F7\u3002
+						const fr = 0;
 						const fl = await eda.sch_PrimitiveComponent.createNetFlag(j.flag, j.net, ex, ey, fr);
 						if (fl) { flags += 1; done.push(j.des + '.' + p.pinNumber + '=' + j.net + '(\u7B26\u53F7)'); }
 						else failed.push({ ref: j.des + '.' + j.pin, why: '\u7535\u6E90/\u5730\u7B26\u53F7\u521B\u5EFA\u5931\u8D25' });
@@ -25392,7 +25396,7 @@ if (dupes.length) {
 var toolMap = new Map(allTools.map((t) => [t.name, t]));
 
 // src/index.ts
-var VERSION2 = "0.1.73";
+var VERSION2 = "0.1.74";
 var bridge = new Bridge();
 var server = new Server({ name: "eda-mcp", version: VERSION2 }, { capabilities: { tools: {} } });
 var currentToolIsMutating = false;
