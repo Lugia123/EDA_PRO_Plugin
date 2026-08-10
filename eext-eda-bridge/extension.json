@@ -3,7 +3,7 @@
 	"uuid": "3882b34b1908ac2c6a5de045f0efaa99",
 	"displayName": "EDA Bridge",
 	"description": "把立创EDA专业版接入 AI 编程工具（Claude Code 等）。仅与本机 127.0.0.1 上的 eda-mcp 通信，需配对后才能执行操作。",
-	"version": "0.1.71",
+	"version": "0.1.72",
 	"publisher": "EDA_PRO_Plugin",
 	"engines": {
 		"eda": "^3.2.0"

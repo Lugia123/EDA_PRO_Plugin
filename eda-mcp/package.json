@@ -1,6 +1,6 @@
 {
 	"name": "eda-mcp",
-	"version": "0.1.71",
+	"version": "0.1.72",
 	"private": true,
 	"description": "立创EDA专业版 本地 MCP Server —— 内置 bridge（WebSocket）与 EDA 扩展通信，esbuild bundle 后随 Claude Code plugin 分发（不走 npm registry）",
 	"type": "module",
