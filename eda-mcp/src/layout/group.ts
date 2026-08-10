@@ -142,10 +142,25 @@ export function layoutByGroups(
 			});
 		});
 
+		// 组内要比全局更「抱团」。组的语义就是这些器件是一伙的 —— 哪怕它们
+		// 之间没有一根直接的连线，也该挨在一起。
+		//
+		// 默认权重里 spread 只有 4，唯一的聚拢力来自连线长度；一旦某个组内部
+		// 是几条互不相连的支路，那几簇之间就没有任何力。实测 led 区的
+		// LED1-R2 和 LED2-R3 两对之间没有共同网络，结果被摆到相距 700，
+		// 一个组裂成两簇、还各自出了图纸，而每簇内部看着都挺合理。
+		const innerWeights: Weights = { ...weights, spread: weights.spread * 8 };
 		const inner = innerNets.get(g) ?? [];
-		const a = inner.length
-			? anneal(sub, inner, init, { iterations, weights, seed: seed + g.length * 31 })
-			: { layout: init, cost: evaluate(sub, [], init, weights), initialCost: evaluate(sub, [], init, weights), iterations: 0, accepted: 0 };
+		const a =
+			sub.size > 1
+				? anneal(sub, inner, init, { iterations, weights: innerWeights, seed: seed + g.length * 31 })
+				: {
+						layout: init,
+						cost: evaluate(sub, inner, init, innerWeights),
+						initialCost: evaluate(sub, inner, init, innerWeights),
+						iterations: 0,
+						accepted: 0,
+					};
 		const r = route(sub, inner, a.layout);
 
 		// 量出实际占地 —— 组框就是照这个画的

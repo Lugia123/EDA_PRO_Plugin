@@ -48,13 +48,20 @@ const COLLECT = `
 		return o;
 	};
 
+	// line 是**段列表**，每 4 个数一段 (x1,y1,x2,y2) —— 不是点序列。
+	// 按点序列（步长 2）解析会把上一段的终点和下一段的起点连成一条虚假的
+	// 斜线，凭空造出跨网络的连接：实测 RESET 因此被并进 GND，报出根本
+	// 不存在的短路。段内必然正交，可以拿这个自检解析对不对。
 	const segs = [];
 	for (const w of (await eda.sch_PrimitiveWire.getAll()) || []) {
 		const p = flat(w.line);
-		for (let i = 0; i + 3 < p.length; i += 2) {
+		for (let i = 0; i + 3 < p.length; i += 4) {
 			segs.push({ x1: p[i], y1: p[i + 1], x2: p[i + 2], y2: p[i + 3], net: String(w.net || '') });
 		}
 	}
+	// 解析自检：原理图导线一律正交，出现斜段就说明步长错了
+	let skew = 0;
+	for (const s of segs) { if (s.x1 !== s.x2 && s.y1 !== s.y2) skew += 1; }
 
 	const terms = [];
 	const parts = [];
@@ -108,11 +115,12 @@ const COLLECT = `
 		texts.push({ x: t.x, y: t.y, s: c.slice(0, 40) });
 	}
 
-	return { segs: segs, terms: terms, parts: parts, decorations: decorations, sheet: sheet, mapRaw: mapRaw, texts: texts };
+	return { skew: skew, segs: segs, terms: terms, parts: parts, decorations: decorations, sheet: sheet, mapRaw: mapRaw, texts: texts };
 `;
 
 interface Collected {
 	error?: string;
+	skew: number;
 	segs: Segment[];
 	terms: Terminal[];
 	parts: Array<{ des: string; xy: [number, number]; pins: number; box: { minX: number; minY: number; maxX: number; maxY: number } | null }>;
@@ -192,6 +200,7 @@ export const netcheckTools: ToolDef[] = [
 				diff.broken.length + diff.shorts.length + orphans.length + out.length + crossings.length;
 			return {
 				page_sheet: d.sheet ?? '读不到（titleBlockData 为空），本次跳过出框检查',
+				skew_segments: d.skew || undefined,
 				counted: {
 					parts: d.parts.length,
 					pins: d.terms.filter((t) => t.kind === 'pin').length,
